@@ -6,6 +6,7 @@ import fcntl
 import hashlib
 import io
 import json
+import logging
 import shutil
 import sqlite3
 import stat
@@ -16,10 +17,13 @@ from collections import Counter, defaultdict
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
+from http.client import IncompleteRead
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
+
+logger = logging.getLogger(__name__)
 
 BASE = "https://resultados.tse.jus.br/oficial"
 UFS = "ac al am ap ba ce df es go ma mg ms mt pa pb pe pi pr rj rn ro rr rs sc se sp to zz".split()
@@ -86,7 +90,7 @@ def configure_manifest(root, requested=None):
         raise ValueError(
             f"Incomplete previous copy exists: {temporary}; inspect it before retrying"
         )
-    print(f"Copying manifest to {target}; raw log files stay in {root}", flush=True)
+    logger.info(f"Copying manifest to {target}; raw log files stay in {root}")
     try:
         with closing(sqlite3.connect(temporary)) as destination:
             if source.exists():
@@ -472,19 +476,35 @@ class Collector:
                     body = b"".join(chunks)
                     expected = headers.get("Content-Length")
                     if expected is not None and len(body) != int(expected):
-                        raise ValueError("Truncated HTTP response")
+                        raise IncompleteRead(body, int(expected) - len(body))
                 break
-            except HTTPError as exc:
-                if exc.code in (403, 429):
-                    reason = f"HTTP {exc.code}; stopped to avoid extending a TSE block"
-                    self.abort(reason)
-                    raise RuntimeError(reason) from exc
-                if exc.code < 500 or attempt == 3:
+            except (HTTPError, URLError, TimeoutError, ConnectionError, IncompleteRead) as exc:
+                if isinstance(exc, HTTPError):
+                    if exc.code in (403, 429):
+                        reason = f"HTTP {exc.code}; stopped to avoid extending a TSE block"
+                        logger.error("%s: %s", url, reason)
+                        self.abort(reason)
+                        raise RuntimeError(reason) from exc
+                    if exc.code < 500 and exc.code != 408:
+                        logger.error("Request failed for %s: %s", url, exc)
+                        raise
+                if attempt == 3:
+                    logger.error(
+                        "Request failed for %s after %d attempts: %s: %s",
+                        url,
+                        attempt + 1,
+                        type(exc).__name__,
+                        exc,
+                    )
                     raise
-            except URLError as exc:
-                # DNS/network failures are environment problems; do not hammer the server.
-                self.abort(f"URLError: {exc}")
-                raise
+                logger.warning(
+                    "Request failed for %s (attempt %d/4): %s: %s; retrying in %ss",
+                    url,
+                    attempt + 1,
+                    type(exc).__name__,
+                    exc,
+                    2**attempt,
+                )
             if self.stop.wait(2**attempt):
                 raise CollectionStopped()
         if metadata:
@@ -584,6 +604,7 @@ class Collector:
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("data/tse/2026/turno-2"))
     parser.add_argument(
@@ -644,15 +665,12 @@ def run_collection(args, collector):
     state_progress = {}
     try:
         pleito, election = runoff(collector.json(f"{BASE}/comum/config/ele-c.json"))
-        print(
+        logger.info(
             f"Official runoff: pleito={pleito}, election={election}; "
             f"workers={args.workers}, max_rps={args.rps}; "
             f"resume_check={'SHA-256' if args.verify_existing else 'existence+size'}; UFs={','.join(args.ufs)}",
-            flush=True,
         )
-        print(
-            f"Manifest: {collector.manifest}; raw files: {collector.root / 'objects'}", flush=True
-        )
+        logger.info(f"Manifest: {collector.manifest}; raw files: {collector.root / 'objects'}")
         for uf in args.ufs:
             url = (
                 f"{BASE}/ele2026/arquivo-urna/{pleito}/config/{uf}/{uf}-p{int(pleito):06d}-cs.json"
@@ -666,28 +684,25 @@ def run_collection(args, collector):
             skipped = Counter()
             resume_seconds = 0.0
             if args.missing_only:
-                print(
+                logger.info(
                     f"{uf}: resume scan of {total} sections (manifest + "
                     f"{'SHA-256' if args.verify_existing else 'existence/size'} checks)",
-                    flush=True,
                 )
                 resume_started = time.monotonic()
                 items, skipped = collector.prepare_resume(
                     items,
                     run,
                     verify_existing=args.verify_existing,
-                    progress=lambda message: print(f"{uf}: {message}", flush=True),
+                    progress=lambda message: logger.info(f"{uf}: {message}"),
                 )
                 resume_seconds = time.monotonic() - resume_started
-                print(
+                logger.info(
                     f"{uf}: already saved={skipped['downloaded']}, aggregated={skipped['aggregated']}, "
                     f"remaining={len(items)} (resume scan {resume_seconds:.1f}s)",
-                    flush=True,
                 )
                 if not items:
-                    print(
+                    logger.info(
                         f"{uf}: SKIPPED — all {total} sections accounted for; no section downloads",
-                        flush=True,
                     )
                     state_progress[uf] = {
                         "skipped": skipped["downloaded"],
@@ -701,7 +716,7 @@ def run_collection(args, collector):
             baseline = collector.statistics()
             processed = Counter()
             started = time.monotonic()
-            last_print = started
+            last_notice = started
             # prepare_resume has already removed every reusable section. Avoid
             # repeating its per-section lookups and whole-file verification.
             job = lambda item: collector.section(item, pleito, run)
@@ -715,21 +730,20 @@ def run_collection(args, collector):
                     if (
                         completed % 256 == 0
                         or completed == len(items)
-                        or current - last_print >= 10
+                        or current - last_notice >= 10
                     ):
                         speed = completed / max(current - started, 0.001)
                         stats = collector.statistics()
                         new_logs = stats.get("new_logs", 0) - baseline.get("new_logs", 0)
                         cached = stats.get("cached_logs", 0) - baseline.get("cached_logs", 0)
                         new_bytes = stats.get("new_log_bytes", 0) - baseline.get("new_log_bytes", 0)
-                        print(
+                        logger.info(
                             f"{uf}: processed={completed}/{len(items)} remaining sections "
                             f"({speed:.1f}/s), skipped={skipped['downloaded']}, "
                             f"new logs={new_logs} ({new_bytes / 1024**2:.1f} MiB), cached logs={cached}, "
                             f"aggregated={skipped['aggregated'] + processed['aggregated']}",
-                            flush=True,
                         )
-                        last_print = current
+                        last_notice = current
             finally:
                 results.close()
                 stats = collector.statistics()
@@ -745,7 +759,7 @@ def run_collection(args, collector):
     except (Exception, KeyboardInterrupt) as exc:
         collector.stop.set()
         error = collector.stop_reason or f"{type(exc).__name__}: {exc}"
-        print(error, flush=True)
+        logger.exception("Collection interrupted: %s", error)
     finally:
         with collector.transaction() as db:
             db.execute("UPDATE runs SET finished_at=?,status=? WHERE id=?", (now(), outcome, run))
@@ -783,7 +797,7 @@ def run_collection(args, collector):
             and not any(counts.get(s, 0) for s in ("error", "aux_not_published", "no_log_listed")),
         }
         (args.output / "coverage.json").write_text(json.dumps(report, indent=2) + "\n")
-        print(json.dumps(report, indent=2), flush=True)
+        logger.info(json.dumps(report, indent=2))
     return 0 if outcome == "finished" else 1
 
 

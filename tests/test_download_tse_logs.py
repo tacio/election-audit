@@ -240,6 +240,53 @@ class CollectorTests(unittest.TestCase):
             self.assertEqual(request.call_count, 1)
         self.assertTrue(self.collector.stop.is_set())
 
+    def test_transient_network_errors_retry_and_log(self):
+        errors = [
+            TimeoutError("read timed out"),
+            dl.URLError(ConnectionResetError(104, "Connection reset by peer")),
+            ConnectionResetError(104, "Connection reset by peer"),
+            dl.IncompleteRead(b"{", 1),
+            dl.HTTPError(self.aux_url, 503, "unavailable", {}, None),
+        ]
+        for error in errors:
+            with (
+                self.subTest(error=error),
+                patch.object(dl, "urlopen", side_effect=[error, Response(b"{}")]) as request,
+                patch.object(self.collector.stop, "wait", return_value=False),
+                self.assertLogs(dl.logger, level="WARNING") as logs,
+            ):
+                self.assertEqual(self.collector.json(self.aux_url), {})
+                self.assertEqual(request.call_count, 2)
+                self.assertIn(self.aux_url, logs.output[0])
+                self.assertIn("retrying", logs.output[0])
+                self.assertFalse(self.collector.stop.is_set())
+
+    def test_retry_exhaustion_logs_and_preserves_exception(self):
+        error = TimeoutError("read timed out")
+        with (
+            patch.object(dl, "urlopen", side_effect=error) as request,
+            patch.object(self.collector.stop, "wait", return_value=False) as waits,
+            self.assertLogs(dl.logger, level="WARNING") as logs,
+        ):
+            with self.assertRaises(TimeoutError) as result:
+                self.collector.json(self.aux_url)
+        self.assertIs(result.exception, error)
+        self.assertEqual(request.call_count, 4)
+        self.assertEqual([c.args[0] for c in waits.call_args_list][1::2], [1, 2, 4])
+        self.assertIn("ERROR", logs.output[-1])
+        self.assertEqual(self.collector.query("SELECT COUNT(*) FROM files", one=True)[0], 0)
+
+    def test_read_timeout_discards_partial_response(self):
+        response = Response(b"unused")
+        with (
+            patch.object(response, "read", side_effect=[b"partial", TimeoutError("read timeout")]),
+            patch.object(dl, "urlopen", side_effect=[response, Response(b"{}")]),
+            patch.object(self.collector.stop, "wait", return_value=False),
+            self.assertLogs(dl.logger, level="WARNING"),
+        ):
+            self.assertEqual(self.collector.json(self.aux_url), {})
+        self.assertTrue(response.closed)
+
     def test_disk_reserve_prevents_commit(self):
         self.collector.reserve = 10**30
         with patch.object(dl, "urlopen", return_value=Response(b"{}")):
@@ -509,12 +556,12 @@ class CollectorTests(unittest.TestCase):
         with (
             patch.object(sys, "argv", arguments + ["--missing-only", "--manifest", str(external)]),
             patch.object(dl, "urlopen", side_effect=config_only),
-            redirect_stdout(io.StringIO()) as output,
+            self.assertLogs(dl.logger, level="INFO") as output,
         ):
             self.assertEqual(dl.main(), 0)
         report = json.loads((self.root / "coverage.json").read_text())
-        self.assertIn("SKIPPED", output.getvalue())
-        self.assertIn("already saved=4", output.getvalue())
+        self.assertIn("SKIPPED", "\n".join(output.output))
+        self.assertIn("already saved=4", "\n".join(output.output))
         self.assertEqual(report["reused_sections"], 4)
         self.assertEqual(report["sections"], {"downloaded": 4})
         self.assertEqual(report["saved_log_versions"], 8)
