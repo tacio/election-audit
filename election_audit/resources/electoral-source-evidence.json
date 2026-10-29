@@ -1,0 +1,49 @@
+{
+  "evidence_version": "electoral-source-discovery-v1",
+  "inspected_on": "2026-10-29",
+  "verification_status": "documentation_discovered_BU_schema_not_verified",
+  "official_resources": [
+    {
+      "url": "https://dadosabertos.tse.jus.br/dataset/resultados-2026-boletim-de-urna/resource/4753eb99-062b-484a-b569-04c51d039885",
+      "role": "AC runoff BU resource metadata",
+      "format": "CSV inside ZIP",
+      "datastore_active": false,
+      "header_or_dictionary_verified": false
+    },
+    {
+      "url": "https://www.tse.jus.br/eleicoes/informacoes-tecnicas-sobre-a-divulgacao-de-resultados",
+      "role": "Official 2026 technical documentation index"
+    },
+    {
+      "url": "https://www.tse.jus.br/eleicoes/eleicoes-2026-content/arquivos/divulgacao-de-resultados/tse-ea16-arquivo-de-configuracao-de-secoes-eleitorais",
+      "document_revision": "2026-05-22",
+      "role": "Section configuration JSON documentation; not BU CSV schema"
+    },
+    {
+      "url": "https://www.tse.jus.br/eleicoes/eleicoes-2026-content/arquivos/divulgacao-de-resultados/tse-ea18-arquivo-auxiliar-de-secao",
+      "document_revision": "2026-05-22",
+      "role": "Auxiliary receipt/status JSON documentation; not BU CSV schema"
+    },
+    {
+      "url": "https://www.tse.jus.br/eleicoes/eleicoes-2026-content/arquivos/divulgacao-de-resultados/tse-ea20-arquivo-de-resultado-unificado",
+      "document_revision": "2026-10-13",
+      "role": "Final hierarchical JSON documentation; not BU CSV schema"
+    }
+  ],
+  "bounded_access_attempt": {
+    "url": "https://cdn.tse.jus.br/estatistica/sead/eleicoes/eleicoes2026/buweb/bweb_2t_AC_261020260742.zip",
+    "range_bytes": [0, 65535],
+    "maximum_bytes": 1048576,
+    "maximum_seconds": 20,
+    "web_result": "unsupported content-type application/zip; also sidecar",
+    "cli_exit_code": 6,
+    "cli_result": "Could not resolve host: cdn.tse.jus.br",
+    "downloaded_bytes": 0
+  },
+  "outstanding": [
+    "Pinned real BU bytes with bundled dictionary and exact original header/encoding",
+    "Reviewed official source field/category/status mapping for an explicit adapter version",
+    "Real BU import/reconciliation validation; fixtures establish normalized arithmetic only"
+  ],
+  "signature_verification": "not_implemented_or_certified"
+}

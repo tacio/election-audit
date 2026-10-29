@@ -1,0 +1,1912 @@
+{
+  "contract_version": "1.0.0",
+  "scope": "2026 presidential runoff, available AC–RJ; partial national; other elections require explicit imports",
+  "null_states": [
+    "missing_source",
+    "not_published",
+    "not_applicable",
+    "unresolved",
+    "conflict",
+    "parse_error",
+    "unknown"
+  ],
+  "type_mapping": {
+    "text": "VARCHAR/string",
+    "sha256": "VARCHAR/string, lowercase 64 hex",
+    "integer": "BIGINT/int64; counts nonnegative",
+    "number": "DOUBLE/float64, finite",
+    "boolean": "BOOLEAN/bool",
+    "date": "DATE/date32, YYYY-MM-DD",
+    "instant": "TIMESTAMPTZ/timestamp[us, UTC], offset required",
+    "json": "JSON/string with canonical JSON payload"
+  },
+  "tables": {
+    "source_object": {
+      "grain": "One exact byte sequence; never a URL or a section",
+      "primary_key": [
+        "object_sha256"
+      ],
+      "fields": {
+        "object_sha256": {
+          "type": "sha256",
+          "nullable": false,
+          "meaning": "Locally computed content digest"
+        },
+        "byte_length": {
+          "type": "integer",
+          "nullable": false,
+          "meaning": "Nonnegative original byte count"
+        },
+        "media_type": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Observed format; retain original bytes"
+        },
+        "storage_locator": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Object location relative to declared source root"
+        }
+      },
+      "foreign_keys": [],
+      "unique_keys": [],
+      "rules": []
+    },
+    "source_observation": {
+      "grain": "One attempt to observe an asset URL in one acquisition run",
+      "primary_key": [
+        "observation_id"
+      ],
+      "fields": {
+        "observation_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Immutable attempt identity"
+        },
+        "run_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Original acquisition run identifier"
+        },
+        "official_url": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Official asset URL even when mirror used"
+        },
+        "retrieval_url": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Actual requested URL"
+        },
+        "object_sha256": {
+          "type": "sha256",
+          "nullable": true,
+          "meaning": "Received bytes; null on failed/no-body attempt"
+        },
+        "observed_at": {
+          "type": "instant",
+          "nullable": false,
+          "meaning": "Client observation time with explicit UTC offset"
+        },
+        "http_status": {
+          "type": "integer",
+          "nullable": true,
+          "meaning": "Actual HTTP status"
+        },
+        "etag": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Opaque server validator"
+        },
+        "last_modified_raw": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Original HTTP header; not publication time"
+        },
+        "observation_status": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "success, missing, blocked, failed or historical_mapping_unknown"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "object_sha256"
+          ],
+          "table": "source_object",
+          "references": [
+            "object_sha256"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": []
+    },
+    "source_package": {
+      "grain": "One official section/package identity within an election, independent of byte hash",
+      "primary_key": [
+        "package_id"
+      ],
+      "fields": {
+        "package_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Stable publisher-context identity"
+        },
+        "section_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Advertised section"
+        },
+        "official_package_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Opaque identifier from URL/metadata"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "section_id"
+          ],
+          "table": "section",
+          "references": [
+            "section_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [
+        [
+          "section_id",
+          "official_package_id"
+        ]
+      ],
+      "rules": []
+    },
+    "package_observation": {
+      "grain": "One package advertisement in one metadata observation",
+      "primary_key": [
+        "package_id",
+        "metadata_observation_id"
+      ],
+      "fields": {
+        "package_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Package identity"
+        },
+        "metadata_observation_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Auxiliary metadata observation"
+        },
+        "package_status_raw": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Unmodified received/rejected/excluded/totalized flag"
+        },
+        "package_status": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Normalized status; unknown remains unknown"
+        },
+        "official_phase_raw": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Unmodified phase flag"
+        },
+        "received_at": {
+          "type": "instant",
+          "nullable": true,
+          "meaning": "Publisher receipt time"
+        },
+        "processed_at": {
+          "type": "instant",
+          "nullable": true,
+          "meaning": "Publisher processing time"
+        },
+        "generated_at": {
+          "type": "instant",
+          "nullable": true,
+          "meaning": "Artifact generation time"
+        },
+        "published_at": {
+          "type": "instant",
+          "nullable": true,
+          "meaning": "Publisher publication time"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "package_id"
+          ],
+          "table": "source_package",
+          "references": [
+            "package_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "metadata_observation_id"
+          ],
+          "table": "source_observation",
+          "references": [
+            "observation_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": []
+    },
+    "package_asset": {
+      "grain": "One advertised filename in a package metadata observation",
+      "primary_key": [
+        "package_id",
+        "metadata_observation_id",
+        "filename"
+      ],
+      "fields": {
+        "package_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Package identity"
+        },
+        "metadata_observation_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Metadata observation"
+        },
+        "filename": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Advertised path/name"
+        },
+        "asset_observation_id": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Attempt observing this asset"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "package_id",
+            "metadata_observation_id"
+          ],
+          "table": "package_observation",
+          "references": [
+            "package_id",
+            "metadata_observation_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "asset_observation_id"
+          ],
+          "table": "source_observation",
+          "references": [
+            "observation_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": []
+    },
+    "snapshot": {
+      "grain": "One immutable declared input population and selection policy",
+      "primary_key": [
+        "snapshot_id"
+      ],
+      "fields": {
+        "snapshot_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Digest of canonical inventory + policy + schema version"
+        },
+        "created_at": {
+          "type": "instant",
+          "nullable": false,
+          "meaning": "Snapshot creation, not source publication"
+        },
+        "contract_version": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Contract version used"
+        },
+        "selection_policy": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Versioned policy identifier"
+        },
+        "population_scope": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Declared election/UF/round coverage and exclusions"
+        },
+        "inventory_sha256": {
+          "type": "sha256",
+          "nullable": false,
+          "meaning": "Digest of immutable inventory"
+        },
+        "manifest_locator": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Resolved authoritative manifest path"
+        },
+        "manifest_captured_at": {
+          "type": "instant",
+          "nullable": false,
+          "meaning": "Consistent read transaction/backup time"
+        }
+      },
+      "foreign_keys": [],
+      "unique_keys": [],
+      "rules": []
+    },
+    "snapshot_observation": {
+      "grain": "One frozen observation included in snapshot",
+      "primary_key": [
+        "snapshot_id",
+        "observation_id"
+      ],
+      "fields": {
+        "snapshot_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Frozen snapshot"
+        },
+        "observation_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Immutable URL-to-byte mapping"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "snapshot_id"
+          ],
+          "table": "snapshot",
+          "references": [
+            "snapshot_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "observation_id"
+          ],
+          "table": "source_observation",
+          "references": [
+            "observation_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": []
+    },
+    "election": {
+      "grain": "One official election and round in its pleito",
+      "primary_key": [
+        "election_id"
+      ],
+      "fields": {
+        "election_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Namespaced year/pleito/election/round identity"
+        },
+        "year": {
+          "type": "integer",
+          "nullable": false,
+          "meaning": "Election year"
+        },
+        "pleito_code": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Official pleito code"
+        },
+        "election_code": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Official election code"
+        },
+        "round": {
+          "type": "integer",
+          "nullable": false,
+          "meaning": "Official round"
+        },
+        "election_date": {
+          "type": "date",
+          "nullable": false,
+          "meaning": "Official target date"
+        }
+      },
+      "foreign_keys": [],
+      "unique_keys": [
+        [
+          "year",
+          "pleito_code",
+          "election_code",
+          "round"
+        ]
+      ],
+      "rules": []
+    },
+    "contest": {
+      "grain": "One cargo/jurisdiction contest in an election",
+      "primary_key": [
+        "contest_id"
+      ],
+      "fields": {
+        "contest_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Election-scoped contest identity"
+        },
+        "election_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Election"
+        },
+        "cargo_code": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Official office/cargo"
+        },
+        "jurisdiction_code": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Official contest jurisdiction"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "election_id"
+          ],
+          "table": "election",
+          "references": [
+            "election_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [
+        [
+          "election_id",
+          "cargo_code",
+          "jurisdiction_code"
+        ]
+      ],
+      "rules": []
+    },
+    "location": {
+      "grain": "One polling location identity scoped to election",
+      "primary_key": [
+        "location_id"
+      ],
+      "fields": {
+        "location_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Election-scoped polling place"
+        },
+        "election_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Election"
+        },
+        "uf": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "UF or ZZ"
+        },
+        "municipality_tse": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Zero-padded TSE code, never implicitly IBGE"
+        },
+        "zone": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Zero-padded zone"
+        },
+        "location_code": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Official polling place code"
+        },
+        "timezone_name": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Evidence-based municipality/overseas timezone rule"
+        },
+        "ibge_code": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Explicit validated mapping only"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "election_id"
+          ],
+          "table": "election",
+          "references": [
+            "election_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [
+        [
+          "election_id",
+          "uf",
+          "municipality_tse",
+          "zone",
+          "location_code"
+        ]
+      ],
+      "rules": []
+    },
+    "section": {
+      "grain": "One registered section in election, including member sections",
+      "primary_key": [
+        "section_id"
+      ],
+      "fields": {
+        "section_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Election-scoped section identity"
+        },
+        "election_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Election"
+        },
+        "uf": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "UF or ZZ"
+        },
+        "municipality_tse": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "TSE code"
+        },
+        "zone": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Zone code"
+        },
+        "section_code": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Section code"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "election_id"
+          ],
+          "table": "election",
+          "references": [
+            "election_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [
+        [
+          "election_id",
+          "uf",
+          "municipality_tse",
+          "zone",
+          "section_code"
+        ]
+      ],
+      "rules": []
+    },
+    "section_composition": {
+      "grain": "One member-to-principal assignment per snapshot; principal maps to itself",
+      "primary_key": [
+        "snapshot_id",
+        "member_section_id"
+      ],
+      "fields": {
+        "snapshot_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Frozen composition"
+        },
+        "member_section_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Member including principal"
+        },
+        "principal_section_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Terminal principal section"
+        },
+        "location_id": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Location for this snapshot"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "snapshot_id"
+          ],
+          "table": "snapshot",
+          "references": [
+            "snapshot_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "member_section_id"
+          ],
+          "table": "section",
+          "references": [
+            "section_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "principal_section_id"
+          ],
+          "table": "section",
+          "references": [
+            "section_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "location_id"
+          ],
+          "table": "location",
+          "references": [
+            "location_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": [
+        "Same election for member, principal and location; principal self-map exists; no chains/cycles.",
+        "Many members to one principal; this bridge NEVER expands principal results before summation."
+      ]
+    },
+    "candidacy": {
+      "grain": "One official candidacy in one contest",
+      "primary_key": [
+        "candidacy_id"
+      ],
+      "fields": {
+        "candidacy_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Contest-scoped official candidacy"
+        },
+        "contest_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Contest"
+        },
+        "official_candidate_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Stable official candidacy identifier, not name"
+        },
+        "ballot_number": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Number printed/used on ballot"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "contest_id"
+          ],
+          "table": "contest",
+          "references": [
+            "contest_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [
+        [
+          "contest_id",
+          "official_candidate_id"
+        ]
+      ],
+      "rules": []
+    },
+    "vote_choice": {
+      "grain": "One countable choice/category in one contest",
+      "primary_key": [
+        "vote_choice_id"
+      ],
+      "fields": {
+        "vote_choice_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Contest-scoped choice identity"
+        },
+        "contest_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Contest"
+        },
+        "choice_code": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Source-normalized code"
+        },
+        "choice_kind": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "candidate, blank, null, special or unresolved"
+        },
+        "candidacy_id": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Only candidate choices reference candidacy"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "contest_id"
+          ],
+          "table": "contest",
+          "references": [
+            "contest_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "candidacy_id"
+          ],
+          "table": "candidacy",
+          "references": [
+            "candidacy_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [
+        [
+          "contest_id",
+          "choice_code"
+        ]
+      ],
+      "rules": [
+        "Candidate requires candidacy in same contest; all other kinds require null candidacy."
+      ]
+    },
+    "physical_device": {
+      "grain": "One evidenced physical machine, independent of section and package",
+      "primary_key": [
+        "device_id"
+      ],
+      "fields": {
+        "device_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Identity from authoritative serial evidence; never inferred from section"
+        },
+        "serial_raw": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Original serial"
+        },
+        "hardware_model": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Observed model"
+        },
+        "identity_state": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "verified or unresolved; unresolved identities never merge by model"
+        }
+      },
+      "foreign_keys": [],
+      "unique_keys": [],
+      "rules": []
+    },
+    "software_configuration": {
+      "grain": "One observed software/version configuration",
+      "primary_key": [
+        "configuration_id"
+      ],
+      "fields": {
+        "configuration_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Digest of known configuration fields + unknown markers"
+        },
+        "version_raw": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Original software version"
+        },
+        "build_raw": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Original build identifier"
+        },
+        "configuration_raw": {
+          "type": "json",
+          "nullable": false,
+          "meaning": "Other observed configuration fields"
+        }
+      },
+      "foreign_keys": [],
+      "unique_keys": [],
+      "rules": []
+    },
+    "result_version": {
+      "grain": "One observed BU/result version for principal section and contest",
+      "primary_key": [
+        "result_version_id"
+      ],
+      "fields": {
+        "result_version_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Immutable result identity; conflicts retained"
+        },
+        "principal_section_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Principal section"
+        },
+        "contest_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Contest"
+        },
+        "package_id": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Origin package if available"
+        },
+        "generated_at": {
+          "type": "instant",
+          "nullable": true,
+          "meaning": "BU generation timestamp"
+        },
+        "received_at": {
+          "type": "instant",
+          "nullable": true,
+          "meaning": "Receipt timestamp"
+        },
+        "processed_at": {
+          "type": "instant",
+          "nullable": true,
+          "meaning": "Processing timestamp"
+        },
+        "published_at": {
+          "type": "instant",
+          "nullable": true,
+          "meaning": "Publication timestamp"
+        },
+        "result_status": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "totalized, received, rejected, excluded, unknown or conflict"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "principal_section_id"
+          ],
+          "table": "section",
+          "references": [
+            "section_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "contest_id"
+          ],
+          "table": "contest",
+          "references": [
+            "contest_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "package_id"
+          ],
+          "table": "source_package",
+          "references": [
+            "package_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": [
+        "Section and contest must belong to same election."
+      ]
+    },
+    "section_contest_totals": {
+      "grain": "One totals row per result version, NEVER per candidate",
+      "primary_key": [
+        "result_version_id"
+      ],
+      "fields": {
+        "result_version_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Result version"
+        },
+        "eligible_electors": {
+          "type": "integer",
+          "nullable": true,
+          "meaning": "Appropriate harmonized electorate"
+        },
+        "attending_voters": {
+          "type": "integer",
+          "nullable": true,
+          "meaning": "Official attendance, separate from completed log cycles"
+        },
+        "abstaining_electors": {
+          "type": "integer",
+          "nullable": true,
+          "meaning": "Official abstention"
+        },
+        "total_presidential_ballots": {
+          "type": "integer",
+          "nullable": true,
+          "meaning": "All applicable choice categories"
+        },
+        "valid_candidate_votes": {
+          "type": "integer",
+          "nullable": true,
+          "meaning": "Candidate-only denominator"
+        },
+        "blank_votes": {
+          "type": "integer",
+          "nullable": true,
+          "meaning": "Blank category total"
+        },
+        "null_votes": {
+          "type": "integer",
+          "nullable": true,
+          "meaning": "Applicable ordinary null categories"
+        },
+        "special_votes": {
+          "type": "integer",
+          "nullable": true,
+          "meaning": "Exceptional categories; 0 only if explicitly absent"
+        },
+        "unresolved_votes": {
+          "type": "integer",
+          "nullable": true,
+          "meaning": "Unresolved categories; unknown is null"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "result_version_id"
+          ],
+          "table": "result_version",
+          "references": [
+            "result_version_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": [
+        "Nonnegative integers; candidate + blank + applicable null + special + unresolved = total when all meanings resolved.",
+        "Electorate and attendance are not additive over vote_choice rows."
+      ]
+    },
+    "vote_choice_count": {
+      "grain": "One count per choice per result version",
+      "primary_key": [
+        "result_version_id",
+        "vote_choice_id"
+      ],
+      "fields": {
+        "result_version_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Result version"
+        },
+        "vote_choice_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Choice in matching contest"
+        },
+        "vote_count": {
+          "type": "integer",
+          "nullable": false,
+          "meaning": "Nonnegative observed count"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "result_version_id"
+          ],
+          "table": "result_version",
+          "references": [
+            "result_version_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "vote_choice_id"
+          ],
+          "table": "vote_choice",
+          "references": [
+            "vote_choice_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": [
+        "Result and choice contest must match; completeness ledger distinguishes absent row from explicit zero."
+      ]
+    },
+    "canonical_result": {
+      "grain": "One selection decision per snapshot/principal/contest; conflict never picks arbitrarily",
+      "primary_key": [
+        "snapshot_id",
+        "principal_section_id",
+        "contest_id"
+      ],
+      "fields": {
+        "snapshot_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Frozen selection"
+        },
+        "principal_section_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Principal"
+        },
+        "contest_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Contest"
+        },
+        "result_version_id": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Selected version only when eligible and conflict resolved"
+        },
+        "selection_state": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "selected, missing, ineligible or conflict"
+        },
+        "selection_reason": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Versioned rule and evidence"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "snapshot_id"
+          ],
+          "table": "snapshot",
+          "references": [
+            "snapshot_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "principal_section_id"
+          ],
+          "table": "section",
+          "references": [
+            "section_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "contest_id"
+          ],
+          "table": "contest",
+          "references": [
+            "contest_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "result_version_id"
+          ],
+          "table": "result_version",
+          "references": [
+            "result_version_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": [
+        "Selected version matches principal/contest; totalized official target phase only; conflicting versions stay unavailable."
+      ]
+    },
+    "voting_session": {
+      "grain": "One reconstructed physical operational session in parser run, not one file",
+      "primary_key": [
+        "session_id"
+      ],
+      "fields": {
+        "session_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Stable within reconstruction version + evidence"
+        },
+        "snapshot_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Inputs"
+        },
+        "principal_section_id": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Unknown assignment retained"
+        },
+        "device_id": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Evidenced hardware"
+        },
+        "configuration_id": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Software configuration"
+        },
+        "reconstruction_version": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Parser/rules version"
+        },
+        "session_kind": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "official VOTA, setup, training, other or unresolved"
+        },
+        "target_selection_state": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "selected, excluded or unresolved"
+        },
+        "uncertainty": {
+          "type": "json",
+          "nullable": false,
+          "meaning": "Ambiguity, missing blocks, clocks and rule evidence"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "snapshot_id"
+          ],
+          "table": "snapshot",
+          "references": [
+            "snapshot_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "principal_section_id"
+          ],
+          "table": "section",
+          "references": [
+            "section_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "device_id"
+          ],
+          "table": "physical_device",
+          "references": [
+            "device_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "configuration_id"
+          ],
+          "table": "software_configuration",
+          "references": [
+            "configuration_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": [
+        "Multiple replacement sessions can serve one principal; deduplicate evidenced overlapping blocks, never message/timestamp alone."
+      ]
+    },
+    "session_package": {
+      "grain": "One session/package evidence link; never a result aggregation path",
+      "primary_key": [
+        "session_id",
+        "package_id"
+      ],
+      "fields": {
+        "session_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Session"
+        },
+        "package_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Evidence package"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "session_id"
+          ],
+          "table": "voting_session",
+          "references": [
+            "session_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "package_id"
+          ],
+          "table": "source_package",
+          "references": [
+            "package_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": []
+    },
+    "selected_event": {
+      "grain": "One ordered parsed event, selected or excluded with reason",
+      "primary_key": [
+        "event_id"
+      ],
+      "fields": {
+        "event_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Parser/version + original event identity"
+        },
+        "session_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Reconstructed session"
+        },
+        "event_sequence": {
+          "type": "integer",
+          "nullable": false,
+          "meaning": "Preserved relative sequence, not clock order"
+        },
+        "event_kind": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Decoded or unresolved event kind"
+        },
+        "selected": {
+          "type": "boolean",
+          "nullable": false,
+          "meaning": "Belongs to target operational analysis"
+        },
+        "selection_reason": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Reason including excluded mixed-round events"
+        },
+        "device_time_raw": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Original naive reading"
+        },
+        "timezone_rule": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Versioned conversion rule"
+        },
+        "offset_seconds": {
+          "type": "integer",
+          "nullable": true,
+          "meaning": "Explicit applied UTC offset"
+        },
+        "clock_adjustment_seconds": {
+          "type": "integer",
+          "nullable": true,
+          "meaning": "Documented correction"
+        },
+        "normalized_at": {
+          "type": "instant",
+          "nullable": true,
+          "meaning": "Converted instant only if supported"
+        },
+        "clock_confidence": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "verified, bounded or unresolved"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "session_id"
+          ],
+          "table": "voting_session",
+          "references": [
+            "session_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [
+        [
+          "session_id",
+          "event_sequence"
+        ]
+      ],
+      "rules": []
+    },
+    "anonymous_cycle": {
+      "grain": "One reconstructed anonymous voter cycle; contains NO candidate or RDV link",
+      "primary_key": [
+        "cycle_id"
+      ],
+      "fields": {
+        "cycle_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Session-scoped reconstruction identity"
+        },
+        "session_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Session"
+        },
+        "cycle_sequence": {
+          "type": "integer",
+          "nullable": false,
+          "meaning": "Sequence in reconstruction"
+        },
+        "start_event_id": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Start evidence"
+        },
+        "end_event_id": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Completion/suspension evidence"
+        },
+        "completion_state": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "completed, suspended, cancelled or unresolved"
+        },
+        "authorization_mode": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "biometric, manual, other or unresolved"
+        },
+        "duration_seconds": {
+          "type": "number",
+          "nullable": true,
+          "meaning": "Only comparable clocks within a cycle"
+        },
+        "uncertainty": {
+          "type": "json",
+          "nullable": false,
+          "meaning": "Unresolved transitions and missing evidence"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "session_id"
+          ],
+          "table": "voting_session",
+          "references": [
+            "session_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "start_event_id"
+          ],
+          "table": "selected_event",
+          "references": [
+            "event_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "end_event_id"
+          ],
+          "table": "selected_event",
+          "references": [
+            "event_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [
+        [
+          "session_id",
+          "cycle_sequence"
+        ]
+      ],
+      "rules": []
+    },
+    "coverage_ledger": {
+      "grain": "One expected registered section per snapshot, including missing/excluded cases",
+      "primary_key": [
+        "snapshot_id",
+        "section_id"
+      ],
+      "fields": {
+        "snapshot_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Frozen population"
+        },
+        "section_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Expected/member section"
+        },
+        "principal_section_id": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Resolved composition"
+        },
+        "installation_state": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "installed, not_installed or unknown"
+        },
+        "log_availability": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "available, missing, not_published, not_applicable or unknown"
+        },
+        "bu_availability": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "available, missing, not_published, not_applicable or unknown"
+        },
+        "parse_state": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "not_attempted, passed, partial or failed"
+        },
+        "reconciliation_state": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "not_attempted, passed, discrepancy or unavailable"
+        },
+        "exclusion_reason": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Explicit analytical exclusion; retain row"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "snapshot_id"
+          ],
+          "table": "snapshot",
+          "references": [
+            "snapshot_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "section_id"
+          ],
+          "table": "section",
+          "references": [
+            "section_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "principal_section_id"
+          ],
+          "table": "section",
+          "references": [
+            "section_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": []
+    },
+    "record_lineage": {
+      "grain": "One original-record contribution to a derived row; multiple references allowed",
+      "primary_key": [
+        "derived_table",
+        "derived_key",
+        "object_sha256",
+        "record_locator",
+        "transformation_version"
+      ],
+      "fields": {
+        "derived_table": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Contract table identifier"
+        },
+        "derived_key": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Canonical JSON primary-key tuple"
+        },
+        "object_sha256": {
+          "type": "sha256",
+          "nullable": false,
+          "meaning": "Exact original bytes"
+        },
+        "record_locator": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Canonical JSON locator: nested archive path segments with member occurrence index, original line/byte/record range where known; original line sequence anchors event identity, never timestamp/message alone"
+        },
+        "transformation_version": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Code/rules revision"
+        },
+        "observation_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Frozen source URL/time context"
+        },
+        "lineage_role": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "input, duplicate, conflict or corroboration"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "object_sha256"
+          ],
+          "table": "source_object",
+          "references": [
+            "object_sha256"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "observation_id"
+          ],
+          "table": "source_observation",
+          "references": [
+            "observation_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": []
+    },
+    "parsing_issue": {
+      "grain": "One retained issue anchored to original bytes",
+      "primary_key": [
+        "issue_id"
+      ],
+      "fields": {
+        "issue_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Stable issue identity"
+        },
+        "snapshot_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Inputs"
+        },
+        "object_sha256": {
+          "type": "sha256",
+          "nullable": false,
+          "meaning": "Original object"
+        },
+        "record_locator": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Known original range"
+        },
+        "issue_code": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Versioned code"
+        },
+        "severity": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "info, warning or error"
+        },
+        "details": {
+          "type": "json",
+          "nullable": false,
+          "meaning": "Issue interpretation and uncertainty; minimize selected structured fields, omit voter/mesario identifiers and unnecessary raw sensitive tokens; source bytes remain authoritative"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "snapshot_id"
+          ],
+          "table": "snapshot",
+          "references": [
+            "snapshot_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "object_sha256"
+          ],
+          "table": "source_object",
+          "references": [
+            "object_sha256"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": []
+    },
+    "processing_event": {
+      "grain": "One observed lifecycle event or explicit missing event field for a package/result, preserving repeated observations",
+      "primary_key": [
+        "processing_event_id"
+      ],
+      "fields": {
+        "processing_event_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Immutable original event/observation identity"
+        },
+        "observation_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Original source observation; client observation is not publisher publication"
+        },
+        "package_id": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Package lifecycle subject; may exist before BU import"
+        },
+        "result_version_id": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Result subject when available; not required for package events"
+        },
+        "event_kind": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "receipt, processing, generation, publication or observation; never interchangeable"
+        },
+        "event_time_raw": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Original timestamp token"
+        },
+        "event_at": {
+          "type": "instant",
+          "nullable": true,
+          "meaning": "Supported normalized event instant"
+        },
+        "availability_state": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "observed, missing_source, not_published, unresolved or conflict"
+        },
+        "conversion_rule": {
+          "type": "text",
+          "nullable": true,
+          "meaning": "Versioned timezone/clock conversion evidence"
+        },
+        "confidence": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "verified, bounded or unresolved"
+        },
+        "event_sequence": {
+          "type": "integer",
+          "nullable": true,
+          "meaning": "Original sequence when the source supplies it"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "observation_id"
+          ],
+          "table": "source_observation",
+          "references": [
+            "observation_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "package_id"
+          ],
+          "table": "source_package",
+          "references": [
+            "package_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "result_version_id"
+          ],
+          "table": "result_version",
+          "references": [
+            "result_version_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": [
+        "At least one package/result subject required; if both present they must agree.",
+        "Each event needs original-record lineage. Missing event time requires availability reason; repeated/corrected timestamps append events.",
+        "Package events do not depend on a successful BU import. Event omission alone does not establish not-published status."
+      ]
+    },
+    "harmonized_population": {
+      "grain": "One declared disjoint comparison population across explicitly imported election rounds/years",
+      "primary_key": [
+        "population_id"
+      ],
+      "fields": {
+        "population_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Versioned comparable population identity"
+        },
+        "harmonization_policy": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Evidence/rules for compositions, transfers, electorate change and completeness"
+        },
+        "comparability_state": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "comparable, incomparable or unresolved"
+        }
+      },
+      "foreign_keys": [],
+      "unique_keys": [],
+      "rules": [
+        "Do not infer equal electorates from equal section numbers or polling-place names.",
+        "Only whole principal units with justified population correspondence may be summed; otherwise incomparable, no invented proportional vote allocation."
+      ]
+    },
+    "harmonized_member": {
+      "grain": "One whole principal result population membership per comparison policy and source election snapshot",
+      "primary_key": [
+        "population_id",
+        "snapshot_id",
+        "principal_section_id"
+      ],
+      "fields": {
+        "population_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Common comparison population"
+        },
+        "snapshot_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Source round/year snapshot"
+        },
+        "principal_section_id": {
+          "type": "text",
+          "nullable": false,
+          "meaning": "Whole principal included once"
+        }
+      },
+      "foreign_keys": [
+        {
+          "fields": [
+            "population_id"
+          ],
+          "table": "harmonized_population",
+          "references": [
+            "population_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "snapshot_id"
+          ],
+          "table": "snapshot",
+          "references": [
+            "snapshot_id"
+          ],
+          "relationship": "many_to_one"
+        },
+        {
+          "fields": [
+            "principal_section_id"
+          ],
+          "table": "section",
+          "references": [
+            "section_id"
+          ],
+          "relationship": "many_to_one"
+        }
+      ],
+      "unique_keys": [],
+      "rules": [
+        "Within one harmonization policy, snapshot/principal belongs to at most one population; publication must check disjointness across group IDs.",
+        "Aggregate each round separately at common-population grain before joining rounds, never expand one round by all members of another."
+      ]
+    }
+  }
+}

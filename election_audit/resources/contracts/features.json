@@ -1,0 +1,484 @@
+{
+  "contract_version": "1.0.0",
+  "scope": "Available AC–RJ 2026 runoff, partial national; all other rounds/history explicit imports",
+  "readiness_states": [
+    "not_evaluated",
+    "ready",
+    "partial",
+    "unavailable",
+    "not_applicable"
+  ],
+  "unavailable_reasons": [
+    "missing_input",
+    "missing_denominator",
+    "zero_denominator",
+    "unresolved_semantics",
+    "unresolved_clock",
+    "conflict",
+    "incomparable",
+    "out_of_support",
+    "unsupported_assumptions",
+    "outside_scope"
+  ],
+  "inputs": {
+    "freeze": "Immutable snapshot and coverage ledger; absent until Phase3; live latest mappings do not prove historical mappings",
+    "logs": "Original logs/indexes/auxiliaries in available AC–RJ corpus; presence alone is not decoded evidence",
+    "sessions": "Validated target official VOTA reconstruction, replacement/copy deduplication, anonymous cycles and uncertainty",
+    "clocks": "Evidence-based municipality/overseas rule, adjustments and clock confidence/sensitivity bounds",
+    "bu2": "Explicit import of 2026 runoff BU counts, electorate and versions; not supplied by logs",
+    "bu1": "Explicit import of 2026 first-round BUs and contest definitions",
+    "composition": "Frozen member-to-principal and cross-round harmonization; splits/mergers/transfers accounted for",
+    "locations": "Election-scoped polling-place register, geography and TSE/IBGE mapping",
+    "processing": "Explicit source receipt/processing/generation/publication timestamps with original values and confidence",
+    "final": "Coherent reconciled final BR/UF/municipality results including ZZ; no margin currently asserted",
+    "history": "Explicit year/round-specific 2022/2018 results and, where available, comparable logs; not clean labels",
+    "rdv_signatures": "Targeted RDV, envelopes, trusted schema/key material and independent verification; transport digest alone insufficient",
+    "corroboration": "Independent BU copies, minutes, incidents, occurrence records and access/suppression evidence",
+    "pre_election": "Pre-election location, accessibility, logistics and other justified covariates; observation dates recorded",
+    "design": "Frozen targets, candidate A/B official identifiers, roles, mechanism variants, splits, seeds and testing families",
+    "calibration": "Validated held-out predictions/scores, overlap, scale floors, exchangeability assessment and cluster units",
+    "validation": "Documented synthetic/benign mechanisms, full pipeline resampling, held-out history/geography and power/resolution",
+    "mechanism": "Corroborated affected population, deduplicated subset/cap and explicit mechanism/counterfactual; otherwise unidentified"
+  },
+  "features": [
+    {
+      "id": "population_coverage",
+      "mart": "operational_coverage",
+      "grain": "snapshot × UF/location/model/version and candidate-support stratum",
+      "requires": [
+        "freeze",
+        "composition",
+        "logs",
+        "locations"
+      ],
+      "denominator": "Expected registered sections; distinct principal count reported separately",
+      "analytical_role": "diagnostic",
+      "definition": "Expected/member/principal/installed/not_installed/log/BU/parsed/reconciled/excluded counts; publish unknown strata",
+      "unavailable_when": [
+        "No complete expected population",
+        "Candidate support needs bu2, otherwise that stratification unavailable"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "session_summary",
+      "mart": "session_summaries",
+      "grain": "snapshot × unique selected session",
+      "requires": [
+        "freeze",
+        "sessions"
+      ],
+      "denominator": "Unique reconstructed sessions; completed cycles for rates",
+      "analytical_role": "outcome",
+      "definition": "Completed/suspended/cancelled/unresolved cycles; manual requests vs completed manual cycles; restarts/outages; selection uncertainty",
+      "unavailable_when": [
+        "No validated session semantics",
+        "Overlapping histories unresolved"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "cycle_duration_gap",
+      "mart": "session_summaries",
+      "grain": "session × prespecified duration/gap statistic",
+      "requires": [
+        "freeze",
+        "sessions",
+        "clocks"
+      ],
+      "denominator": "Completed cycles with valid start/end; within-session adjacent valid cycles for gaps",
+      "analytical_role": "outcome",
+      "definition": "Duration/gap distribution with eligible pair counts; failed authorization per known attempt; outages and within-day intensity per observed exposure seconds",
+      "unavailable_when": [
+        "Unresolved clocks or gaps",
+        "Unknown attempts/completions/exposure",
+        "Governor/other contest count not validated"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "processing_event_availability",
+      "mart": "processing_event_availability",
+      "grain": "snapshot × principal × package/result version × event type",
+      "requires": [
+        "freeze",
+        "processing"
+      ],
+      "denominator": "Expected packages/results in declared status population, not number of observed timestamps",
+      "analytical_role": "diagnostic",
+      "definition": "Separate availability for receipt, processing, generation and publication; missing is not zero latency",
+      "unavailable_when": [
+        "Absent source field",
+        "Timestamp semantics or timezone unresolved"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "late_voting",
+      "mart": "late_voting",
+      "grain": "snapshot × principal × deduplicated selected session population",
+      "requires": [
+        "freeze",
+        "sessions",
+        "clocks",
+        "composition"
+      ],
+      "denominator": "Completed cycles with classifiable completion instants; separately all completed and unresolved cycles",
+      "analytical_role": "outcome",
+      "definition": "Domestic after17 means completion strictly after 17:00:00 America/Sao_Paulo (Brasilia) on target election date; equal boundary not after. Overseas separately with local convention; never candidate attribution. Store counts, share, last completion, and clock-bound sensitivity",
+      "unavailable_when": [
+        "Absolute time unresolved",
+        "Overlapping sessions not deduplicated",
+        "Overseas convention unvalidated"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "section_results",
+      "mart": "section_results",
+      "grain": "snapshot × principal × contest",
+      "requires": [
+        "freeze",
+        "bu2",
+        "composition"
+      ],
+      "denominator": "Eligible electorate for turnout; all presidential ballots for blank/null; candidate votes for valid share",
+      "analytical_role": "outcome",
+      "definition": "One canonical eligible totalized result; totals one row per result, long choices separately; reconcile every category",
+      "unavailable_when": [
+        "Canonical conflict/missing BU",
+        "Unknown electorate/category semantics",
+        "Incoherent round/phase/contest"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "unanimous_results",
+      "mart": "unanimous_results",
+      "grain": "snapshot × principal × contest",
+      "requires": [
+        "freeze",
+        "bu2",
+        "composition"
+      ],
+      "denominator": "Canonical resolved principal results with total_presidential_ballots > 0; separately counts unavailable",
+      "analytical_role": "diagnostic",
+      "definition": "Strict unanimity: one candidate has total_presidential_ballots, all other choices zero, blank/null/special/unresolved zero and complete. All-valid-only unanimity is a different separately named statistic",
+      "unavailable_when": [
+        "Unknown or nonzero special/unresolved category",
+        "Incomplete choices",
+        "Zero total",
+        "Canonical conflict"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "result_timing",
+      "mart": "result_timing",
+      "grain": "snapshot × principal × result version × interval type",
+      "requires": [
+        "freeze",
+        "bu2",
+        "processing",
+        "clocks"
+      ],
+      "denominator": "Results with both specified event instants known; report missing/out-of-order counts separately",
+      "analytical_role": "diagnostic",
+      "definition": "Keep receipt, processing, generation, publication, client observation distinct; compute explicitly named intervals without overwriting negative/corrected values; distinguish closing-to-receipt from receipt-to-publication",
+      "unavailable_when": [
+        "One endpoint unavailable",
+        "Incompatible clocks or unresolved event semantics",
+        "Log download time is not transmission"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "round_comparison",
+      "mart": "round_comparison",
+      "grain": "harmonized common population × contest pair",
+      "requires": [
+        "freeze",
+        "bu1",
+        "bu2",
+        "composition",
+        "locations"
+      ],
+      "denominator": "Matched/harmonized electorate or candidate-only valid votes separately for each round",
+      "analytical_role": "context",
+      "definition": "Preference vector and turnout differences on equivalent aggregation; candidate IDs/contest counts explicit, changed electorates/transfers retained. No individual vote-transfer inference",
+      "unavailable_when": [
+        "Missing first round",
+        "Unharmonizable splits/mergers/transfers",
+        "Incomparable contest/candidate semantics"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "audit_features",
+      "mart": "audit_features",
+      "grain": "snapshot × principal/cluster × feature × specification version",
+      "requires": [
+        "freeze",
+        "design"
+      ],
+      "denominator": "Feature-specific denominator and availability, never generic zero imputation",
+      "analytical_role": "context",
+      "definition": "Long feature ledger includes value, unit, numerator, denominator, status/reason, source keys, transformation version, role and mechanism-specification membership",
+      "unavailable_when": [
+        "Prerequisites of referenced feature unavailable",
+        "Role or specification not frozen"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "turnout_target",
+      "mart": "audit_features",
+      "grain": "harmonized principal × election",
+      "requires": [
+        "freeze",
+        "bu2",
+        "composition",
+        "design"
+      ],
+      "denominator": "Eligible electors > 0 in same population",
+      "analytical_role": "outcome",
+      "definition": "attending_voters / eligible_electors; validated log completions are corroboration, not automatic replacement of official attendance",
+      "unavailable_when": [
+        "Zero/unknown electorate",
+        "Unexplained attendance/electorate discrepancy"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "candidate_share_target",
+      "mart": "audit_features",
+      "grain": "harmonized principal × presidential contest",
+      "requires": [
+        "freeze",
+        "bu2",
+        "composition",
+        "design"
+      ],
+      "denominator": "A + B > 0; all other candidate categories explicitly reconciled",
+      "analytical_role": "outcome",
+      "definition": "A / (A + B); A/B fixed from official candidacy IDs and evaluated symmetrically",
+      "unavailable_when": [
+        "Zero valid votes",
+        "Unresolved candidate/categories",
+        "A/B identity not fixed"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "blank_null_targets",
+      "mart": "audit_features",
+      "grain": "principal × contest × choice category",
+      "requires": [
+        "freeze",
+        "bu2",
+        "composition",
+        "design"
+      ],
+      "denominator": "total_presidential_ballots > 0 including all applicable categories",
+      "analytical_role": "outcome",
+      "definition": "Separate blank and applicable null proportions; exceptional categories separately identified, not silently merged",
+      "unavailable_when": [
+        "Zero/unknown total",
+        "Unresolved category meaning/completeness"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "peer_covariates",
+      "mart": "audit_features",
+      "grain": "harmonized principal × versioned pre-specified peer definition",
+      "requires": [
+        "freeze",
+        "bu1",
+        "composition",
+        "locations",
+        "history",
+        "pre_election",
+        "design"
+      ],
+      "denominator": "Comparable population/overlap; source observation dates for covariates",
+      "analytical_role": "context",
+      "definition": "Electorate/size, first-round vector, geography, comparable history, pre-election polling-place characteristics, contest count; current-cycle-only/no-first-round sensitivity variants",
+      "unavailable_when": [
+        "Explicit imports absent",
+        "Out-of-support",
+        "Post-outcome measurement/leakage",
+        "History not comparable"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "device_logistics",
+      "mart": "audit_features",
+      "grain": "session/principal × specification",
+      "requires": [
+        "freeze",
+        "sessions",
+        "pre_election",
+        "design"
+      ],
+      "denominator": "Known hardware/software/logistics exposure and observed sessions",
+      "analytical_role": "sensitivity",
+      "definition": "Model/version/logistics adjust one operational specification and are possible mechanisms in another; turnout/manual/outages remain outcomes/exposures when hypothesized effects",
+      "unavailable_when": [
+        "Unresolved device identity/version",
+        "Role would condition away proposed effect"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "integrity",
+      "mart": "audit_features",
+      "grain": "snapshot × reconciliation population/check",
+      "requires": [
+        "freeze",
+        "bu2",
+        "composition",
+        "final",
+        "sessions",
+        "rdv_signatures"
+      ],
+      "denominator": "Same coherent principal population and canonical versions at every hierarchy",
+      "analytical_role": "diagnostic",
+      "definition": "Accounting and BR/UF/municipality incl ZZ checks; targeted RDV recount/signatures; distinguish publication gaps, numerical disagreement and independent corroboration",
+      "unavailable_when": [
+        "Missing independent records or final population",
+        "Signature verification absent",
+        "Partial AC–RJ cannot establish national reconciliation"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "conditional_unusualness",
+      "mart": "audit_features",
+      "grain": "location/municipality cluster and descriptive section",
+      "requires": [
+        "freeze",
+        "design",
+        "calibration",
+        "validation"
+      ],
+      "denominator": "Eligible held-out peers/calibration clusters; record n_cal and overlap",
+      "analytical_role": "outcome",
+      "definition": "Matched empirical median/quantiles/MAD and quantile regression forest compared by held-out quantile loss/coverage; signed residuals plus prespecified joint maximum score with trained scale floors",
+      "unavailable_when": [
+        "No fitted/calibrated model in scope",
+        "Unsupported exchangeability yields descriptive tail ranks only",
+        "Insufficient power/resolution"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "multiplicity",
+      "mart": "audit_features",
+      "grain": "frozen testing family × cluster/outcome/model variant",
+      "requires": [
+        "freeze",
+        "design",
+        "calibration",
+        "validation"
+      ],
+      "denominator": "Full prespecified tested family incl null results; valid p-values required",
+      "analytical_role": "diagnostic",
+      "definition": "Whole-location splits/seeds/geographic strata; municipality stress tests; dependence-aware BY at proposed 5% FDR; retain adaptive/exploratory ledger and test-set access history",
+      "unavailable_when": [
+        "Unsupported input p-values",
+        "Adaptive search or monitoring not covered by fixed family",
+        "Uninspected holdout absent"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "validation_investigation",
+      "mart": "audit_features",
+      "grain": "mechanism × magnitude × geographic concentration / investigated case",
+      "requires": [
+        "freeze",
+        "design",
+        "validation",
+        "corroboration"
+      ],
+      "denominator": "All simulated cases plus random unflagged sample; stratum coverage",
+      "analytical_role": "diagnostic",
+      "definition": "Independent validation copies for additions/switches/turnout reduction/duplicates/missing blocks/clock errors; power/localization/benign false alarms; initially candidate-blinded log review where feasible",
+      "unavailable_when": [
+        "Simulations not implemented",
+        "No corroboration for mechanism",
+        "History not independently clean"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "conditional_margin_bounds",
+      "mart": "audit_features",
+      "grain": "disjoint affected principal/subset × mechanism",
+      "requires": [
+        "freeze",
+        "bu2",
+        "final",
+        "sessions",
+        "mechanism"
+      ],
+      "denominator": "r completed presidential ballots with 0 <= r <= a + b + c; validated q_i caps; reconciled M",
+      "analytical_role": "sensitivity",
+      "definition": "Anonymous-removal sharp bounds; at-most-r includes zero; switching cap 2 * min(q_i, a_i); strict-win thresholds floor(M/2) + 1 or M + 1; no allocation of anonymous cycles to candidates",
+      "unavailable_when": [
+        "Missing final margin",
+        "Unjustified mechanism/cap",
+        "Overlapping detectors",
+        "r counts attempts instead of ballots",
+        "National impact unidentified outside affected population"
+      ],
+      "initial_state": "not_evaluated"
+    },
+    {
+      "id": "counterfactual_excess",
+      "mart": "audit_features",
+      "grain": "frozen reconciled population × model/mechanism variant",
+      "requires": [
+        "freeze",
+        "bu2",
+        "final",
+        "design",
+        "calibration",
+        "validation",
+        "mechanism"
+      ],
+      "denominator": "n_valid_i with fixed valid turnout; absent-voter preference assumptions separate",
+      "analytical_role": "sensitivity",
+      "definition": "Excess relative to baseline: 2 * sum(a_i - n_valid_i * p_hat_i); full fit/selection pipeline geographic block resampling and sensitivity; signed effects not stolen votes",
+      "unavailable_when": [
+        "No fitted model",
+        "Counterfactual/causal mechanism unidentified",
+        "Section intervals cannot be summed as national confidence interval"
+      ],
+      "initial_state": "not_evaluated"
+    }
+  ],
+  "ledger_fields": [
+    "snapshot_id",
+    "unit_key",
+    "feature_id",
+    "specification_version",
+    "value",
+    "unit",
+    "numerator",
+    "denominator",
+    "readiness_state",
+    "unavailable_reason",
+    "details",
+    "analytical_role",
+    "lineage_keys"
+  ],
+  "rules": [
+    "Missing observations are never numerical zero.",
+    "Every requested unit remains in coverage/readiness ledger, including unavailable and excluded units.",
+    "Readiness is evaluated per feature and unit after validated inputs; this registry does not certify data availability.",
+    "No fitting, fraud labeling, candidate attribution of anonymous cycles, or national inference from partial collection."
+  ]
+}

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[project]
+name = "election-audit"
+version = "0.1.0"
+description = "Reproducible tooling for a partial TSE 2026 runoff log corpus"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "duckdb==1.5.3",
+    "pyarrow==24.0.0",
+]
+
+[project.scripts]
+election-audit = "election_audit.cli:main"
+
+[dependency-groups]
+dev = ["ruff==0.17.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["election_audit", "scripts"]
+
+[tool.uv]
+exclude-newer = "2026-10-29T00:00:00Z"
+build-constraint-dependencies = ["pluggy==1.6.0"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# Preserve the legacy worker callback while separating formatting from behavior.
+"scripts/download_tse_logs.py" = ["E731"]

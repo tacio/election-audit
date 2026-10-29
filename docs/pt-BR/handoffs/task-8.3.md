@@ -1,0 +1,24 @@
+# Tarefa 8.3 — Fundação imutável de análise e investigação
+
+Document-ID: EA-HANDOFF-8.3 · Revision: 1 · Language: pt-BR
+
+Objetivo: persistir protocolo/execução/snapshot, explorações/resultados nulos completos, configuração de escore/calibração, investigação, acesso ao teste e impacto condicional sem ajustar modelos. Pré-requisitos: [8.1](task-8.1.md), [8.2](task-8.2.md), [guia analítico](../analysis.md), apenas extensão de derivados imutáveis.
+
+Arquivos/interfaces: `analysis.py`, `analysis_partitions.py`, `analysis_ledgers.py`, `analysis_reports.py`; extensão do produtor de derivados; CLI/receita `analyze PARENT --bundle FILE --store STORE`; `validate/query/report --language en|pt-BR|both` existentes. Registro/saída, planos/atribuições de partição, registros analíticos, cenários e situação de teste usam tabelas guiadas pelo manifesto. Fatos dos pais e todos os artefatos anteriores permanecem intactos. Configuração é preservada em bytes exatos; fixações de origem/esquema, grãos, digests lógicos, SELECT limitado e integridade da cadeia de pais continuam verificados.
+
+Entregas: IDs imutáveis e referências tipadas; famílias fixadas/exploratórias incluem resultado/subgrupo/janela/escala/modelo/histórico; snapshots completos não omitem resultados registrados ou explorados/nulos. Configurações preservam fitted=false. Pertencimento à calibração e populações de escores/investigação são validados. Âncoras resolvem em hashes source_object congelados; semânticas de revisão fornecidas continuam alegações. Fluxo de consulta reserva testes intocados; training_features filtra unidades de desenvolvimento vinculadas. Inspeção registrada cria novo filho e marca locais estáveis como desenvolvimento em análises posteriores, inclusive novas sementes. Este é um fluxo auditável, não barreira de segurança contra leitura direta de caminhos dos pais, arquivos ou carregadores internos.
+
+Cenários condicionais: um único snapshot/eleição/disputa e par de candidatos, concordância com contagens canônicas normalizadas, limites de cédulas concluídas, premissas explícitas de mecanismo/margem e âncoras congeladas. Apenas principais disjuntos ou união corroborada; sobreposições ficam indisponíveis. Limites de remoção anônima exata/no máximo e trocas preservam escolhas desconhecidas. Margem final ausente fica indisponível; margem assumida empatada exige uma troca para vitória estrita. Sem atribuição a candidatos, identificação causal, valores-p/FDR certificados, ajuste de modelo ou rótulos de fraude.
+
+Aceitação: 16 testes sintéticos focados da fase 8 passaram, código 0. Casos cobrem 21 contratos/papéis; comparecimento normalizado 10 / 20 = 0.5 e saídas de modelo indisponíveis; cadeia imutável pai→eleitoral→analítica com consulta/validação/relatório pareado; identidades desconhecidas persistidas; agrupamento estável verificado entre turnos; semente/ordem/retomada/população/estresse; evidência obsoleta/conflitante/não resolvida; atomicidade de retomada/conflito dos registros; resultados nulos e snapshots completos da família; populações de calibração/escores; acesso/contaminação/novas sementes de teste; sobreposição/limites/margem ausente/empate condicionais. `rtk proxy env UV_OFFLINE=1 just check` final passou, código 0: lock, Ruff, contratos, documentação pareada e 160 testes offline em 33.478s. `analyze/query/report --help` passou, código 0.
+
+Limites: toda aceitação é sintética. Tarefa 7.1 continua parcial: adaptador BU oficial TSE e validação de BU real pendentes; verificações normalizadas não provam compatibilidade oficial/assinaturas. Disponibilidade temporal da origem permanece desconhecida, portanto variáveis numéricas continuam cientificamente inelegíveis. Sem leitura do corpus real, download nacional ou mudança na aquisição. Git indisponível; sem alegação de commit/hash. Contexto compacto é limitado por max_events e configuração por 8 MiB; saída de variáveis usa lotes SQL limitados.
+
+Próxima tarefa exata: agente novo da fase 9 recebe apenas este handoff, índice, guia analítico, CLI e tests/test_analysis*.py, além de contratos selecionados de entrada congelada/publicação quando necessário. Crie demonstração sintética pequena reproduzível e pacote de revisão com cadeia relativa completa, evidências/configuração, SQL, disponibilidade/denominadores, todos os nulos e limites. Depois selecione explicitamente piloto bruto AC–RJ congelado limitado, inspecione semântica real e forneça evidência de reprodução/desempenho/revisão. Preserve aquisição em execução/bytes originais e bloqueio do adaptador oficial. Não reabra toda a pesquisa, baixe nacionalmente, ajuste modelos ou rotule fraude.
+
+```sh
+rtk proxy env UV_OFFLINE=1 just check
+rtk proxy env UV_OFFLINE=1 just analyze --help
+rtk proxy env UV_OFFLINE=1 just query --help
+rtk proxy env UV_OFFLINE=1 just report --help
+```

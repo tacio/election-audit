@@ -1,0 +1,8 @@
+data/
+.local-state/
+__pycache__/
+*.pyc
+.venv/
+.ruff_cache/
+dist/
+*.egg-info/
