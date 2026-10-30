@@ -1,14 +1,14 @@
 {
   "evidence_version": "electoral-source-discovery-v1",
   "inspected_on": "2026-10-29",
-  "verification_status": "documentation_discovered_BU_schema_not_verified",
+  "verification_status": "official_BWEB_layout_verified_AC_real_published_row_arithmetic_checked",
   "official_resources": [
     {
       "url": "https://dadosabertos.tse.jus.br/dataset/resultados-2026-boletim-de-urna/resource/4753eb99-062b-484a-b569-04c51d039885",
       "role": "AC runoff BU resource metadata",
       "format": "CSV inside ZIP",
       "datastore_active": false,
-      "header_or_dictionary_verified": false
+      "header_or_dictionary_verified": true
     },
     {
       "url": "https://www.tse.jus.br/eleicoes/informacoes-tecnicas-sobre-a-divulgacao-de-resultados",
@@ -32,7 +32,10 @@
   ],
   "bounded_access_attempt": {
     "url": "https://cdn.tse.jus.br/estatistica/sead/eleicoes/eleicoes2026/buweb/bweb_2t_AC_261020260742.zip",
-    "range_bytes": [0, 65535],
+    "range_bytes": [
+      0,
+      65535
+    ],
     "maximum_bytes": 1048576,
     "maximum_seconds": 20,
     "web_result": "unsupported content-type application/zip; also sidecar",
@@ -41,9 +44,29 @@
     "downloaded_bytes": 0
   },
   "outstanding": [
-    "Pinned real BU bytes with bundled dictionary and exact original header/encoding",
-    "Reviewed official source field/category/status mapping for an explicit adapter version",
-    "Real BU import/reconciliation validation; fixtures establish normalized arithmetic only"
+    "Official totalization/supersession linkage for each BU version",
+    "Explicit complete choice ledger, including omitted/zero/exception categories",
+    "Independent final hierarchy/electorate references",
+    "Reviewed clocks, other UF layouts and first-round/history imports"
   ],
-  "signature_verification": "not_implemented_or_certified"
+  "signature_verification": "not_implemented_or_certified",
+  "successful_access": {
+    "observed_at": "2026-10-30T00:54:14+00:00",
+    "resource_id": "4753eb99-062b-484a-b569-04c51d039885",
+    "archive_url": "https://cdn.tse.jus.br/estatistica/sead/eleicoes/eleicoes2026/buweb/bweb_2t_AC_261020260742.zip",
+    "archive_bytes": 1254611,
+    "archive_sha256": "35c1f1676e04d0824eb57df158f40d3c1e943926fd4754933a9d2863ccf06e1b",
+    "csv_sha256": "30b79be4214eef80f9260c8a80586cd451e00a2b991c759fd7467e328b45f209",
+    "dictionary_sha256": "abac13b4817dec9816583033a3258f8016c9baef7431bc0806ebb4f497c40fb2",
+    "official_sha512_matches": true,
+    "zip_crc_checks": "passed",
+    "presidential_rows": 8697,
+    "excluded_governor_rows": 8925,
+    "principal_sections": 2270,
+    "published_vote_sum": 453654,
+    "attendance_and_electorate_checks_matched": 2270,
+    "layout_resource": "bweb-2026-layout.json",
+    "local_bundle": "data/official-bu/ac-runoff-2026-10-30/bundle.json",
+    "catalog_caveat": "package_show response lists first-round resources; separate resource_show confirms runoff URL"
+  }
 }

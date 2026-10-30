@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 11 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 12 · Language: pt-BR
 
 Leia instruções do repositório (incluindo `/home/tacio/.codex/RTK.md`), este índice,
 handoff atribuído e só contratos relevantes. Use agente separado por fase com
@@ -33,9 +33,9 @@ e manifesto. Outros turnos/histórico exigem importações; subconjunto não é 
 | 6.1 | Publicações limitadas imutáveis DuckDB/Parquet, recursos e current atômico | [6.1](handoffs/task-6.1.md) |
 | 6.2 | Marts de cobertura/sessão/disponibilidade de ciclo de vida/votação tardia e incerteza | [6.2](handoffs/task-6.2.md) |
 | 6.3 | Construção/validação/consulta somente leitura/relatórios bilíngues; extensão da Fase 7 | [6.3](handoffs/task-6.3.md) |
-| 7.1 (parcial) | Importador normalizado estrito/proveniência; adaptador BU oficial TSE verificado pendente (acesso bloqueado) | [7.1](handoffs/task-7.1.md) |
+| 7.1 | Importações normalizadas estritas e adaptador BWEB oficial fixado; leiaute AC real e aritmética das linhas publicadas verificados | [7.1](handoffs/task-7.1.md) |
 | 7.2 | Derivadas imutáveis com pai fixado, seleção canônica evidenciada, reconciliação aritmética/hierárquica | [7.2](handoffs/task-7.2.md) |
-| 7.3 | Quatro marts eleitorais, SELECT limitado, validação e relatórios em par; validação BU real indisponível | [7.3](handoffs/task-7.3.md) |
+| 7.3 | Quatro marts eleitorais, SELECT limitado, validação e relatórios em par; reconciliação final real indisponível | [7.3](handoffs/task-7.3.md) |
 | 8.1 | Registro versionado dos 21 contratos, saídas descritivas em fluxo e bloqueios científicos explícitos | [8.1](handoffs/task-8.1.md) |
 | 8.2 | Populações estáveis de locais revisadas com sementes, estratos geográficos e reservas de estresse municipal | [8.2](handoffs/task-8.2.md) |
 | 8.3 | Registros imutáveis de protocolo/exploração/nulos/investigação/cenários, acesso ao teste, CLI e relatórios pareados | [8.3](handoffs/task-8.3.md) |
@@ -52,9 +52,9 @@ esperado das cinco UFs 54166; 49235 eventos, 44403 desconhecidos; todas as
 piloto completo 406.437 segundos; arquivos medidos 1084083961 bytes.
 `data/phase9/` preserva roteiro, piloto, pacotes de revisão, reproduções novas,
 relatórios pareados e verificações. Não há processamento completo, ajuste de
-modelo, atribuição de candidato, margem nacional ou rótulo de fraude. Tarefa 7.1
-permanece parcial: adaptador BU oficial TSE verificado e validação BU real
-indisponíveis. Git indisponível.
+modelo, atribuição de candidato, margem nacional ou rótulo de fraude. A tarefa 7.1 agora inclui adaptador BWEB oficial com validação aritmética de linhas reais AC. Situação/completude/hierarquia finais permanecem sem verificação. Repasses anteriores registram aceitação histórica; o repasse atual 7.1 substitui seu bloqueio de acesso à fonte.
+
+Aceitação atual da tarefa 7.1: `rtk just check` passou com 177 testes sem rede. Validação da fonte AC real e relatórios da derivada imutável estão em `data/official-bu/ac-runoff-2026-10-30/`; consulte o [repasse atual](handoffs/task-7.1.md).
 
 | Interface | Fonte / contrato relevante |
 | --- | --- |
@@ -66,7 +66,7 @@ indisponíveis. Git indisponível.
 | APIs da análise estrutural | `archive_parsing.parse_snapshot/inspect_parse/iter_event_witnesses/iter_lineage/iter_parsing_issues`; [guia de arquivos](archive-parsing.md); versão `jez-structural-v1`; `source_line_sha256` exato, contextos não resolvidos, cache separado de todos os testemunhos do publicador |
 | Reconstrução operacional | `reconstruction.reconstruct_parse/inspect_reconstruction/iter_reconstruction_rows/load_reconstruction_context`; [guia](reconstruction.md); `operational-v1`; `FrozenParseReader` para grupos limitados, contexto completo compartilhado, incerteza explícita |
 | Publicações operacionais | `publication`, `operational_marts`, `release_tools`; [guia de publicação](publication.md); DuckDB/Parquet imutáveis, consultas somente SELECT e relatórios em par |
-| Derivadas eleitorais | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`; [guia](electoral-results.md); apenas normalizado, nacional parcial; adaptador BU oficial pendente |
+| Derivadas eleitorais | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`; [guia](electoral-results.md); importações normalizadas e BWEB oficiais, nacional parcial; reconciliação final indisponível |
 | Validador estrutural | `election_audit/contracts.py`; `load_contract`, `validate_contracts`, `validate_rows`; recursos empacotados; semântica/relações ficam para publicação |
 | Granularidade/uniões/tempo | [Dicionário](schema-dictionary.md), [convenções](transformation-conventions.md); totais/escolhas separados, versões canônicas únicas, sem multiplicação por integrantes/sessões/evidências |
 | Atributos | `election_audit/resources/contracts/features.json`; [prontidão](feature-readiness.md); desconhecido não é zero, AC–RJ parcial, after17 Brasília, unanimidade estrita |
@@ -74,12 +74,7 @@ indisponíveis. Git indisponível.
 | Checagem documental | `scripts/check_docs.py`; `check_docs(root)`; metadados/revisões/links locais/blocos; sem executar comandos |
 | Receitas | `justfile`; `setup doctor fmt lint test contracts-check docs-check check download resume inspect snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill docs-command-check` |
 
-Próxima: tarefa 7.1, adaptador oficial/validação real, após obter documentação
-oficial fixada e dados BU originais acessíveis. Use [9.4](handoffs/task-9.4.md),
-[reprodução](reproduction.md), [processamento](backfill.md) e
-[guia eleitoral](electoral-results.md). Revise evidência real de mensagens/sessões/
-relógios antes de alegar elegibilidade operacional. Preserve desconhecidos e
-cobertura nacional parcial; nenhum ajuste é autorizado.
+Próxima: obter vínculo explícito de totalização/supersessão, evidência completa de escolhas e referências finais independentes para resultados reais. Lacuna de importação BWEB oficial resolvida para leiaute AC verificado. Consulte [guia eleitoral](electoral-results.md), [reprodução](reproduction.md) e [processamento](backfill.md). Novos logs exigem novos snapshots; pilotos existentes permanecem parciais. Revise mensagens/sessões/relógios antes de conceder elegibilidade. Nenhum ajuste é autorizado.
 
 Pares sob `docs/en/` e `docs/pt-BR/` compartilham Document-ID/Revision; pesquisa
 mantém caminhos ingleses e pares `.pt-BR.md`. Incremente revisões juntas. Código,

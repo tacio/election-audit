@@ -102,6 +102,83 @@ class DerivativeTests(test_snapshots.SourceFixture):
             query_release(moved_child, "SELECT count(*) FROM canonical_result")["rows"], [(1,)]
         )
 
+    def test_official_bu_child_preserves_verification_originals_unknowns_and_relocation(self):
+        from test_official_bu import official_bundle
+
+        base, parent, _, _ = self.parent_and_bundle()
+        root = base / "official"
+        root.mkdir()
+        bundle = official_bundle(root)
+        child = publish_derivative(parent, bundle, base / "warehouse")
+        doc = inspect_release(child)
+        self.assertEqual(doc["verification_status"], "official_layout_verified")
+        validation = validate_release(child)
+        self.assertEqual(validation["verification_status"], "official_layout_verified")
+        self.assertEqual(validation["integrity"], "passed")
+        self.assertEqual(
+            query_release(child, "SELECT count(*) FROM result_version")["rows"], [(3,)]
+        )
+        self.assertEqual(
+            query_release(child, "SELECT DISTINCT result_status FROM result_version")["rows"],
+            [("unknown",)],
+        )
+        report_release(child, base / "official-report")
+        findings = json.loads((base / "official-report/findings.json").read_text())
+        self.assertEqual(findings["verification_status"], "official_layout_verified")
+        self.assertIn(
+            "Official BWEB layout verified", (base / "official-report/report.en.md").read_text()
+        )
+        self.assertEqual(len(doc["originals"]), 6)
+        from election_audit.analysis import feature_rows
+
+        features = list(
+            feature_rows(child, doc, {"cutoff_at": "2026-10-30T00:00:00+00:00"}, ResourceConfig())
+        )
+        official = [r for r in features if "official_layout_verified" in r["quality_indicators"]]
+        self.assertTrue(official)
+        self.assertTrue(all(not r["scientific_eligible"] for r in official))
+        self.assertTrue(
+            all(
+                "source_schema_not_officially_verified" not in r["scientific_blockers"]
+                for r in official
+            )
+        )
+        self.assertTrue(any("normalized_only" in r["quality_indicators"] for r in features))
+        moved = base / "official-moved"
+        shutil.move(base / "warehouse", moved)
+        self.assertEqual(validate_release(moved / "releases" / child.name)["integrity"], "passed")
+
+    def test_official_reobservation_appends_without_reusing_another_snapshot_identity(self):
+        from test_official_bu import official_bundle
+
+        base, parent, _, _ = self.parent_and_bundle()
+        root = base / "official"
+        root.mkdir()
+        bundle = official_bundle(root)
+        first = publish_derivative(parent, bundle, base / "warehouse")
+        document = json.loads(bundle.read_text())
+        # Same exact original files; a new archive observation with reused catalog evidence.
+        document["archive"]["observed_at"] = "2026-10-31T00:00:00+00:00"
+        bundle.write_text(json.dumps(document))
+        second = publish_derivative(first, bundle, base / "warehouse")
+        self.assertEqual(
+            query_release(second, "SELECT count(*) FROM result_version")["rows"], [(6,)]
+        )
+        self.assertEqual(
+            query_release(first, "SELECT count(*) FROM result_version")["rows"], [(3,)]
+        )
+        self.assertEqual(validate_release(second)["integrity"], "passed")
+        self.assertEqual(
+            query_release(second, "SELECT count(DISTINCT snapshot_id) FROM result_evidence")[
+                "rows"
+            ],
+            [(2,)],
+        )
+        self.assertEqual(
+            query_release(second, "SELECT DISTINCT result_status FROM result_version")["rows"],
+            [("unknown",)],
+        )
+
     def test_append_derivative_retains_versions_and_recalculates_conflict(self):
         base, parent, bundle, data = self.parent_and_bundle()
         child = publish_derivative(parent, bundle, base / "warehouse")

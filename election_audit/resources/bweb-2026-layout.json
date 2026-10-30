@@ -1,0 +1,86 @@
+{
+  "adapter": "tse-bweb-2026-v1",
+  "dictionary_sha256": "abac13b4817dec9816583033a3258f8016c9baef7431bc0806ebb4f497c40fb2",
+  "dictionary_member": "_leiame-boletimurnaweb.pdf",
+  "encoding": "latin-1",
+  "delimiter": ";",
+  "header": [
+    "DT_GERACAO",
+    "HH_GERACAO",
+    "ANO_ELEICAO",
+    "CD_TIPO_ELEICAO",
+    "NM_TIPO_ELEICAO",
+    "CD_PLEITO",
+    "DT_PLEITO",
+    "NR_TURNO",
+    "CD_ELEICAO",
+    "DS_ELEICAO",
+    "SG_UF",
+    "CD_MUNICIPIO",
+    "NM_MUNICIPIO",
+    "NR_ZONA",
+    "NR_SECAO",
+    "NR_LOCAL_VOTACAO",
+    "CD_CARGO_PERGUNTA",
+    "DS_CARGO_PERGUNTA",
+    "NR_PARTIDO",
+    "SG_PARTIDO",
+    "NM_PARTIDO",
+    "DT_BU_RECEBIDO",
+    "QT_APTOS",
+    "QT_COMPARECIMENTO",
+    "QT_ABSTENCOES",
+    "CD_TIPO_URNA",
+    "DS_TIPO_URNA",
+    "CD_TIPO_VOTAVEL",
+    "DS_TIPO_VOTAVEL",
+    "NR_VOTAVEL",
+    "NM_VOTAVEL",
+    "QT_VOTOS",
+    "NR_URNA_EFETIVADA",
+    "CD_CARGA_1_URNA_EFETIVADA",
+    "CD_CARGA_2_URNA_EFETIVADA",
+    "CD_FLASHCARD_URNA_EFETIVADA",
+    "DT_CARGA_URNA_EFETIVADA",
+    "DS_CARGO_PERGUNTA_SECAO",
+    "DS_SECOES_AGREGADAS",
+    "DT_ABERTURA",
+    "DT_ENCERRAMENTO",
+    "QT_ELEI_BIOM_SEM_HABILITACAO",
+    "DT_EMISSAO_BU",
+    "NR_JUNTA_APURADORA",
+    "NR_TURMA_APURADORA"
+  ],
+  "scope": "2026 presidential runoff; explicit UF; verified against AC source only",
+  "missing_values": {
+    "#NULO": "missing_source",
+    "#NULO#": "missing_source",
+    "-1": "missing_source",
+    "#NE": "not_published",
+    "#NE#": "not_published",
+    "-3": "not_published"
+  },
+  "vote_categories": {
+    "1": [
+      "Nominal",
+      "candidate"
+    ],
+    "2": [
+      "Branco",
+      "blank"
+    ],
+    "3": [
+      "Nulo",
+      "null"
+    ]
+  },
+  "limitations": [
+    "Apurada is not Totalizado; official result_status remains unknown",
+    "Absent choice rows are not explicit zero counts",
+    "No special/unresolved zero categories inferred",
+    "No stable cross-contest candidacy identity inferred from ballot numbers",
+    "Raw timestamps preserved without assumed timezone",
+    "No binary BU signature certification or independent final hierarchy validation"
+  ],
+  "identity_rule": "snapshot-scoped-result-and-run-scoped-observation-and-witness-v1"
+}

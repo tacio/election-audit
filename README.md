@@ -1,10 +1,10 @@
 # Election audit — 2026 presidential runoff
 
-Document-ID: EA-ONBOARDING · Revision: 4 · Language: en
+Document-ID: EA-ONBOARDING · Revision: 5 · Language: en
 
 [Português](README.pt-BR.md)
 
-This project preserves original acquisition bytes and publishes frozen snapshots → structural parses → operational reconstruction → immutable DuckDB/Parquet releases → normalized electoral imports → descriptive features, partitions and immutable analysis ledgers. Available AC–RJ logs are a partial national population. No model is fitted and no fraud label is produced.
+This project preserves original acquisition bytes and publishes frozen snapshots → structural parses → operational reconstruction → immutable DuckDB/Parquet releases → normalized electoral imports → descriptive features, partitions and immutable analysis ledgers. Raw log acquisition now spans all UFs and ZZ, with explicit unpublished/no-log gaps; frozen derived releases retain their original partial populations. No model is fitted and no fraud label is produced.
 
 Install uv, just and rtk. Python 3.14, DuckDB 1.5.3, PyArrow 24.0.0 and Ruff are pinned in the lockfile. Recipes use `/tmp/election-audit-uv-cache`; offline setup needs an existing populated cache. Checks never acquire election data.
 
@@ -43,7 +43,7 @@ rtk proxy just resume --help
 rtk proxy just inspect --help
 ```
 
-Task 7.1 remains PARTIAL: implement the official TSE 2026 BU adapter only after obtaining and verifying official documentation and original BU data, then run real compatibility/arithmetic validation. The normalized importer and synthetic 10/20 turnout do not satisfy that task. Missing real BU does not prevent operational diagnostics. Numeric features remain scientifically ineligible; exchangeability, candidate attribution and final national margin are unavailable.
+Task 7.1 now includes the official `tse-bweb-2026-v1` adapter, verified against real AC runoff bytes and the bundled dictionary. All 2270 presidential sections pass published-row arithmetic checks. Missing choice rows, official totalization linkage, independent final totals and clocks remain unresolved; no canonical result or scientific eligibility is inferred. See the [electoral guide](docs/en/electoral-results.md).
 
 Legacy downloader flags, object layout, authoritative `manifest-location.json` and live WAL behavior are preserved. Keep one downloader per raw root. Fresh snapshot capture observes current committed state; reproduce an existing frozen snapshot to avoid changing source observation identities. Additional UFs/ZZ and rounds/history require explicit snapshots/imports.
 

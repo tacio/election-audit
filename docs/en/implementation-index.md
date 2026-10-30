@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 11 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 12 · Language: en
 
 Read repository instructions (including `/home/tacio/.codex/RTK.md`), this index,
 the assigned task handoff and only relevant contracts. Use a separate agent per
@@ -33,9 +33,9 @@ Other rounds/history require explicit imports; successful subsets are not nation
 | 6.1 | Immutable bounded DuckDB/Parquet releases, resource limits, atomic current | [6.1](handoffs/task-6.1.md) |
 | 6.2 | Coverage/session/lifecycle availability/late-voting marts, clock uncertainty | [6.2](handoffs/task-6.2.md) |
 | 6.3 | Build/validate/read-only query/bilingual reports; Phase 7 extension seam | [6.3](handoffs/task-6.3.md) |
-| 7.1 (partial) | Strict normalized importer/provenance; verified official TSE BU adapter outstanding (source access blocked) | [7.1](handoffs/task-7.1.md) |
+| 7.1 | Strict normalized imports plus pinned official BWEB adapter; real AC layout and published-row arithmetic verified | [7.1](handoffs/task-7.1.md) |
 | 7.2 | Immutable parent-pinned derivatives, evidenced canonical selection, arithmetic/hierarchy reconciliation | [7.2](handoffs/task-7.2.md) |
-| 7.3 | Four electoral marts, bounded SELECT, validation and paired reports; real BU validation unavailable | [7.3](handoffs/task-7.3.md) |
+| 7.3 | Four electoral marts, bounded SELECT, validation and paired reports; real final reconciliation unavailable | [7.3](handoffs/task-7.3.md) |
 | 8.1 | Versioned 21-contract feature registry, streamed descriptive outputs and explicit scientific blockers | [8.1](handoffs/task-8.1.md) |
 | 8.2 | Persisted seeded reviewed stable-location populations, geographic strata and municipal stress holdouts | [8.2](handoffs/task-8.2.md) |
 | 8.3 | Immutable protocol/exploration/null/investigation/scenario ledgers, test access history, CLI and paired reports | [8.3](handoffs/task-8.3.md) |
@@ -51,8 +51,9 @@ five principals AC/AL/DF/ES/PR; full five-UF expected denominator 54166;
 Pipeline 162.549 seconds, full pilot 406.437 seconds; measured run bytes 1084083961.
 `data/phase9/` retains demo, pilot, review bundles, fresh reproduction results,
 paired reports and verification evidence. No full backfill, model fitting,
-candidate attribution, national margin or fraud label. Task 7.1 remains partial:
-verified official TSE BU adapter and real BU validation unavailable. Git unavailable.
+candidate attribution, national margin or fraud label. Task 7.1 now has an official BWEB adapter with real AC published-row arithmetic validation. Final status/completeness/hierarchy remain unverified. Earlier handoffs describe historical acceptance; the current 7.1 handoff supersedes their source-access blocker.
+
+Current Task 7.1 acceptance: `rtk just check` passed with 177 offline tests. Real AC source validation and immutable derivative reports are under `data/official-bu/ac-runoff-2026-10-30/`; see the current [handoff](handoffs/task-7.1.md).
 
 | Interface | Relevant source / contract |
 | --- | --- |
@@ -64,7 +65,7 @@ verified official TSE BU adapter and real BU validation unavailable. Git unavail
 | Structural parse APIs | `archive_parsing.parse_snapshot/inspect_parse/iter_event_witnesses/iter_lineage/iter_parsing_issues`; [archive guide](archive-parsing.md); version `jez-structural-v1`; exact `source_line_sha256`, unresolved contexts, content cache separate from all publisher witnesses |
 | Operational reconstruction | `reconstruction.reconstruct_parse/inspect_reconstruction/iter_reconstruction_rows/load_reconstruction_context`; [guide](reconstruction.md); `operational-v1`; `FrozenParseReader` for bounded groups, shared full population context, explicit uncertainty |
 | Operational releases | `publication`, `operational_marts`, `release_tools`; [publication guide](publication.md); immutable DuckDB/Parquet, SELECT-only queries and paired reports |
-| Electoral derivatives | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`; [guide](electoral-results.md); normalized-only, partial national; official BU adapter outstanding |
+| Electoral derivatives | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`; [guide](electoral-results.md); normalized and official BWEB imports, partial national; final reconciliation remains unavailable |
 | Analysis foundation | `analysis`, `analysis_partitions`, `analysis_ledgers`, `analysis_reports`; [guide](analysis.md); `analyze`, `validate`, `query`, `report` |
 | Structural validator | `election_audit/contracts.py`; `load_contract`, `validate_contracts`, `validate_rows`; packaged resources; semantic/relational checks remain publication work |
 | Grains/joins/time | [Dictionary](schema-dictionary.md), [conventions](transformation-conventions.md); separate totals/choices, unique canonical versions, no member/session/witness multiplication |
@@ -73,12 +74,7 @@ verified official TSE BU adapter and real BU validation unavailable. Git unavail
 | Docs check | `scripts/check_docs.py`; `check_docs(root)`; metadata/revisions/local links/fenced parity; safe separate help/command/SQL syntax checks |
 | Recipes | `justfile`; `setup doctor fmt lint test contracts-check docs-check check download resume inspect snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill docs-command-check` |
 
-Next: task 7.1 official adapter/real validation, after obtaining accessible
-pinned official documentation and original BU data. Use [9.4](handoffs/task-9.4.md),
-[reproduction](reproduction.md), [backfill](backfill.md) and
-[electoral guide](electoral-results.md). Review actual message/session/clock
-evidence before claiming operational eligibility. Preserve unknowns and partial
-national coverage; no fitting is authorized.
+Next: obtain explicit totalization/supersession linkage, complete choice evidence and independent final references for real results. The official BWEB import gap is closed for the verified AC layout. Use [electoral guide](electoral-results.md), [reproduction](reproduction.md) and [backfill](backfill.md). New raw logs require new frozen snapshots; existing pilot releases remain partial. Review message/session/clock evidence before granting eligibility. No fitting is authorized.
 
 Pairs under `docs/en/` and `docs/pt-BR/` share Document-ID/Revision; research keeps
 English paths plus `.pt-BR.md` counterparts. Bump both revisions together. Code,

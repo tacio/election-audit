@@ -1,6 +1,8 @@
 # Reproduction and peer review
 
-Document-ID: EA-REPRODUCTION · Revision: 1 · Language: en
+Document-ID: EA-REPRODUCTION · Revision: 2 · Language: en
+
+Current source status: Task 7.1 now provides the official BWEB adapter, verified with real AC runoff bytes and published-row arithmetic. Final totalization linkage, complete choice evidence and independent final references remain unavailable; no scientific eligibility follows. Earlier descriptions of a missing adapter below record the prior acceptance state. See [current electoral guide](electoral-results.md).
 
 The offline demo is SYNTHETIC throughout: deterministic tiny ZIP originals exercise mixed device dates, exact copied history, replacement devices, manual request/cancellation, unresolved clocks and malformed nested content. Reviewed session/copy/semantic assertions are generated from exact preserved synthetic line hashes. Expected members 3, unique principals 2, normalized attending voters 10, eligible electors 20 and turnout 0.5 are known fixture numbers. They do not validate real electoral data. Unknown identity links remain unavailable; a registered exploration preserves its null result and complete history without fitting.
 

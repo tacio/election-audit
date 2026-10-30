@@ -169,7 +169,14 @@ def inspect_derivative(path, document, *, seen=None, cache=None):
         imported = _read_checked(path, "import.json")
         if (
             imported["bundle"] != document["identity"]["adapter"]
-            or document["verification_status"] != "normalized_only"
+            or document["verification_status"] != imported["verification_status"]
+            or document["verification_status"]
+            != (
+                "official_layout_verified"
+                if imported["bundle"].get("adapter") == "tse-bweb-2026-v1"
+                else "normalized_only"
+            )
+            or document["electoral_validation"] != imported["real_bu_validation"]
         ):
             raise PublicationError("Derivative import provenance mismatch")
         if (
@@ -495,7 +502,7 @@ def publish_derivative(parent, bundle, store, *, config=None, _analysis=False):
                 "originals": [f"originals/{sha}" for sha in sorted(imported["originals"])],
                 "national_status": "partial_national",
                 "electoral_validation": imported["real_bu_validation"],
-                "verification_status": "normalized_only",
+                "verification_status": imported["verification_status"],
             }
             # Use the pinned verified parent without a second physical corpus scan.
             verified = {**document, "_parent_document": parent_doc, "_parent_path": str(parent)}
@@ -611,10 +618,10 @@ def validate_derivative(path, document):
         "grains_foreign_keys": "passed",
         "national_status": "partial_national",
         "electoral_validation": document["electoral_validation"],
-        "verification_status": "normalized_only",
+        "verification_status": document.get("verification_status", "normalized_only"),
         "deferred_checks": deferred,
         "parent_chain": [parent_validation],
-        "reconciliation": "normalized_arithmetic_only",
+        "reconciliation": document["electoral_validation"],
     }
 
 

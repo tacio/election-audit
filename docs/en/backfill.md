@@ -1,6 +1,8 @@
 # Resumable frozen backfill and storage planning
 
-Document-ID: EA-BACKFILL · Revision: 1 · Language: en
+Document-ID: EA-BACKFILL · Revision: 2 · Language: en
+
+Current source status: Task 7.1 now provides the official BWEB adapter, verified with real AC runoff bytes and published-row arithmetic. Final totalization linkage, complete choice evidence and independent final references remain unavailable; no scientific eligibility follows. Earlier descriptions of a missing adapter below record the prior acceptance state. See [current electoral guide](electoral-results.md).
 
 Backfill is an explicit derived-data operation over one immutable snapshot, with one bounded reconstruction group per content object. It does not invoke acquisition. Repeating the identical frozen input, output and resource configuration verifies/reuses parse cache, shared reconstruction context, completed shards and release; it restores the current pointer only to a verified release. New live downloads require a new snapshot and cannot silently enlarge an existing backfill.
 

@@ -80,14 +80,14 @@ def report_electoral(path, output, document, *, language="both"):
         "release_id": path.name,
         "national_status": "partial_national",
         "electoral_validation": document["electoral_validation"],
-        "verification_status": "normalized_only",
+        "verification_status": document.get("verification_status", "normalized_only"),
         "validation": validation,
         "calculations": calculations,
         "sql": SQL,
         "parent_chain": chain,
         "assumptions": "reviewed_normalized_status_completeness_clocks_and_harmonization_assertions",
         "exclusions": "unresolved_versions_missing_categories_non_totalized_results_unmatched_populations",
-        "uncertainty": "no_verified_official_BU_adapter_or_real_BU_validation",
+        "uncertainty": "final_status_completeness_independent_hierarchy_clocks_and_signatures_require_separate_evidence",
         "challenging_evidence": "original_bytes_official_corrections_composition_ZZ_coverage_category_dictionary_clocks",
         "reproduce": f"rtk proxy env UV_OFFLINE=1 just report '{path}' --output '{output}'",
     }
@@ -101,7 +101,15 @@ def report_electoral(path, output, document, *, language="both"):
             "",
             text["scope"],
             "",
-            text["validation"],
+            (
+                "Official BWEB layout verified; published-row arithmetic checked. Final totalization, "
+                "complete choices, independent final totals and signatures remain unverified."
+                if lang == "en"
+                else "Leiaute BWEB oficial verificado; aritmética das linhas publicadas conferida. Totalização final, "
+                "escolhas completas, totais finais independentes e assinaturas permanecem não verificados."
+            )
+            if document.get("verification_status") == "official_layout_verified"
+            else text["validation"],
             "",
             text["body"],
             "",

@@ -1,10 +1,10 @@
 # Auditoria eleitoral — segundo turno presidencial de 2026
 
-Document-ID: EA-ONBOARDING · Revision: 4 · Language: pt-BR
+Document-ID: EA-ONBOARDING · Revision: 5 · Language: pt-BR
 
 [English](README.md)
 
-Este projeto preserva os bytes originais da aquisição e publica snapshots congelados → análises estruturais → reconstrução operacional → publicações imutáveis DuckDB/Parquet → importações eleitorais normalizadas → atributos descritivos, partições e registros imutáveis de análise. Logs disponíveis AC–RJ formam uma população nacional parcial. Nenhum modelo é ajustado e nenhum rótulo de fraude é produzido.
+Este projeto preserva os bytes originais da aquisição e publica snapshots congelados → análises estruturais → reconstrução operacional → publicações imutáveis DuckDB/Parquet → importações eleitorais normalizadas → atributos descritivos, partições e registros imutáveis de análise. A coleta bruta de logs agora abrange todas as UFs e ZZ, com lacunas explícitas de dados não publicados/logs ausentes; derivadas congeladas preservam suas populações parciais originais. Nenhum modelo é ajustado e nenhum rótulo de fraude é produzido.
 
 Instale uv, just e rtk. Python 3.14, DuckDB 1.5.3, PyArrow 24.0.0 e Ruff estão fixados no arquivo de dependências. As receitas usam `/tmp/election-audit-uv-cache`; instalação sem rede exige cache previamente preenchido. As verificações nunca adquirem dados eleitorais.
 
@@ -43,7 +43,7 @@ rtk proxy just resume --help
 rtk proxy just inspect --help
 ```
 
-A tarefa 7.1 permanece PARCIAL: implementar o adaptador BU oficial TSE 2026 somente após obter e verificar documentação oficial e dados BU originais, e então executar validação real de compatibilidade/aritmética. O importador normalizado e comparecimento sintético 10/20 não satisfazem essa tarefa. BU real ausente não impede diagnósticos operacionais. Atributos numéricos continuam cientificamente inelegíveis; permutabilidade, atribuição de candidatos e margem nacional final estão indisponíveis.
+A tarefa 7.1 agora inclui o adaptador oficial `tse-bweb-2026-v1`, verificado com bytes reais AC do segundo turno e dicionário incluído. Todas as 2270 seções presidenciais passam nas verificações aritméticas das linhas publicadas. Escolhas ausentes, vínculo de totalização oficial, totais finais independentes e relógios permanecem não resolvidos; nenhum resultado canônico ou elegibilidade científica é inferido. Consulte o [guia eleitoral](docs/pt-BR/electoral-results.md).
 
 Opções do coletor legado, estrutura de objetos, `manifest-location.json` autoritativo e comportamento WAL ativo foram preservados. Mantenha um coletor por raiz original. Nova captura de snapshot observa o estado confirmado atual; reproduza um snapshot congelado existente para preservar identidades de observação. UFs/ZZ adicionais e turnos/histórico exigem snapshots/importações explícitos.
 

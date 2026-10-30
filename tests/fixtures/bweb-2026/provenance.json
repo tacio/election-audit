@@ -1,0 +1,18 @@
+{
+  "official_archive_url": "https://cdn.tse.jus.br/estatistica/sead/eleicoes/eleicoes2026/buweb/bweb_2t_AC_261020260742.zip",
+  "original_archive_sha256": "35c1f1676e04d0824eb57df158f40d3c1e943926fd4754933a9d2863ccf06e1b",
+  "original_csv_sha256": "30b79be4214eef80f9260c8a80586cd451e00a2b991c759fd7467e328b45f209",
+  "source_records": [
+    2,
+    3211,
+    5150,
+    13752,
+    6,
+    3215,
+    5154,
+    4976,
+    6471,
+    453
+  ],
+  "scope": "Re-serialized subset of real CSV records for offline regressions. Test ZIPs and metadata are generated fixture containers, not official archives. Bundled PDF is exact original dictionary; CC-BY TSE dataset."
+}

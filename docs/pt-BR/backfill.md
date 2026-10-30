@@ -1,6 +1,8 @@
 # Processamento retroativo retomável e planejamento de armazenamento
 
-Document-ID: EA-BACKFILL · Revision: 1 · Language: pt-BR
+Document-ID: EA-BACKFILL · Revision: 2 · Language: pt-BR
+
+Situação atual da fonte: a tarefa 7.1 agora fornece adaptador BWEB oficial, verificado com bytes reais AC do segundo turno e aritmética das linhas publicadas. Vínculo de totalização final, evidência completa de escolhas e referências finais independentes continuam indisponíveis; não há elegibilidade científica. Descrições abaixo de adaptador ausente registram a aceitação anterior. Consulte o [guia eleitoral atual](electoral-results.md).
 
 O processamento retroativo é operação derivada explícita sobre um snapshot imutável, com um grupo limitado de reconstrução por objeto de conteúdo. Não invoca aquisição. Repetir entrada congelada, saída e configuração de recursos idênticas verifica/reutiliza cache estrutural, contexto compartilhado, fragmentos concluídos e publicação; restaura current somente para publicação verificada. Downloads posteriores exigem novo snapshot e não ampliam silenciosamente processamento existente.
 

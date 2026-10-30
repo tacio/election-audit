@@ -1,15 +1,42 @@
 # Task 7.1 — Explicit electoral imports
 
-Document-ID: EA-HANDOFF-7.1 · Revision: 1 · Language: en
+Document-ID: EA-HANDOFF-7.1 · Revision: 2 · Language: en
 
-Objective: strict versioned normalized imports with original bytes, source hashes, observations and record locators. Files: `electoral_imports.py`, `tests/test_electoral_imports.py`. CSV uses exact contract headers, semicolon delimiter, strict UTF-8, canonical integers, explicit null states; JSONL rejects duplicate keys. Retransmissions retain witnesses; conflicting immutable keys fail. Location, composition, electorate, final hierarchy, first and second rounds use explicit contracts.
+The source-access/official-adapter gap is closed for the verified AC BWEB layout.
+The normalized importer remains available. `official_bu.py` adds a bounded,
+versioned official CSV adapter through `read_import` and `import-results`.
+The original archive, checksum, catalog/resource metadata, decompressed CSV and
+bundled dictionary are preserved by hash in immutable derivatives. Record witnesses
+cover dimensions, composition, choices, totals and raw processing-event tokens.
+`bweb-2026-layout.json` pins dictionary/header/encoding/category semantics.
 
-Official evidence inspected on 2026-10-29: TSE technical page, EA16 revision 2026-05-22, EA18 revision 2026-05-22, EA20 revision 2026-10-13 and AC runoff BU resource 4753eb99-062b-484a-b569-04c51d039885. These identify official formats/resources but do not verify a BU CSV header/encoding/category mapping. No real BU was supplied/imported. Exact blocker: missing pinned real BU bytes and its bundled dictionary/header plus reviewed normalized mapping. The implemented adapter is normalized_only; no official BU compatibility or signature certification.
+Real AC source: 1254611-byte ZIP, SHA-256
+`35c1f1676e04d0824eb57df158f40d3c1e943926fd4754933a9d2863ccf06e1b`;
+published SHA-512 and ZIP CRCs pass. 17622 input rows split into 8697 presidential
+and 8925 excluded governor rows. 2270 presidential principal sections, 2411 member
+sections and 668 locations are imported. Published choices sum to 453654 votes.
+All 2270 published-vote-sum/attendance and electorate-accounting checks match.
 
-Acceptance: four normalized importer fixtures passed, exit 0. No raw corpus read or acquisition change. Git unavailable; no commit claim. Next: task 7.2 canonical selection, append-only evidence and arithmetic/hierarchy reconciliation. Read this handoff and the electoral contracts only.
+Limits: missing choices never become zero; no complete choice ledger is certified.
+Apurada does not certify Totalizado; official result status remains unknown.
+No canonical electoral ratio, timezone conversion, independent final hierarchy,
+signature certification, national BU coverage or scientific eligibility is claimed.
+BU composition uses a separate source snapshot; operational linkage needs explicit
+review. Other layouts/categories fail until reviewed. First-round/history and
+external final/electorate references still use explicit normalized contracts.
 
-```sh
-rtk proxy env UV_OFFLINE=1 UV_CACHE_DIR=/tmp/election-audit-uv-cache uv run --locked python -m unittest discover -s tests -p test_electoral_imports.py -v
-```
+Regression coverage includes an attributed real CSV subset and exact dictionary,
+unknown choices/clocks/status, office filtering, aggregations, retransmissions,
+contradictory immutable records, corrupt pins/checksums, unknown categories,
+resource/encoding/header/dictionary bounds and immutable derivative relocation.
+Official verification survives loader/validator/report and snapshot-specific feature
+quality flags; no model is fitted. Earlier source-access failures remain historical
+evidence. See [guide](../electoral-results.md) for the bundle and real validation commands.
 
-Verified official TSE adapter remains outstanding: this is a partial task 7.1 delivery. Bounded AC ZIP range access additionally failed DNS (curl exit 6, zero bytes); web rejected ZIP/sidecar binary content. See [guide](../electoral-results.md) for exact resource links and pinned discovery evidence.
+Acceptance: `rtk just check` passed with 177 offline tests, formatting, lint,
+lock, contract registries, paired documentation and harmless command/SQL checks.
+Real source validation is in `data/official-bu/ac-runoff-2026-10-30/validation-final.json`;
+immutable release validation, reports and the current release ID are beside it in
+`release-validation.json`, `reports/` and `run-evidence.json`. New observations of
+identical bytes append separate frozen result/event/observation witnesses without
+changing old snapshots. Original log acquisition and existing pilot releases are unchanged.

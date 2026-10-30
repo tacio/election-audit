@@ -228,9 +228,17 @@ def feature_rows(parent, document, spec, config):
         units += " UNION SELECT snapshot_id,section_id AS principal_section_id FROM operational_coverage WHERE json_extract_string(payload,'$.principal_section_id') IS NULL"
     sql = f"SELECT c.snapshot_id,c.principal_section_id,{result_sql} FROM ({units}) c {join} ORDER BY c.snapshot_id,c.principal_section_id"
     analysis_id = digest(spec)
+    from election_audit.derivatives import release_layers
+
+    official_snapshots = set()
+    for layer_path, layer in release_layers(parent, document):
+        if layer.get("verification_status") == "official_layout_verified":
+            evidence = _read_checked(layer_path, "import.json")["source_discovery"]
+            official_snapshots.add(evidence["real_validation"]["snapshot_id"])
     with open_release(parent, _verified_document=document, config=config) as db:
         for snapshot, principal, payload in _rows(db, sql, config.batch_rows):
             result = json.loads(payload) if payload else {}
+            official_layout = snapshot in official_snapshots
             source_key = {
                 "snapshot_id": snapshot,
                 "principal_section_id": principal,
@@ -282,13 +290,19 @@ def feature_rows(parent, document, spec, config):
                             },
                             "scientific_eligible": False,
                             "quality_indicators": [
-                                "normalized_only",
-                                "real_BU_validation_unavailable",
+                                "official_layout_verified"
+                                if official_layout
+                                else "normalized_only",
+                                "final_BU_reconciliation_unavailable"
+                                if official_layout
+                                else "real_BU_validation_unavailable",
                                 "partial_national",
                                 "temporal_source_availability_unverified",
                             ],
                             "scientific_blockers": [
-                                "source_schema_not_officially_verified",
+                                "official_status_and_complete_choices_unverified"
+                                if official_layout
+                                else "source_schema_not_officially_verified",
                                 "no_fitted_model",
                                 "no_assessed_exchangeability",
                                 "no_coherent_final_national_margin",

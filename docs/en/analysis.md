@@ -1,6 +1,8 @@
 # Statistical analysis foundation
 
-Document-ID: EA-ANALYSIS · Revision: 1 · Language: en
+Document-ID: EA-ANALYSIS · Revision: 2 · Language: en
+
+Current source status: Task 7.1 now provides the official BWEB adapter, verified with real AC runoff bytes and published-row arithmetic. Final totalization linkage, complete choice evidence and independent final references remain unavailable; no scientific eligibility follows. Earlier descriptions of a missing adapter below record the prior acceptance state. See [current electoral guide](electoral-results.md).
 
 [Português](../pt-BR/analysis.md) · [Index](implementation-index.md) · [Electoral parent](electoral-results.md)
 

@@ -1,30 +1,60 @@
 # Electoral imports and derivative releases
 
-Document-ID: EA-ELECTORAL-RESULTS · Revision: 1 · Language: en
+Document-ID: EA-ELECTORAL-RESULTS · Revision: 2 · Language: en
 
 [Português](../pt-BR/electoral-results.md) · [Index](implementation-index.md) · [Publication](publication.md)
 
-Available AC–RJ 2026 presidential runoff logs remain partial national coverage.
-The usable importer is **electoral-normalized-v1**, not a verified official TSE BU
-decoder. Task 7.1's verified official adapter remains outstanding. No real BU was
-provided/imported; synthetic arithmetic checks do not constitute real electoral
-validation or signature certification. Acquisition and base releases are unchanged.
+The official **tse-bweb-2026-v1** adapter now imports the acquired AC runoff BWEB
+CSV using its pinned bundled dictionary, exact 45-column header, Latin-1 encoding
+and reviewed candidate/blank/null mapping. The existing **electoral-normalized-v1**
+interface remains available for explicitly normalized sources, including other
+rounds/history and external references. Original log acquisition and frozen parent
+releases are preserved. BU imports use a separate source snapshot; no automatic
+linkage to operational sessions or clock conversion is inferred.
 
-Primary evidence inspected on 2026-10-29: [official technical index](https://www.tse.jus.br/eleicoes/informacoes-tecnicas-sobre-a-divulgacao-de-resultados),
-[AC runoff BU metadata](https://dadosabertos.tse.jus.br/dataset/resultados-2026-boletim-de-urna/resource/4753eb99-062b-484a-b569-04c51d039885),
-[EA16](https://www.tse.jus.br/eleicoes/eleicoes-2026-content/arquivos/divulgacao-de-resultados/tse-ea16-arquivo-de-configuracao-de-secoes-eleitorais)
-(2026-05-22), [EA18](https://www.tse.jus.br/eleicoes/eleicoes-2026-content/arquivos/divulgacao-de-resultados/tse-ea18-arquivo-auxiliar-de-secao)
-(2026-05-22), [EA20](https://www.tse.jus.br/eleicoes/eleicoes-2026-content/arquivos/divulgacao-de-resultados/tse-ea20-arquivo-de-resultado-unificado)
-(2026-10-13). These JSON specifications are distinct from the BU CSV dictionary.
-The web tool rejected the AC BU ZIP and sidecar as unsupported binary content.
-A bounded CLI range request failed DNS, exit 6, with zero bytes downloaded.
-Exact blocker: pinned BU bytes and bundled dictionary/header/encoding/category
-mapping could not be obtained. Discovery evidence and the normalized schema digest
-are pinned in each derivative's identity/import provenance; discovery does not
-certify a source schema. No national download is attempted.
+The official AC archive, SHA-512 sidecar, catalog and resource API bytes were
+acquired on 2026-10-30 UTC. The published checksum matches and ZIP CRCs pass.
+The archive has 17622 rows: 8697 presidential rows (election 6258, cargo 1) and
+8925 governor rows (election 6260, cargo 3), which are explicitly excluded.
+All 2270 presidential principal sections pass both published-vote-sum versus
+attendance and attendance plus abstention versus electorate checks; published
+presidential choices sum to 453654 votes. These are real source arithmetic checks,
+not independent final-result reconciliation. Absent choices remain unknown, not
+zero. Apurada is not Totalizado: result status remains unknown, complete choice
+ledgers are unavailable and canonical results/ratios remain unavailable. Raw BU
+emission/receipt tokens are retained as unresolved processing events. Special and
+unresolved categories, signatures and independent final totals remain unverified.
+
+[Official AC resource](https://dadosabertos.tse.jus.br/dataset/resultados-2026-boletim-de-urna/resource/4753eb99-062b-484a-b569-04c51d039885).
+`election_audit/resources/bweb-2026-layout.json` pins the dictionary and mapping;
+`electoral-source-evidence.json` records the earlier failed access and successful
+acquisition. The dataset API response listed only first-round resources even though
+the separate runoff resource API confirmed this archive. Both responses are kept.
+
+The local acquired directory is `data/official-bu/ac-runoff-2026-10-30/`; it is
+ignored by Git. Its `bundle.json` names exactly four local source specs: `archive`,
+`checksum`, `resource_metadata`, `catalog_metadata`. Each requires `path`, `sha256`,
+`official_url`, `observed_at`. Top-level fields are `adapter`, `verification_status`
+(`official_layout_verified`), these four specs, `election` (the exact supported
+2026 runoff contract) and `uf` (`ac` for the real validation). Paths are confined,
+all source hashes checked, SHA-512 and resource/archive links verified, archive
+members and the dictionary edition pinned. Input plus expanded source bytes are
+bounded by 64 MiB and input/generated rows by `max_events`; this is a bounded
+importer, not national streamed BU processing. Identical retransmissions retain
+all source record witnesses; contradictory counts or repeated metadata fail.
+Re-observation runs retain separate snapshot/result/event identities and share
+original byte objects without conflicting observation keys.
+
+The inspection output must be a new file. The import example uses the existing
+frozen pilot's 108350 inherited electoral rows and an explicit 200000-row bound;
+new imported facts remain in a separate immutable derivative. The scientific
+eligibility blockers for official BU snapshots reflect status/completeness rather
+than incorrectly claiming the schema is unverified. Older snapshots retain their
+own quality indicators. Other UF/category/dictionary editions require review.
 
 ```sh
-rtk proxy curl --range 0-65535 --max-time 20 --max-filesize 1048576 --fail --show-error --silent --dump-header /tmp/election-audit-bu-range.headers --output /tmp/election-audit-bu-range.bin https://cdn.tse.jus.br/estatistica/sead/eleicoes/eleicoes2026/buweb/bweb_2t_AC_261020260742.zip
+rtk proxy env UV_OFFLINE=1 uv run --locked python -m election_audit.official_bu --bundle data/official-bu/ac-runoff-2026-10-30/bundle.json --output data/official-bu/ac-runoff-2026-10-30/validation-recheck.json
+rtk proxy env UV_OFFLINE=1 just import-results data/phase9/pilot/warehouse/releases/64eafb496f230a6634f3eade0c49cbacd7845d95a1ac73d7a2bbc76070cc998a --bundle data/official-bu/ac-runoff-2026-10-30/bundle.json --store data/official-bu/ac-runoff-2026-10-30/warehouse --max-events 200000
 ```
 
 Explicit normalized imports are usable now. A local bundle lists only the files
@@ -143,5 +173,5 @@ Phase 8 input: use the pinned derivative path and the four marts plus operationa
 parent views, checking availability and denominators before analysis. To add new
 families, extend normalized/derived schemas and producer with a new versioned rule;
 the loader reads manifest columns/keys rather than changing operational `FACTS`.
-Never edit the base DB/schema or existing releases. Outstanding official BU adapter
-and real-validation status must propagate. No fitting or fraud labels in this phase.
+Never edit the base DB/schema or existing releases. Official layout verification and the remaining final-reconciliation
+limits must propagate. No fitting or fraud labels in this phase.

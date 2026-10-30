@@ -181,9 +181,9 @@ def _rows(data, spec, name):
         raise PublicationError("Normalized format must be csv or jsonl")
 
 
-def validate_import_row(name, row):
+def validate_import_row(name, row, *, schema=None):
     if name in SCHEMA:
-        errors = validate_rows(name, [row])
+        errors = validate_rows(name, [row], schema=schema)
         if errors:
             raise PublicationError("; ".join(errors))
     else:
@@ -242,6 +242,12 @@ def read_import(bundle, *, max_rows=100_000, max_bytes=64 * 1024**2):
     bundle = Path(bundle).resolve()
     bundle_bytes = bundle.read_bytes()
     document = strict_json(bundle_bytes.decode("utf-8"))
+    if isinstance(document, dict) and document.get("adapter") == "tse-bweb-2026-v1":
+        from election_audit.official_bu import read_official_bu
+
+        return read_official_bu(
+            bundle, document, bundle_bytes, max_rows=max_rows, max_bytes=max_bytes
+        )
     if set(document) != {"adapter", "verification_status", "sources"}:
         raise PublicationError("Invalid normalized bundle fields")
     if document["adapter"] != VERSION or document["verification_status"] != "normalized_only":

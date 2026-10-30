@@ -1,6 +1,8 @@
 # Reprodução e revisão por pares
 
-Document-ID: EA-REPRODUCTION · Revision: 1 · Language: pt-BR
+Document-ID: EA-REPRODUCTION · Revision: 2 · Language: pt-BR
+
+Situação atual da fonte: a tarefa 7.1 agora fornece adaptador BWEB oficial, verificado com bytes reais AC do segundo turno e aritmética das linhas publicadas. Vínculo de totalização final, evidência completa de escolhas e referências finais independentes continuam indisponíveis; não há elegibilidade científica. Descrições abaixo de adaptador ausente registram a aceitação anterior. Consulte o [guia eleitoral atual](electoral-results.md).
 
 A demonstração sem rede é inteiramente SINTÉTICA: pequenos originais ZIP determinísticos exercitam datas mistas do dispositivo, histórico copiado exato, substituição de dispositivos, solicitação manual/cancelamento, relógios não resolvidos e conteúdo aninhado malformado. Asserções revisadas de sessão/cópia/semântica são geradas com hashes exatos de linhas sintéticas preservadas. Membros esperados 3, principais únicos 2, comparecimento normalizado 10, eleitores aptos 20 e comparecimento proporcional 0.5 são números conhecidos da fixture. Não validam dados eleitorais reais. Ligações de identidade desconhecidas ficam indisponíveis; exploração registrada preserva resultado nulo e histórico completo sem ajuste de modelo.
 

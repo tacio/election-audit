@@ -1,6 +1,8 @@
 # Fundação de análise estatística
 
-Document-ID: EA-ANALYSIS · Revision: 1 · Language: pt-BR
+Document-ID: EA-ANALYSIS · Revision: 2 · Language: pt-BR
+
+Situação atual da fonte: a tarefa 7.1 agora fornece adaptador BWEB oficial, verificado com bytes reais AC do segundo turno e aritmética das linhas publicadas. Vínculo de totalização final, evidência completa de escolhas e referências finais independentes continuam indisponíveis; não há elegibilidade científica. Descrições abaixo de adaptador ausente registram a aceitação anterior. Consulte o [guia eleitoral atual](electoral-results.md).
 
 [English](../en/analysis.md) · [Índice](implementation-index.md) · [Pai eleitoral](electoral-results.md)
 
