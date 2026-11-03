@@ -1,369 +1,298 @@
-# Statistical audit of the 2026 presidential runoff
+# Statistical audit of the 2026 presidential election: study protocol
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 1 · Language: en
+Document-ID: EA-ANALYSIS-PLAN · Revision: 2 · Language: en
 
-[Português](analysis-plan.pt-BR.md)
+[Português](analysis-plan.pt-BR.md) · [Completion plan](completion-plan.md) · [Related work](related-work.md)
 
-Working protocol, 29 October 2026. This is a proposed analysis design, not a fraud
-finding, a fitted national model, or a preregistration made before seeing any data.
-Initial inspection has covered the acquisition manifest and a few AC/AL/AM logs.
-Freeze the protocol and data snapshot before inspecting candidate-specific anomaly
-rankings; record subsequent changes as exploratory analyses.
+**Status: draft protocol, 3 November 2026.** This document says what the audit will
+claim, how each claim is tested and how sensitive each test is. It is not yet
+frozen. It will be frozen and publicly pre-registered (OSF registration plus a
+signed git tag) in Phase 23, before any confirmatory analysis. After the freeze,
+every change is a recorded deviation and its results are labelled exploratory.
+No fraud finding, national margin or fitted national model exists today.
 
-## Recommendation
+## 1. Questions and the claims they allow
 
-Use a conditional, non-parametric baseline for turnout and candidate vote share,
-with a separate operational model for log behavior. Start with matched empirical
-comparisons; use quantile regression forests as the principal flexible predictor.
-Calibrate scores on held-out voting locations, investigate spatial clusters, and
-apply multiplicity controls only where their assumptions are defensible. Treat
-findings as relative anomalies requiring investigation. A reference population
-assembled from official returns is not independently certified fraud-free.
+The audit answers three separate questions:
 
-There are three distinct questions:
+1. **Integrity.** Do the published artifacts agree with each other, with their
+   signatures and with independent copies? Answered by deterministic checks
+   (section 5). A discrepancy is a fact about artifacts, not about intent.
+2. **Unusualness.** Do some places, device groups or the whole distribution of
+   results depart from what comparable sections and the same sections' first round
+   predict? Answered by a small, prespecified family of statistical tests (section
+   7). A rejection says "this pattern is unlikely under the stated model", not
+   "these votes are fraudulent".
+3. **Outcome sensitivity.** Under an explicit mechanism, population and cap, how
+   much could the national margin move? Answered by arithmetic bounds (section 8).
+   These are conditional statements, not estimates of what happened.
 
-1. **Integrity:** do source versions, counts and independent records reconcile?
-2. **Unusualness:** which sections or clusters differ from comparable peers?
-3. **Outcome:** under an explicit mechanism and affected population, how much
-   could the national margin change?
+**Results always come with their power.** The headline of the statistical part is
+the *minimum detectable manipulation*: for each mechanism, the smallest change
+to the national margin that the tests would detect with 80% probability. A null
+result without that number would be uninterpretable, so it is never reported
+alone.
 
-A model residual answers the second question. It does not, by itself, identify
-fraudulent votes or a causal effect on the result. Fraud can also look ordinary or
-affect a whole reference population, so failure to find outliers cannot certify
-the absence of fraud.
+The audit does **not** claim:
 
-## Repository review
+- that any section, person or party committed fraud;
+- that the absence of signals proves the absence of fraud;
+- that any vote, late cycle or manual authorization belongs to a candidate (the
+  RDV is shuffled; see section 6);
+- a corrected winner, or the result of removing flagged sections.
 
-Reviewed browser-accessible files on the named branches, not every file or a
-security audit of either project. Pin commit hashes before adopting code.
+## 2. What has already been seen
 
-| Source | Useful practices | Limits for this project |
+Pre-registration is only meaningful if it discloses what the authors saw before
+writing it. As of this revision:
+
+- **Acre (AC):** runoff BWEB and binary BUs (2270 sections, content-verified);
+  section features; one turnout model fitted and evaluated on calibration data;
+  126 development case packets. AC is development data.
+- **Five-UF structural pilot (AC, AL, DF, ES, PR):** frozen logs, with sessions,
+  cycles and clocks all left unresolved. Development data.
+- **National runoff structural summaries (Phase 11):** per-log counts of lines,
+  structural events, authorizations, completions and manual requests for 498581
+  logs. No electoral result was joined to them and no ranking was computed. Each
+  runoff log spans setup (September), the first round and the runoff, so these
+  counts mix rounds and are not runoff measures.
+- **Inspection registries:** every location listed in
+  `data/phase15/inspection.sqlite`, `data/national/phase11-protection-2026-10-31/`
+  and the Phase 11 tranche registries is development data.
+- **Not seen:** any national electoral result at section level, any national
+  operational measure, the 596 protected/stress runoff logs, and any 2022 data.
+
+## 3. Threat model: from mechanism to observable
+
+Each mechanism leaves traces in specific artifacts, or none. The audit is designed
+around this table; a test that does not appear here does not belong to the
+confirmatory family.
+
+| Mechanism | Where it would leave traces | Checks and tests | What the audit cannot see |
+| --- | --- | --- | --- |
+| Altered or substituted results after the urn (transmission, totalization, publication) | BU signature; binary BU vs BWEB vs hierarchical totals; printed BU copies | I1, I2, I4, I8 | Nothing within the electronic chain if the signing keys themselves were compromised; printed copies are the out-of-band check |
+| Software that alters votes inside the urn, with BU, RDV and log all consistent | No log trace; aggregate result patterns only | TSE election-day integrity tests (external evidence, section 4); C1, C2, C4, C6 | A small, spatially uniform switch that mimics ordinary swing; its size is bounded by the minimum detectable manipulation |
+| Ballot stuffing or impersonation by poll workers | Manual (non-biometric) authorizations, cycles outside normal hours, bursts of fast cycles; turnout and share spikes | I5; C2, C3, C5 | Stuffing spread thinly over many sections at normal times and with biometric authorizations |
+| Suppression or obstruction of voters | Turnout drop from round 1 to round 2 relative to peers; long gaps, suspensions, late opening, urn replacement | C1 (turnout), C4, C5 | Causes outside the polling place; legitimate causes (transport, weather) produce the same signal |
+| Tampered, copied or fabricated logs | Block hashes; the round-1 segment inside each runoff log vs the round-1 log; clock discontinuities | I6, I7 | A complete, consistently re-signed artifact chain |
+| Errors in publication or in this pipeline | Any reconciliation failure | I1–I9 | — |
+
+Benign processes produce several of these signals: regional political swings,
+age and accessibility of the electorate, biometric enrolment rates, transport,
+urn replacements and administrative practice. Each test therefore has a stated
+benign alternative and a control (section 7.6).
+
+## 4. Data and frozen provenance
+
+| Input | Use | Status |
 | --- | --- | --- |
-| [Turicas / eleicoes-brasil](https://github.com/turicas/eleicoes-brasil), `develop` | Explicit historical schemas, original-to-normalized header mappings and raw/derived separation. | Historical ETL is not a validated 2026 section-log parser. |
-| [INEMA / eleicoes2026](https://github.com/inematds/eleicoes2026), `main` | Provenance, immutable publication versions, accounting checks, handling asynchronous result updates. | Its live dashboard and aggregate estimates do not establish section-level fraud or identify individual vote transfers. |
+| Section logs, both rounds | Sessions, cycles, authorization mix, timing | Acquired; manifests pinned by the SHA-256 migration certificates |
+| Phase 11 runoff structural release `55e55e91549dac53eb546a596f62033bc837e0a34e3ff9b178c4687ae9257f88` | Block hashes, member structure, object index | Complete for 498581 eligible logs; structural only |
+| BWEB, 27 UFs and ZZ, both rounds | Section results | To acquire (AC done); TSE publishes SHA-512 checksums |
+| Binary BUs, RDVs and signatures (totalized packages) | I1–I3 | To acquire (AC done for BUs) |
+| Hierarchical results (EA20) | I4 | To acquire |
+| Voter profile by section (age, sex, schooling) and polling places | Covariates, location keys | To acquire |
+| 2022 presidential BWEB, BUs and logs, both rounds, with voter profile | Negative control (section 7.6) | To acquire |
+| TSE election-day integrity test reports, both rounds | External evidence about in-urn software | To collect |
+| Independent printed BU copies (QR codes) | I8 | To collect; selection is not random |
 
-Turicas' [extractor implementation](https://raw.githubusercontent.com/turicas/eleicoes-brasil/develop/extractors.py)
-uses Latin-1 input and validates observed CSV headers against a declared schema.
-Its inspected `VotacaoZonaExtractor.get_headers()` rejects years after 2018. Adopt
-the schema discipline; do not assume this path supports the current election.
-Preserve original missing-value codes alongside normalized nulls rather than
-losing their distinct meanings.
+Rules that apply to every table:
 
-INEMA's [data contract](https://github.com/inematds/eleicoes2026/blob/main/contrato/README.md)
-distinguishes eligible electors in counted sections from the entire electorate,
-and valid votes from total votes. Its
-[collector](https://raw.githubusercontent.com/inematds/eleicoes2026/main/coleta/coletor.py)
-keeps raw responses and treats national/state differences during asynchronous
-publication differently from final discrepancies. Adopt these checks. Our audit
-should also retain decreases and corrections as versioned observations rather
-than discard them because totals were expected to increase.
+- Analyses read the **frozen, certified manifest copies** in
+  `migration-2026-11-01/manifest-r{1,2}.sqlite`, identified by hash, not the live
+  manifests in `.local-state/`. Paths in the manifests are relative to the object
+  root.
+- One canonical result per principal section after resolving retransmissions,
+  with competing versions kept. Aggregated sections join their principal section
+  exactly once. Keys stay zero-padded text; counts stay integers.
+- A population ledger records expected, aggregated, installed, not-installed,
+  BU-available, log-available, reconciled, failed and excluded sections, by UF and
+  device model. Unknown is never zero; nothing is dropped silently.
+- `Recebido` (received, not totalized) packages are never added to totalized
+  votes.
 
-Its [failure history](https://github.com/inematds/eleicoes2026/blob/main/FALHAS.md)
-records timezone and stale-CDN problems. The
-[normalization code](https://raw.githubusercontent.com/inematds/eleicoes2026/main/coleta/nucleo.py)
-uses a UF-level time adjustment. That is insufficient as a general section-clock
-rule: municipality exceptions and overseas locations need explicit treatment.
+## 5. Tier 1: deterministic integrity checks
 
-An additional implementation to examine is
-[DataUrnas-BR](https://github.com/alissonlinneker/DataUrnas-BR): its documented
-handling of replacement urns, copied logs, timezone exceptions and Parquet output
-is relevant. Independently validate its parsers and findings against TSE originals
-before reuse; its published conclusions are not ground truth for our model.
+These checks need no statistical model. They are reported first, as counts with
+complete discrepancy tables and the source hashes needed to verify each row.
 
-## Data required before fitting
+| ID | Check | Unit | A failure means |
+| --- | --- | --- | --- |
+| I1 | BU signature verification against TSE trust material | BU | The artifact is not the one signed by the urn |
+| I2 | Binary BU content equals the BWEB row | Section × choice | Publication differs from the signed artifact |
+| I3 | RDV recount equals the BU | Section | Ballot record and count disagree |
+| I4 | Section sums equal published municipality, UF, ZZ and national totals | Hierarchy node | Totalization differs from sections |
+| I5 | Completed cycles in the identified runoff session equal BU attendance | Section | Log and count disagree (often a parsing or session problem; investigated) |
+| I6 | Round-1 blocks inside each runoff log equal the round-1 log of the same urn | Urn | One of the two published histories changed |
+| I7 | Log clock continuity and session structure pass the reconstruction rules | Session | History is incomplete or out of order |
+| I8 | Independent printed BU copies equal the published BU | Section (sample) | Publication differs from the printed record |
+| I9 | Package status, aggregation and round identity are consistent | Package | Population is mis-specified |
 
-The current downloader collects logs and auxiliary metadata. Logs alone do not
-provide the candidate totals, electorate denominators and location attributes
-needed for the proposed electoral model.
+If the RDV archive does not cover every section, I3 uses a prespecified uniform
+random sample. To claim, with 95% confidence, that the discrepancy rate is below
+`p` when the sample shows none, the sample size is:
 
-| Input | Purpose | Validation / source |
-| --- | --- | --- |
-| Second-round BUs, preferably the published CSV plus selected binary BUs | Candidate totals, eligible electors, turnout, blank/null votes, voting location, urn/version identifiers | [TSE BU dataset](https://dadosabertos.tse.jus.br/dataset/resultados-2026-boletim-de-urna); reconcile CSV against binary samples and final totals. |
-| First-round BUs and section details | First-round preference vector and turnout baseline | Same dataset, correct round and cargo; aggregate changed section compositions before joining. |
-| Second-round logs, auxiliary files and section indexes | Sessions, voting events, operational history, aggregation and publication status | [TSE technical documentation](https://www.tse.jus.br/eleicoes/informacoes-tecnicas-sobre-a-divulgacao-de-resultados). |
-| Final federal result at BR/UF/municipality levels | Final reporting margin and hierarchical reconciliation | Election 6258, cargo 1; use a coherent final snapshot. |
-| Selected RDVs and signature envelopes | Recompute counts and validate signed artifacts | [TSE format links](https://www.tse.jus.br/eleicoes/eleicoes-2026/eleicoes-2026); these are additional downloads. |
-| Section/locality register, historical results, temporary transfers, polling-place information | Stable joins and peer selection | Verify each year's schema, TSE-versus-IBGE code mapping and denominator definitions. |
-| Occurrence records, polling-station minutes, independent BU copies or other corroboration | Resolve specific suspicious cases and study access/suppression mechanisms | Obtain for identified cases; official electronic artifacts share parts of the same production chain. |
+```
+n = ceil(ln(0.05) / ln(1 - p))        # p = 0.001 gives n = 2995
+```
 
-TSE publishes BUs by UF and round, with separate checksum resources, in the
-[BU catalog](https://dadosabertos.tse.jus.br/dataset/resultados-2026-boletim-de-urna).
-Do not confuse a catalog example or a dashboard simulation with an observed final
-result. No final margin is asserted in this plan.
+Independent printed copies (I8) come from third-party collections whose selection
+is not random. Their agreement corroborates the sections they cover; it does not
+extend to other sections.
 
-## Canonical tables and integrity checks
+Agreement among artifacts produced by the same software chain (I1–I4) shows
+consistency, not voter intent. The TSE integrity tests and printed copies are the
+only out-of-band evidence, and they are reported with that caveat.
 
-Use a principal-section key `(year, round, election, UF, municipality_TSE, zone,
-section)` and separate `physical_urn`, `source_package` and `voting_session` keys.
-Keep codes as zero-padded text and vote counts as integers. A physical urn can
-serve multiple historical sessions; a section can use replacement hardware.
+## 6. Log semantics (rules before any operational measure)
 
-Produce append-only source snapshots, a section-composition crosswalk, section
-results, session summaries, parsing issues and candidate-independent anomaly
-features. Use Parquet for large derived tables when the analysis dependencies are
-installed; retain SQLite for manifest queries. Keep the running downloader's
-manifest read-only during analysis. Its current `files` table records the latest
-URL mapping: before analysis, add/freeze per-run URL-to-object provenance so later
-metadata updates cannot silently change the analysis inputs.
-If `manifest-location.json` exists, resolve it with the downloader's
-`manifest_path()` helper; an HDD-local `manifest.sqlite` may be a pre-migration
-snapshot rather than the authoritative database.
+- A runoff log file is not a runoff event filter. A `logd.dat` contains setup,
+  first-round and runoff events. Identify official voting sessions, round
+  transitions, urn identity, restarts, suspensions and clock changes in line order
+  before selecting a session.
+- Count completed voter cycles, not messages. A request for manual data can be
+  cancelled; it is not a completed manual vote. Unresolved cycles stay unknown.
+- Timestamps are naive device-clock readings. Keep the original reading, the
+  assigned offset, adjustments, the conversion rule and its confidence. Do not
+  infer a timezone from an early or late first vote. Unresolved clocks block
+  absolute-time claims but not count checks.
+- Deduplicate copied histories by verified block lineage, never by identical
+  message text and second-resolution time, which repeat legitimately.
+- The RDV is shuffled by design
+  ([TSE](https://www.tse.jus.br/comunicacao/noticias/2021/Julho/registro-digital-do-voto-permite-recontagem-e-amplia-transparencia-do-processo-eleitoral)),
+  so log cycles cannot be joined to ballot choices. No operational event is ever
+  attributed to a candidate.
+- Message semantics come from the official
+  [log guide](https://www.tse.jus.br/eleicoes/eleicoes-2026-content/arquivos/log-do-ecossistema)
+  as exact reviewed templates (`real-log-rules.json`); messages outside them stay
+  unknown and are counted in a published template vocabulary.
 
-Required checks include:
+## 7. Tier 2: statistical analysis
 
-- Correct date, round, cargo, official phase and package status; downloaded
-  received/rejected/excluded versions must not be added to totalized votes.
-- One canonical result per principal section after resolving retransmissions;
-  preserve competing versions and conflicts. Do not sum all hashes.
-- Aggregate sections into their principal electorate exactly once. For historical
-  comparisons, harmonize changed compositions or mark them incomparable.
-- Candidate votes + blank + applicable null categories = presidential votes;
-  check turnout/abstention against the appropriate electorate, documenting any
-  transfers or exceptional categories. Repeated BU rows must not multiply a
-  section's electorate or turnout.
-- Sum results to municipality, UF and BR, including ZZ, using the same final
-  population and version. Separate publication gaps from numerical discrepancies.
-- Compare log completion and suspension events against BU totals after decoding
-  session semantics; a raw message-count mismatch is an investigation item.
-- Verify digital signatures using TSE's schema and trust material separately from
-  checking transport hashes or ZIP CRCs. Agreement among artifacts generated by
-  the same software is a consistency check, not independent proof of voter intent.
+### 7.1 Units and outcomes
 
-Maintain a population ledger: expected sections, aggregated sections, installed
-and non-installed sections, available BUs, available logs, reconciled records,
-parser failures and exclusions. Report coverage by UF, location, model/version
-and candidate support; do not silently drop unusual records. Alphabetical download
-order makes the current partial collection unsuitable for national inference.
+The unit is the principal section, harmonized across rounds; sections whose
+composition changed between rounds are matched only through an explicit
+crosswalk, or marked incomparable. Outcomes:
 
-## Log semantics: checks before computing features
+- runoff turnout (attendance / eligible electorate);
+- candidate A share of valid votes, `A / (A + B)`, undefined when valid votes are
+  zero; every test runs in both directions (A and B), with A and B fixed from
+  official candidacy identifiers;
+- blank and null shares, with their own denominators;
+- operational measures: manual-authorization share of completed cycles, share of
+  cycles after the official closing time, and cycle cadence (completed cycles per
+  active minute).
 
-Direct inspection of three saved AC/AL/AM files found setup dates, 4 October and
-25 October events in the same `logd.dat`. A second-round filename is not a filter
-for second-round events. Preserve line order and identify official VOTA sessions,
-turn transitions, urn identity, restarts, suspensions and clock changes before
-selecting the target session. Date filtering is a useful diagnostic, not a full
-replacement for session reconstruction.
+### 7.2 Primary model: round-1 to round-2 swing
 
-The [official log guide](https://www.tse.jus.br/eleicoes/eleicoes-2026-content/arquivos/log-do-ecossistema)
-shows successful voting, partial/full suspensions and registration workflows.
-Count completed voter cycles rather than every message mentioning a vote or a
-manual authorization. A request for manual data may be cancelled and is not
-automatically a completed manual vote. Keep unresolved cycles explicitly unknown.
+Each section's runoff outcome is predicted from its own first-round vector
+(candidate shares, blank, null, turnout), its voter profile (age bands, sex,
+schooling), its size and its location (UF, municipality, polling place).
+Predicting change rather than level removes most stable local structure, which is
+the main source of false alarms in cross-sectional models.
 
-Log timestamps are naive device-clock readings. Preserve the original reading,
-assigned timezone/offset, clock adjustments, conversion rule and confidence.
-Verify municipality-level mappings and overseas conventions against BU/session
-records; do not infer timezone from an unusually early/late first vote. Opening,
-closing, transmission and download times are different quantities. Evaluate
-sensitivity to plausible clock errors; unresolved clocks exclude absolute-time
-claims but need not exclude result-count checks.
+- **Size-aware noise.** Counts are modelled with an overdispersed binomial
+  (beta-binomial) likelihood, so small sections are not flagged for being noisy.
+  Each section receives a predictive tail probability for its observed count,
+  using mid-p for discreteness. A funnel plot of residual against size is
+  published for every outcome.
+- **Cross-fitting.** Every section is scored by a model that never saw its polling
+  place: 10 folds grouped by polling place and stratified by UF
+  ([Chernozhukov et al. 2018](https://doi.org/10.1111/ectj.12097)). This gives an
+  honest score for every section instead of a small held-out test set.
+- **Within-location contrast.** Sections in the same polling place share
+  neighbourhood, staff and logistics. The difference between a section and the
+  other sections at its location is reported as a primary, model-light statistic.
+- **Flexible comparator.** A quantile regression forest
+  ([Meinshausen 2006](https://www.jmlr.org/papers/v7/meinshausen06a.html)) is
+  compared against the beta-binomial swing model on development data using held-out
+  quantile loss and interval coverage. The model is chosen before the freeze; the
+  choice and the losing model's results are both published.
+- **Without round 1.** The models are also fitted without the first-round vector,
+  because the first round could itself be affected.
 
-Deduplicate copied files and verified overlapping event blocks across replacement
-packages, retaining lineage. Do not deduplicate solely on identical messages or
-second-resolution timestamps, which can legitimately repeat. Do not sum the same
-physical session through multiple section/package references.
+### 7.3 Confirmatory family
 
-TSE explains that RDV entries are shuffled to prevent reconstructing voter order:
-[official RDV explanation](https://www.tse.jus.br/comunicacao/noticias/2021/Julho/registro-digital-do-voto-permite-recontagem-e-amplia-transparencia-do-processo-eleitoral).
-Therefore, log timestamps cannot be joined by row number to RDV choices. We cannot
-attribute late, fast or manually authorized voting cycles to a candidate.
+Confirmatory tests act only at global or cluster level, where 500,000 sections
+give power rather than an impossible multiple-testing burden. Each test is
+two-sided or run in both candidate directions, and each has a simulation-based
+null drawn from the fitted model with whole-location resampling.
 
-## Non-parametric model specification
+| ID | Test | Detects | Benign alternative |
+| --- | --- | --- | --- |
+| C1 | Calibration of swing residuals: excess of extreme predictive tail probabilities, signed, for share and turnout | Widespread manipulation beyond ordinary swing | Model misspecification (checked on 2022 and development data) |
+| C2 | Turnout × share joint distribution compared with the model-implied null, in the spirit of [Klimek et al. 2012](https://doi.org/10.1073/pnas.1210722109) | Stuffing that raises turnout and one candidate together | Strongly mobilized homogeneous communities |
+| C3 | Excess of integer percentages relative to a size-aware null ([Kobak et al. 2016](https://doi.org/10.1214/16-AOAS904); [Rozenas 2017](https://doi.org/10.1017/pan.2016.9)) | Fabricated or rounded results | Small sections; tested against the exact discrete null |
+| C4 | Scan statistic over polling places and municipalities on residuals ([Kulldorff 1997](https://doi.org/10.1080/03610929708831995)) | Geographically concentrated manipulation | Local political events; reviewed with source evidence |
+| C5 | Association between operational excess (manual share, late cycles, cadence) and share residual, both directions | Stuffing or impersonation linked to one candidate | Low biometric enrolment, accessibility, queues |
+| C6 | Swing residual by device model and software version, within location | Device-specific software manipulation | Composition of places using older devices (the 2022 Instituto Voto Legal error; section 7.6) |
 
-### Targets and controls
+Multiplicity is controlled across this family with Benjamini–Yekutieli at 5% FDR
+([Benjamini and Yekutieli 2001](https://doi.org/10.1214/aos/1013699998)). The
+family, statistics, nulls, seeds and thresholds are frozen in the pre-registration.
+Mixture-model forensics such as Mebane's eforensics are run as a secondary,
+exploratory analysis; their known sensitivity to strategic voting and
+administration is reported with them.
 
-Fit separate conditional distributions for:
+### 7.4 Section rankings are triage only
 
-- Turnout: completed voters / eligible electorate in the harmonized section.
-- Candidate A share: A / (A + B), undefined if valid votes are zero.
-- Blank/null proportions with their correct denominators.
-- Operational measures: distributions of completed-cycle durations, within-session
-  gaps, failed authorizations, outages/restarts and within-day intensity changes.
+Section and location scores are published as ranked predictive tail
+probabilities for investigation (section 9). With 500,000 sections, the smallest
+attainable rank p-value and the multiple-testing threshold make individual
+confirmatory claims unreachable, so rankings carry no significance label.
 
-Use a prespecified first-round preference vector, electorate/size, geography,
-historical voting patterns where comparable, and relevant pre-election polling
-place characteristics. Check whether a state also voted for governor: the number
-of contests changes voting duration. Candidate A/B definitions are fixed from
-official identifiers and the tests run symmetrically in both directions.
+### 7.5 Power and minimum detectable manipulation
 
-Maintain two model specifications: one adjusts operational comparisons for device
-model/version and known logistics; another examines those factors as possible
-mechanisms. Do not automatically control away turnout, manual authorization or
-outages when those are the hypothesized effects of manipulation. Repeat electoral
-models without the current first-round baseline, which itself may be affected.
+Before the freeze, synthetic manipulations are injected into copies of the
+development data and the 2022 data, then the full pipeline (fit, scoring, tests)
+is rerun:
 
-### Predictors and scores
+- mechanisms: vote switching, ballot stuffing (turnout increase with one-sided
+  share), suppression (turnout decrease), fabricated round results, copied or
+  missing log segments, clock errors;
+- magnitudes: from 0.1% to 10% of affected sections' votes;
+- concentration: spread uniformly, concentrated in municipalities, concentrated
+  in a UF, concentrated in one device model.
 
-Start with interpretable matched-peer medians, empirical conditional quantiles
-and median absolute deviations. Compare within polling place where possible, then
-within zone/municipality with size and historical-preference matching. Sections
-are not randomly assigned voters: within-school permutations are not automatically
-exact randomization tests. Require overlap and flag out-of-support cases rather
-than force a prediction.
+For each mechanism and concentration the protocol reports power curves and the
+**minimum detectable manipulation**: the smallest national margin shift detected
+with 80% power by the family. Benign injected disturbances (clock errors, copied
+logs) measure false alarms. These numbers are part of the pre-registration and of
+the headline results.
 
-The main nonlinear predictor is a **quantile regression forest**, which estimates
-conditional outcome quantiles without a fixed normal-error model:
-[Meinshausen (2006)](https://www.jmlr.org/papers/v7/meinshausen06a.html).
-Compare it against the matched empirical baseline using held-out quantile loss
-and interval coverage. Flexibility alone does not establish robustness to bad
-data, confounding or contaminated training populations.
+### 7.6 Negative controls
 
-For an interval `[L_j(x), U_j(x)]`, a possible component score is
-`s_ij = max(L_j(x_i) - y_ij, y_ij - U_j(x_i), 0) / scale_j(x_i)`.
-Specify scale floors and discrete/zero-denominator handling using training data.
-Prespecify a joint maximum score across components, then calibrate that joint
-score; do not add separate p-values without justification. Keep signed residuals
-for interpretation and absolute scores for symmetric detection.
+- **2022 presidential election, both rounds,** through the same pipeline. 2022 is
+  not certified clean, but a method that flags 2022 as strongly as it would flag a
+  manipulated election is not informative, and the comparison is published either
+  way.
+- **The 2022 device-model claim.** In November 2022 a report by Instituto Voto
+  Legal argued that votes from older urn models should be discarded; the TSE
+  rejected it and fined the coalition that filed it
+  ([TSE decision](https://www.tse.jus.br/comunicacao/arquivos/voto-alexandre-de-moraes)).
+  C6 is required to show how a naive device-model contrast arises from where older
+  devices were deployed, and that the within-location contrast removes it.
+- **Placebos:** permuted candidate labels within location, randomized location
+  labels, and the first round predicted from itself, which must produce null
+  results.
 
-### Calibration, geography and multiplicity
+### 7.7 Development, confirmatory and holdout data
 
-Split by whole polling locations into training, calibration and test sets, with
-fixed seeds and geographic strata. Use municipal holdouts as a stronger stress
-test. Same-location peer diagnostics form a separate descriptive layer; using
-neighbors to train and test would otherwise exaggerate generalization.
+- **Development:** the data listed in section 2. Used to build and tune everything.
+- **Sealed holdout:** at the freeze, a random 10% of polling places, stratified by
+  UF, is drawn with a seed published in the pre-registration and its list hashed.
+  The holdout is not opened until the confirmatory run on the rest is published.
+  It then replicates C1–C6 once, and concordance is reported.
+- **Confirmatory:** every other location. Its tests are run once, after the
+  freeze. The 596 protected/stress runoff logs stay unread until the freeze and are
+  then allocated by the same random draw as every other location.
+- **Development UFs** are reported descriptively, never as confirmatory evidence.
 
-For a frozen score and an exchangeable reference, a conservative rank p-value is
-`p_i = (1 + number of calibration scores >= s_i) / (n_cal + 1)`.
-[Bates et al. (2023)](https://doi.org/10.1214/22-AOS2244) develop conformal outlier
-testing under stated sampling assumptions. Election sections share environments
-and are not independent random draws; splitting into clusters alone does not
-prove exchangeability. Examine calibration within prespecified strata and use
-whole-cluster scores for confirmatory geographic tests. Where assumptions remain
-unsupported, publish empirical tail ranks as descriptive scores, not valid fraud
-p-values. [Barber et al. (2023)](https://arxiv.org/abs/2202.13415) discuss the impact
-of departures from exchangeability.
+## 8. Outcome sensitivity
 
-Primary inferential units should initially be polling-location/municipality
-clusters; section rankings guide investigation. For valid p-values, use a
-prespecified testing family and a dependence-aware procedure, such as
-[Benjamini–Yekutieli](https://doi.org/10.1214/aos/1013699998), at a proposed 5% FDR.
-This controls a testing error criterion under its assumptions, not the percentage
-of accusations that constitute fraud. It cannot repair invalid input p-values.
-Define families across outcomes, geographic scales and model variants before
-testing; label additional searches exploratory.
-
-Check resolution and power before committing: with 20,000 calibration units, the
-minimum rank p-value is about 0.00005. For 500,000 tests the first BH threshold at
-5% is 0.0000001, and BY is more stringent. Such a design cannot detect an isolated
-outlier at that threshold. Do not invent tiny p-values by extrapolating an
-unsupported tail distribution. Coarser cluster tests, prespecified global tests,
-or a larger valid reference may be necessary. State the undetectable effect range.
-
-### Guardrails against selective testing and repeated inspection
-
-The [xkcd Significant comic](https://xkcd.com/882/) illustrates testing many
-subgroups and selectively reporting one low p-value. With 20 independent true-null
-tests at 5%, the probability of at least one false rejection is
-`1 - 0.95**20`, about 64%; the expected number is one. Dependence changes the first
-calculation, but does not make unadjusted exploratory searches confirmatory.
-
-Keep an analysis ledger containing every outcome, subgroup, geographic scale,
-time window, hardware comparison, model variant and historical-election comparison
-examined, including null results and unsuccessful specifications. Freeze the
-confirmatory family and the joint score before examining test-set rankings.
-Selecting interesting subgroups after seeing their results is itself selection;
-correcting only the final displayed list does not account for the preceding search.
-
-Reserve a genuinely untouched test partition. Choose features, peer definitions,
-hyperparameters and thresholds using development data and historical backtests.
-Once inspected, a test partition becomes development data for subsequent changes;
-use new held-out evidence or a justified selection-adjusted analysis for renewed
-confirmatory claims. Statistical multiplicity correction alone does not fix
-training/test leakage or adaptive model selection.
-
-Treat monitoring while downloads arrive as descriptive. Confirmatory testing uses
-a frozen population and snapshot. Repeatedly inspecting p-values and stopping
-when a threshold is crossed is not covered by the present fixed-family helpers;
-sequential claims would require a separately specified valid sequential method.
-
-Report effect sizes and conditional vote-margin bounds alongside uncertainty.
-A non-significant test does not prove absence of fraud; a small p-value does not
-give the probability of fraud. A 5% FDR target concerns the expected fraction of
-false null rejections among rejections, with zero when none are rejected; it is
-neither a per-case probability nor a bound on the share of fraudulent votes. These
-interpretation safeguards follow the
-[ASA's p-value statement](https://www.amstat.org/asa/files/pdfs/p-valuestatement.pdf).
-Non-parametric modeling does not remove any of these design requirements.
-
-## Historical elections: acquisition priority and validation
-
-Historical data can improve peer definition, expose persistent local behavior
-and stress-test generalization. It is not a certified clean control group. A
-pattern recurring across elections can be ordinary structure, a recurrent data
-artifact or a persistent irregularity; recurrence alone cannot distinguish them.
-
-Prioritize:
-
-1. **2026 first-round results and section composition:** the closest electorate
-   baseline for the runoff. Distinguish actual change from aggregation and
-   transfers, and allow the first-round data themselves to be contaminated.
-2. **2022 presidential results, both rounds, plus comparable logs:** a prior cycle
-   for turnout/preferences and operational validation. TSE lists presidential
-   section results and section details in its
-   [2022 catalog](https://dadosabertos.tse.jus.br/dataset/resultados-2022), and
-   [documents public online logs from 2022](https://www.justicaeleitoral.jus.br/fato-ou-boato/checagens/2022/logs-das-urnas-eletronicas-sao-dados-publicos-e-nao-revelam-votos-de-eleitores).
-   Check current file availability and year-specific formats before bulk retrieval.
-3. **2018 presidential results, both rounds:** another cycle to assess stability
-   and temporal sensitivity. TSE's
-   [2018 catalog](https://dadosabertos.tse.jus.br/dataset/resultados-2018) includes
-   presidential section votes and section details. Do not presume the same online
-   log coverage as 2022 or identical meanings across schemas.
-
-Use chronological development/backtests where feasible: for example, develop
-using 2018 data and perform a frozen retrospective check on 2022 before the final
-2026 evaluation. If 2022 results inform another revision, label the earlier check
-as development and preserve a fresh final test. Compare historical-assisted and
-current-cycle-only models under the same held-out evaluation; retain history only
-where it improves calibration, prediction or investigation quality.
-
-Harmonize section splits/mergers, electorate changes, locations, timezone rules,
-device/software generations, biometric workflows and numbers of contests. Do not
-equate different candidates' raw shares or assume voter preferences remain fixed.
-Municipal-election data may help validate parsing and some operational mechanisms,
-but do not automatically belong in a presidential-turnout/vote-share reference.
-Use history as context and as a stress test, rather than simply concatenating all
-rows and claiming a larger independent calibration sample. Repeated observations
-of the same places and year-to-year distribution shifts violate that shortcut.
-
-## Validation and investigation protocol
-
-Before applying anomaly labels:
-
-1. Validate parser and count reconciliation across hardware, software, geography,
-   normal/replacement sessions and exceptional BU types.
-2. Use held-out geography and independent historical elections as stress tests,
-   not as assumed fraud-free training labels. First- and second-round differences
-   can reflect legitimate vote transfers and different contest counts.
-3. Inject documented synthetic mechanisms into separate validation copies:
-   added votes, switched votes, reduced turnout, duplicated histories, missing
-   segments and clock errors, at multiple geographic concentrations and magnitudes.
-   Refit/calibrate where appropriate so contamination effects are tested too.
-4. Report detection power, localization, false alarms under benign simulated
-   mechanisms, and coverage by stratum. Simulations assess the implemented
-   detector against specified mechanisms, not all possible fraud.
-5. Investigate ranked cases with source evidence, plus a random sample of
-   unflagged cases. Seek independent BU copies, minutes, incident explanations and
-   corroborating evidence. Analysts reviewing operational logs should initially
-   be blinded to candidate identity where feasible.
-
-Inspect coherent regional and model/version shifts as well as isolated extremes:
-a widespread alteration could be absorbed by a flexible baseline. Conversely,
-regional political preferences, age, accessibility, transport and administration
-can generate coherent differences without fraud. First-round aggregate changes
-cannot identify individual vote transfers (an ecological identification problem).
-
-Use operational and result evidence jointly, with explicit alternative
-explanations. Neither high support, low biometric use, fast voting, late closure,
-late transmission nor a particular device model is sufficient alone. Do not use
-Benford conformity as the primary test: [Deckert, Myagkov and Ordeshook
-(2011)](https://authors.library.caltech.edu/records/5jbtk-8wn05) show that this can
-misclassify election data. Do not delete flagged sections and declare the
-remaining sum the true outcome.
-
-## Estimating outcome impact
-
-Let `M = total_A - total_B > 0` be the frozen official national margin. Obtain it
-from reconciled final data, not the incomplete local logs. Distinguish:
+Let `M = total_A - total_B > 0` be the official national margin, taken from
+reconciled final data. The arithmetic thresholds are:
 
 | Mechanism assumed and corroborated | Largest margin change per affected ballot |
 | --- | --- |
@@ -371,14 +300,9 @@ from reconciled final data, not the incomplete local logs. Distinguish:
 | Correct a vote counted for A that should have been B | 2 votes |
 | Restore a suppressed additional vote for B | 1 vote |
 
-For a strict B win, at least `floor(M/2) + 1` A-to-B switches are required, if that
-many A votes are eligible for correction. At least `M + 1` A removals or additional
-B votes are required under the corresponding one-vote mechanism. These are
-arithmetic thresholds, not estimates of what happened.
-
-For an anonymous flagged subset of `r` completed ballots in a section with
-`a` A votes, `b` B votes and `c` other ballots, assume all `r` are removed. Its
-removed A-minus-B contribution has sharp feasible bounds:
+A strict B win needs at least `floor(M/2) + 1` A-to-B switches, or `M + 1`
+removals or additional B votes. For an anonymous subset of `r` completed ballots
+removed from a section with `a` A votes, `b` B votes and `c` other ballots:
 
 ```
 d_max = min(r, a) - max(0, r - a - c)
@@ -386,50 +310,92 @@ d_min = max(0, r - b - c) - min(r, b)
 corrected national margin in [M - d_max, M - d_min]
 ```
 
-Sum these contribution bounds over disjoint affected sections/subsets. They use
-only anonymous subset size and BU counts; they do not allocate late/manual votes
-to a candidate. Overlapping detectors must be deduplicated before adding bounds.
-The removal assumption itself needs justification, and `r` must count presidential
-ballots, not authorization attempts or generic log messages. If “at most r” are
-affected, include the zero-removal case as well.
+Bounds add over disjoint sections; overlapping detectors are deduplicated first.
+`r` counts presidential ballots, not authorizations or messages. With a validated
+cap `q_i` on switched ballots, the largest adverse correction is `2 * min(q_i, a_i)`
+per section. If the total stays below `M`, that mechanism, within that population
+and cap, cannot reverse the result; nothing follows about mechanisms outside it.
 
-For a two-candidate switching scenario with a validated cap `q_i` on affected
-ballots, the maximum adverse margin correction is `2 * min(q_i, a_i)` per section.
-This assumes at most that many currently A ballots can be switched to B; different
-mechanisms, changed electorates and blank/null conversions require different
-constraints. If the resulting total bound is smaller than M, that *specified
-mechanism within that specified population and cap* cannot reverse the result.
-This says nothing about undetected manipulation outside the population.
+A model-based counterfactual `2 * sum(a_i - n_valid_i * p_hat_i)` is labelled
+**excess relative to the baseline**, never stolen votes. Its uncertainty comes
+from geographic block resampling of the full fit, selection and estimation
+pipeline. The minimum detectable manipulation (section 7.5) is reported alongside
+it, so readers can compare what could be hidden with what was seen.
 
-A model-based counterfactual can estimate expected A votes as `n_valid_i * p_hat_i`
-with valid turnout held fixed. The implied two-candidate margin difference is
-`2 * sum(a_i - n_valid_i * p_hat_i)`. Label it **excess relative to the baseline**,
-not stolen votes. To study turnout manipulation, model participation separately
-and vary absent voters' hypothetical choices; these are not observed in the logs.
-Use geographic block resampling of the full fit/selection/estimation pipeline,
-report signed effects and sensitivity to matching, contamination and omitted
-factors. A simple bootstrap of selected residuals ignores selection bias.
-Prediction intervals for sections cannot simply be added as a national confidence
-interval, and predictive uncertainty does not identify causal uncertainty.
+## 9. Investigation protocol
 
-Every reported case should include source hashes, section/session/package keys,
-observed and expected features, peer definition, score/assumptions, multiplicity
-status, alternative explanations, corroboration, affected-vote bounds and the
-conditional national-margin implications. “Real impact” remains unidentified
-without defensible evidence about the mechanism and counterfactual.
+Ranked locations and a random sample of unflagged locations receive the same case
+packet: source hashes, keys, observed and expected values, peer definition, score,
+integrity results, alternative explanations, corroboration sought and
+affected-vote bounds. Reviewers of operational evidence are blinded to candidate
+direction where feasible. Corroboration is sought from polling-station minutes,
+incident records and printed BU copies. Investigation results are reported for
+flagged and unflagged cases alike, so the false-alarm rate of the triage is
+visible.
 
-## Execution order
+## 10. Guardrails against selective inference
 
-1. Let acquisition continue; inspect a small, reproducible read-only log sample.
-2. Obtain BUs for both rounds, final totals, a section crosswalk and the required
-   schema documentation; add targeted RDV/signature checks.
-3. Freeze a coverage/provenance snapshot; build and reconcile session/result tables.
-4. Freeze targets, null assumptions, splits, testing families and validation
-   simulations; implement and compare the conditional empirical and forest models.
-5. Produce a candidate-symmetric investigation table, then conditional impact
-   bounds and sensitivity analyses. Publish neither fraud counts nor a corrected
-   winner from statistical residuals alone.
+- An append-only analysis ledger records every outcome, subgroup, geography, time
+  window, device comparison and model variant examined, including null and failed
+  specifications.
+- Selecting subgroups after seeing results is itself selection; correcting only
+  the displayed list does not account for the search
+  ([xkcd 882](https://xkcd.com/882/)).
+- Once inspected, data becomes development data. Renewed confirmatory claims need
+  new held-out evidence.
+- Monitoring results as they arrive is descriptive; there is no sequential
+  stopping rule.
+- A small p-value is not the probability of fraud; a non-significant test is not
+  proof of its absence; a 5% FDR is not a bound on the share of fraudulent votes
+  ([ASA statement](https://www.amstat.org/asa/files/pdfs/p-valuestatement.pdf)).
+- Benford-style digit tests are not used as evidence
+  ([Deckert, Myagkov and Ordeshook 2011](https://authors.library.caltech.edu/records/5jbtk-8wn05)).
+- Exchangeability is assumed only where stated and checked within strata; where it
+  fails, scores are descriptive ranks
+  ([Bates et al. 2023](https://doi.org/10.1214/22-AOS2244);
+  [Barber et al. 2023](https://arxiv.org/abs/2202.13415)).
 
-`scripts/audit_statistics.py` contains tested rank-calibration, multiplicity and
-impact-bound primitives. It does not fit the proposed model. The log-inspection
-utility is a parser diagnostic, with no timezone conversion or fraud classifier.
+## 11. Reproducibility and how to challenge the results
+
+The results should be checkable by someone who does not trust the authors.
+
+- **Pre-registration.** The frozen protocol, confirmatory family, seeds, holdout
+  hash and power results are registered on OSF and in a signed git tag before the
+  confirmatory run.
+- **Claims register.** Every number in the findings report links to the query that
+  produces it, the hashes of its input releases and the command that rebuilds it.
+- **Replication kit.** The released Parquet tables and scripts recompute every
+  headline number on a laptop in under an hour, without the raw logs.
+- **Forensic replay.** The review bundle rebuilds any release from the original
+  TSE bytes, verified by hash, on a clean machine.
+- **Explorer.** Bilingual marimo notebooks over the released tables let readers
+  inspect coverage, integrity results, residual maps, funnel plots and case
+  packets, with every view exportable with its provenance.
+- **Alternative specifications.** Documented switches (peer definition, covariate
+  set, with or without round 1, model family) let a reviewer rerun the family under
+  their own choices and compare.
+- **Deviations and errata** are published in the same repository, dated and
+  never rewritten.
+
+## 12. Historical data
+
+History improves peer definition and stress-tests the method; it is not a clean
+control group. Harmonize section splits and mergers, electorate changes, timezone
+rules, device generations, biometric workflows and number of contests. Do not
+concatenate years as if they were independent observations. 2022 is in scope as a
+negative control (section 7.6); 2018 remains a later stress test.
+
+## References
+
+- Barber, R. F. et al. (2023). [Conformal prediction beyond exchangeability](https://arxiv.org/abs/2202.13415).
+- Bates, S. et al. (2023). [Testing for outliers with conformal p-values](https://doi.org/10.1214/22-AOS2244). *Annals of Statistics*.
+- Benjamini, Y. and Yekutieli, D. (2001). [The control of the false discovery rate in multiple testing under dependency](https://doi.org/10.1214/aos/1013699998). *Annals of Statistics*.
+- Chernozhukov, V. et al. (2018). [Double/debiased machine learning for treatment and structural parameters](https://doi.org/10.1111/ectj.12097). *Econometrics Journal*.
+- Deckert, J., Myagkov, M. and Ordeshook, P. (2011). [Benford's Law and the detection of election fraud](https://authors.library.caltech.edu/records/5jbtk-8wn05). *Political Analysis*.
+- Klimek, P., Yegorov, Y., Hanel, R. and Thurner, S. (2012). [Statistical detection of systematic election irregularities](https://doi.org/10.1073/pnas.1210722109). *PNAS*.
+- Kobak, D., Shpilkin, S. and Pshenichnikov, M. (2016). [Integer percentages as electoral falsification fingerprints](https://doi.org/10.1214/16-AOAS904). *Annals of Applied Statistics*.
+- Kulldorff, M. (1997). [A spatial scan statistic](https://doi.org/10.1080/03610929708831995). *Communications in Statistics: Theory and Methods*.
+- Mebane, W. R. Jr. [Election forensics working papers](https://public.websites.umich.edu/~wmebane/), including the eforensics finite-mixture model (Ferrari, Mebane, McAlister and Wu 2019, and later papers).
+- Meinshausen, N. (2006). [Quantile regression forests](https://www.jmlr.org/papers/v7/meinshausen06a.html). *JMLR*.
+- Rozenas, A. (2017). [Detecting election fraud from irregularities in vote-share distributions](https://doi.org/10.1017/pan.2016.9). *Political Analysis*.
+- Wasserstein, R. and Lazar, N. (2016). [The ASA statement on p-values](https://www.amstat.org/asa/files/pdfs/p-valuestatement.pdf).

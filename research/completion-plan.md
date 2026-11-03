@@ -1,31 +1,89 @@
 # 2026 audit completion plan
 
-Document-ID: EA-COMPLETION-PLAN · Revision: 9 · Language: en
+Document-ID: EA-COMPLETION-PLAN · Revision: 10 · Language: en
 
-[Português](completion-plan.pt-BR.md)
+[Português](completion-plan.pt-BR.md) · [Study protocol](analysis-plan.md)
 
-Approved implementation scope: the full research workflow for the two 2026 presidential rounds. Each numbered phase is assigned to a fresh sub-agent; integration and acceptance are coordinated by the parent agent. This scope authorizes fitting in phases 15–17 and supersedes historical foundation-only restrictions for new artifacts; old releases retain their original meaning.
+Approved scope: the full research workflow for the two 2026 presidential rounds,
+with the 2022 presidential election as a negative control. The study design is the
+[study protocol](analysis-plan.md); this plan turns it into phases. Each numbered
+phase is assigned to a fresh sub-agent, runs alone and is reviewed before the next
+is dispatched. Current status and artifact locations are in the
+[implementation index](../docs/en/implementation-index.md).
 
-Execution status (3 November 2026): phases run one at a time, each assigned to a fresh sub-agent and reviewed before the next is dispatched. Phases 10 and 11 are complete; Phases 12–18 exist as Acre (AC) development artifacts only. This plan and the analysis plan are under revision after the methodology review of 3 November 2026; no new phase is dispatched until that revision lands. Phase 18 (marimo notebooks/dashboard) stays last. Current status, artifacts and remaining work are in the [implementation index](../docs/en/implementation-index.md).
+## Status (3 November 2026)
 
-| Phase | Deliverable |
-| --- | --- |
-| 10 | Verify both round identities; correct explicit round acquisition; preserve all original manifests and bytes. |
-| 11 | Stream national processing through bounded disk-backed partitions, checksummed checkpoints and capacity guards; benchmark before expansion. |
-| 12 | Decode official binary BUs, link totalized EA18 packages to BWEB, establish choice completeness and reconcile final hierarchies including ZZ. |
-| 13 | Validate real log messages, sessions, copied histories and clocks; publish eligible operational measures with uncertainty. |
-| 14 | Harmonize both rounds and locations; produce all 21 feature families and explicit availability ledgers. |
-| 15 | Freeze research families and grouped partitions; protect test outcomes and preserve all inspection history. |
-| 16 | Fit empirical baselines and quantile forests, simulate mechanisms and run one recorded final evaluation. |
-| 17 | Investigate symmetric signals and unflagged controls; compute conditional bounds and baseline-relative sensitivities. |
-| 18 | Deliver four linked bilingual marimo notebooks and a portable checksummed local/HTTPS dataset interface. |
+| Phase | Deliverable | State |
+| --- | --- | --- |
+| 10 | Verify both round identities; explicit round acquisition; preserve all original manifests and bytes | Done |
+| 11 | Resource-bounded national structural processing; benchmark before expansion | Done for the 498581 eligible runoff logs (structural only; see below) |
+| 12–18 | First-version phases: binary BU, operational semantics, features, protocol, models, investigations, notebooks | Closed as Acre (AC) development pilots; tools are reused below |
 
-Defaults: 2026 only; record 2022 backtesting and 2018 stress testing as future phases. Current machine only: durable storage on the HDD and the added output volume, bounded SSD scratch, at most half the allotted CPU capacity, measured real worker parallelism, one library thread per process, 4 GiB aggregate Phase 11 working memory, 8 GiB total per-object scratch budget, a 10 GiB SSD reserve and a 20 GiB HDD floor. Use 60/20/20 stable-location partitions and an additional 10% municipal stress holdout. Protect outcomes until frozen final evaluation. Previously inspected locations remain development data. The originally supplied manifests contain runoff URLs only. Corrected first-round acquisition used `.local-state/tse-2026-t1-verified.sqlite` and `turno-1-verified`; it finished on 31 October 2026, and both rounds were copied to the output volume and SHA-256 verified on 1 November 2026.
+The methodology review of 3 November 2026 replaced the first-version definitions of
+Phases 12–18. Their code and AC artifacts stay as development pilots and their
+handoffs stay as dated records. The revised work continues as Phases 19–26, so
+that new handoffs never overwrite old ones.
 
-Dashboard: coverage/integrity, electoral comparisons, operations, models/investigations. Use standard marimo controls and Altair, shared AuditDataset reader, lazy bounded queries, explicit unavailable states and provenance-bearing exports. Never launch acquisition or fitting from reactive widget changes. Serve on loopback by default; actual remote hosting is future work.
+What Phase 11 does and does not provide: per-log structural counts, member
+structure and block hashes for every eligible runoff log. Each runoff log also
+contains setup and first-round events, so its counts mix rounds; there is no
+session, clock or timing information; the 596 protected/stress logs and the whole
+first round are unprocessed. Every operational measure therefore needs the
+semantic pass of Phase 21.
 
-Acceptance requires regression tests, real redacted fixtures, matching-population reconciliation, interrupted/resumed processing, resource measurements, protected-outcome tests, reproducible fitting and simulations, notebook/browser checks, local/HTTP equivalence, paired documentation and compact handoffs. A completed phase must distinguish implemented tools, executed real runs, and unresolved evidence. Missing sources, clocks, signatures or exchangeability never become invented facts. No automatic fraud classification or anonymous candidate attribution.
+## Revised phases
+
+| Phase | Deliverable | Reuses |
+| --- | --- | --- |
+| 19 | **National inputs.** Acquire and freeze, with checksums and immutable manifests: BWEB for 27 UFs and ZZ, both rounds; binary BUs, RDVs and signatures for totalized packages; hierarchical results (EA20); voter profile by section and polling places; 2022 presidential BWEB, BUs, logs and voter profile, both rounds; TSE election-day integrity test reports. Pin the certified manifest copies as analysis inputs and document the stale manifest files. | `official_bu`, `electoral_imports`, downloader |
+| 20 | **Tier 1 integrity checks (I1–I9)** nationally, both rounds: deterministic reports with full discrepancy tables, source hashes and a population ledger. Collect independent printed BU copies for I8. | `binary_bu`, `electoral_verification` (AC pilot) |
+| 21 | **National semantic log pass,** both rounds and 2022: one streaming pass per round applies the reviewed message rules and writes per-session aggregates (cycles by authorization method, suspensions, opening/closing readings, hourly counts, cadence, clock events), round-1 block comparisons (I6) and a message-template vocabulary. Equivalence-tested against the AC event-level adapter before the national run. | `national_summary`, `operational_review`, `real-log-rules.json` |
+| 22 | **Section feature table v2:** cross-round harmonized units with an explicit crosswalk, voter-profile covariates, polling-place keys, device model and software, operational measures, availability ledger. | `features` (AC pilot) |
+| 23 | **Development modelling, power study and protocol freeze.** On development data only: beta-binomial swing model, within-location contrasts, cross-fitting, the quantile-forest comparator, the C1–C6 tests and their simulated nulls; fix the known first-version model defects (fixed `1e-6` scale floor, tied zero scores, leaf selection inconsistent with location-held-out calibration, optimistic forest-vs-baseline comparison). Run the injection study and report minimum detectable manipulation. Draw and hash the sealed holdout. Freeze and publicly pre-register (OSF and signed git tag). | `research_models`, `research_protocol`, `research_evaluation` |
+| 24 | **Confirmatory run,** once: cross-fitted scores for every section, C1–C6 with BY control, 2022 negative control, placebo tests; then the single opening of the sealed holdout. All deviations recorded. | Phase 23 frozen code |
+| 25 | **Investigations and outcome sensitivity:** triage packets for ranked and random unflagged locations, corroboration requests, conditional margin bounds and baseline-relative excess. | `investigations` |
+| 26 | **Publication:** bilingual findings report led by integrity results and minimum detectable manipulation; claims register; laptop replication kit; marimo explorer over the released tables; review bundle rebuilt on a clean machine. | `dashboard*`, `reproduction` |
+
+## Resource and I/O rules
+
+The machine has two rotational data drives and an SSD root with about 25 GB free.
+Phase 11 read 91.5 GB at about 2.5 MB/s with 94% I/O pressure, while writing
+68.8 GB of checkpoints to the same drive to produce a 547 MB release. Small random reads, not CPU, set the pace.
+Every full pass must therefore:
+
+- benchmark the read order first (manifest order vs on-disk order) on a sample;
+- keep checkpoint and output volume proportional to the result, on a different
+  spindle from the source being read;
+- consider fusing a one-time sequential repack of the raw objects onto the other
+  drive into the first pass, so later passes read sequentially;
+- stay within half the CPU, 4 GiB of aggregate RAM and one library thread per
+  process, with explicit SSD and HDD free-space floors.
+
+## Data policy
+
+- Development data: AC, the five pilot UFs (AC, AL, DF, ES, PR) and every location
+  in the Phase 11 and Phase 15 inspection registries.
+- Sealed holdout: 10% of polling places drawn by UF at the freeze (Phase 23) and
+  opened once, after the confirmatory run (Phase 24).
+- The 596 protected/stress runoff logs stay unread until the freeze, then follow
+  the same draw as every other location.
+- Analyses read the certified manifest copies by hash, never live manifests.
+- Unknown is never zero; no fraud labels; no candidate attribution of anonymous
+  cycles.
+
+## Acceptance
+
+Each phase needs regression tests, real redacted fixtures, population ledgers that
+reconcile, interrupted/resumed runs where long, resource measurements, paired
+documentation and a compact handoff. A phase report distinguishes implemented
+tools, executed real runs and unresolved evidence. Missing sources, clocks,
+signatures or exchangeability never become invented facts.
 
 ## Execution record
 
-Phase 11's measured benchmarks, tuning studies, tranches, capacity reviews, move to the added output volume, copied-source migration and the final feature-oriented runoff run are recorded in the [Phase 11 handoff](../docs/en/handoffs/task-11.md) and the [feature-oriented processing guide](../docs/en/feature-oriented-processing.md). Their saved evidence is under `data/national/`.
+Phase 11's measured benchmarks, tuning studies, tranches, capacity reviews, move to
+the added output volume, copied-source migration and the final feature-oriented
+runoff run are recorded in the [Phase 11 handoff](../docs/en/handoffs/task-11.md)
+and the [feature-oriented processing guide](../docs/en/feature-oriented-processing.md).
+Their saved evidence is under `data/national/`. The first-version Phase 12–18
+pilots are recorded in their handoffs.

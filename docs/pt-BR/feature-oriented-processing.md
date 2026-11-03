@@ -1,6 +1,6 @@
 # Processamento nacional orientado a features
 
-Document-ID: EA-FEATURE-PIPELINE · Revision: 3 · Language: pt-BR
+Document-ID: EA-FEATURE-PIPELINE · Revision: 4 · Language: pt-BR
 
 ## Decisão e escopo científico
 
@@ -169,8 +169,17 @@ O manifesto registra `complete_requested_scope=true`, `full_national_complete=fa
 (as 596 observações protegidas/de estresse estão ausentes por desenho) e
 `scientific_eligibility=unavailable_structural_only`. Cerca de 90% dos eventos
 percorridos pertencem a classes de mensagem que o parser estrutural deixa como
-`unknown`; a Fase 13 precisa classificá-las antes que sessões, ciclos ou relógios se
-tornem elegíveis. O primeiro turno não foi processado. O ponteiro do job é
+`unknown`; a passada semântica (Fase 21 do
+[plano de conclusão](../../research/completion-plan.pt-BR.md)) precisa classificá-las
+antes que sessões, ciclos ou relógios se tornem elegíveis. O primeiro turno não foi
+processado.
+
+As contagens por objeto não são medidas do segundo turno. Cada `logd.dat` do segundo
+turno contém eventos de preparação de setembro, a sessão do primeiro turno e a do
+segundo (as leituras mais antigas dos membros caem em setembro, e 3004
+membros terminam em 4 de outubro), então `observed_authorizations` e
+`observed_completions` (252940011 e 252882361 no total) contam os dois turnos. Use-as
+só como diagnósticos estruturais. O ponteiro do job é
 `data/national/current-phase11.json`.
 
 ## Finalização analítica compacta e releitura

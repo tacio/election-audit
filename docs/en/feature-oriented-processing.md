@@ -1,6 +1,6 @@
 # Feature-oriented national processing
 
-Document-ID: EA-FEATURE-PIPELINE · Revision: 3 · Language: en
+Document-ID: EA-FEATURE-PIPELINE · Revision: 4 · Language: en
 
 ## Decision and scientific scope
 
@@ -168,9 +168,16 @@ bytes of Parquet: `source_summaries` (498581 rows), `source_witnesses` and
 Its manifest records `complete_requested_scope=true`, `full_national_complete=false`
 (the 596 protected/stress observations are deliberately absent) and
 `scientific_eligibility=unavailable_structural_only`. About 90% of scanned events
-belong to message classes the structural parser leaves `unknown`; Phase 13 must
+belong to message classes the structural parser leaves `unknown`; the semantic
+pass (Phase 21 of the [completion plan](../../research/completion-plan.md)) must
 classify them before sessions, cycles or clocks become eligible. Round 1 has not
-been processed. The job pointer is `data/national/current-phase11.json`.
+been processed.
+
+The per-object counts are not runoff measures. Each runoff `logd.dat` contains
+setup events from September, the first-round session and the runoff session (the
+earliest member readings fall in September, and 3004 members end on
+4 October), so `observed_authorizations` and `observed_completions` (252940011 and
+252882361 in total) count both rounds. Use them only as structural diagnostics. The job pointer is `data/national/current-phase11.json`.
 
 ## Compact analytical finalization and replay
 

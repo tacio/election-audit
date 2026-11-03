@@ -1,6 +1,6 @@
 # Auditoria eleitoral — eleição presidencial brasileira de 2026
 
-Document-ID: EA-ONBOARDING · Revision: 11 · Language: pt-BR
+Document-ID: EA-ONBOARDING · Revision: 12 · Language: pt-BR
 
 [English](README.md)
 
@@ -16,10 +16,14 @@ vez de serem estimados. As ferramentas não produzem rótulos de fraude.
   versões de log do primeiro turno e 499177 do segundo, com lacunas explícitas de
   seções sem log e sem arquivo auxiliar publicado).
 - **Processamento estrutural:** todos os 498581 logs elegíveis do segundo turno
-  resumidos em uma release Parquet imutável. O primeiro turno ainda não foi processado.
+  resumidos em uma release Parquet imutável (só contagens estruturais; cada log
+  mistura os dois turnos). O primeiro turno ainda não foi processado.
 - **Verificação eleitoral, semântica operacional, features, modelos, investigações e
   notebooks:** implementados e exercitados só no Acre (AC).
-- **Próximo:** revisão do plano de análise e das definições das fases.
+- **Próximo:** Fase 19, entradas nacionais, sob o
+  [protocolo do estudo](research/analysis-plan.pt-BR.md) e o
+  [plano de conclusão](research/completion-plan.pt-BR.md) revisados. O protocolo será
+  pré-registrado publicamente antes de qualquer análise confirmatória.
 
 O [índice de implementação](docs/pt-BR/implementation-index.md) traz o estado
 completo, os locais dos artefatos e o mapa de interfaces. Comece por ele.
@@ -75,7 +79,7 @@ coleta, ambiente e credenciais. Veja [reprodução](docs/pt-BR/reproduction.md).
 7. **Análise** (`analyze`, `features`, `research-protocol`, `research-models`,
    `investigations`): features descritivas, partições congeladas, avaliação final
    protegida e ledgers só de acréscimo. Veja [análise](docs/pt-BR/analysis.md) e o
-   [plano de análise](research/analysis-plan.pt-BR.md).
+   [protocolo do estudo](research/analysis-plan.pt-BR.md).
 8. **Reprodução** (`demo`, `pilot`, `review-bundle`, `reproduce`, `backfill`).
 
 O processamento estrutural em escala nacional usa resumos paralelos com recursos

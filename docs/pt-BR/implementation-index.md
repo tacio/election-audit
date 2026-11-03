@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 19 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 20 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -30,6 +30,19 @@ verificado por SHA-256. As cópias são os originais de referência para o
 processamento derivado; as raízes originais no HDD e os manifestos em
 `.local-state/` foram preservados sem alteração.
 
+A mudança de disco não exigiu reescrever manifestos: os caminhos nos manifestos são
+relativos à raiz de objetos (`objects/xx/<sha>.<ext>`), e o `manifest-location.json`
+de cada nova raiz aponta para seu manifesto no SSD (`.local-state/tse-2026.sqlite`
+no segundo turno, `.local-state/tse-2026-t1-verified.sqlite` no primeiro). As cópias
+certificadas `migration-2026-11-01/manifest-r{1,2}.sqlite` batem com os hashes dos
+certificados e, em 3 de novembro, suas linhas de files, logs, sections e runs se
+mostraram idênticas às dos manifestos vivos no SSD. As análises fixam as cópias
+certificadas. Sobras a ignorar: a antiga raiz do segundo turno no HDD aponta para o
+mesmo manifesto no SSD; `raw/2026/turno-2/manifest.sqlite` é o banco obsoleto de
+antes da separação; `.local-state/tse-2026-t1.sqlite` é um manifesto do primeiro
+turno superado; e `migration-2026-11-01/status.json` mostra `FAILED_STOPPED` porque
+o job encadeado depois da cópia verificada foi parado, não porque a cópia falhou.
+
 **Processamento estrutural (Fase 11): concluído no escopo elegível do segundo
 turno.** O job de resumos orientados a features processou todos os 498581 objetos
 elegíveis (499177 observações menos 596 observações protegidas/de estresse e seus
@@ -39,15 +52,28 @@ completo e 6 parcialmente (190 erros retidos). Foram percorridos 5032537448 even
 estruturais; cerca de 90% estão em classes de mensagem que o parser estrutural deixa
 como `unknown`. A release publicada
 `55e55e91549dac53eb546a596f62033bc837e0a34e3ff9b178c4687ae9257f88`
-(`source-summary-analysis-release-v1`, 546,6 MB de Parquet) é a entrada das fases
-seguintes; os 68,8 GB de checkpoints agrupados ficam só para recuperação e evidência.
-O primeiro turno ainda não passou pelo processamento estrutural. Resumos estruturais
-não conferem elegibilidade científica: sessões, relógios e históricos copiados ainda
-dependem da Fase 13.
+(`source-summary-analysis-release-v1`, 546,6 MB de Parquet) guarda contagens por
+log, estrutura de membros e hashes de blocos; os 68,8 GB de checkpoints agrupados
+ficam só para recuperação e evidência.
 
-**Fases 12–18: apenas artefatos de desenvolvimento do Acre (AC).** As ferramentas de
-cada fase existem e foram exercitadas com dados reais do AC, mas nada foi executado
-em escala nacional:
+Para que ela não serve: cada `logd.dat` do segundo turno vai da preparação em
+setembro, passando pelo primeiro turno, até o segundo turno, então as contagens de
+habilitações e conclusões por log (252940011 e 252882361 no total) misturam turnos e
+não são medidas do segundo turno. Não há sessões, relógios nem tempos. Os 596 logs
+protegidos/de estresse e todo o primeiro turno não foram processados. Toda medida
+operacional precisa da passada semântica da Fase 21.
+
+O disco, não a CPU, limitou a vazão: 91.5 GB de objetos pequenos lidos a cerca de
+2.5 MB/s com 94% de pressão de E/S, enquanto os checkpoints eram gravados no mesmo
+disco. Os dois discos de dados são rotacionais e a raiz SSD tem cerca de 25 GB
+livres, então uma passada completa ingênua ainda custa cerca de 10 horas por turno.
+O [plano de conclusão](../../research/completion-plan.pt-BR.md#regras-de-recursos-e-es)
+define as regras de E/S para a próxima passada.
+
+**Fases 12–18: encerradas como pilotos de desenvolvimento do Acre (AC).** A revisão
+metodológica de 3 de novembro substituiu suas definições; o trabalho revisado são as
+Fases 19–26. Suas ferramentas existem, foram exercitadas com dados reais do AC e são
+reutilizadas, mas nada foi executado em escala nacional:
 
 - Fase 12: 2270 seções do segundo turno no AC com conteúdo verificado entre BU binário
   e BWEB; os totais da UF batem. Assinaturas, recontagem de RDV e hierarquia nacional
@@ -73,11 +99,13 @@ e `election_audit/electoral_references.py`.
 
 ## Próximo passo
 
-O plano de análise e as definições das Fases 12–18 estão sendo revisados após a
-revisão metodológica de 3 de novembro de 2026. Não despache nova fase até que
-[o plano de análise](../../research/analysis-plan.pt-BR.md) e
-[o plano de conclusão](../../research/completion-plan.pt-BR.md) tragam o escopo
-revisado.
+Fase 19 (entradas nacionais) no plano revisado. O
+[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 2) define as
+afirmações, o mapa de ameaças e observáveis, as verificações de integridade I1–I9, os
+testes confirmatórios C1–C6, o estudo de poder e a política de dados; o
+[plano de conclusão](../../research/completion-plan.pt-BR.md) (Revisão 10) define as
+Fases 19–26. O protocolo é um rascunho até ser congelado e pré-registrado
+publicamente na Fase 23.
 
 ## Regras de trabalho
 
@@ -137,14 +165,15 @@ com verificações aritméticas reais do AC (177 testes).
 | Fase | Estado | Pendências | Handoff |
 | --- | --- | --- | --- |
 | 10 | Concluída: dois turnos coletados, copiados e verificados por SHA-256 | Seções com lacuna continuam explícitas; BWEB, cadastros e fontes de RDV/assinatura de outras UFs são importações separadas | [10](handoffs/task-10.md) |
-| 11 | Concluída no escopo elegível do segundo turno (498581 objetos, 0 falhas) | Passagem estrutural do primeiro turno; observações protegidas adiadas por desenho | [11](handoffs/task-11.md) |
+| 11 | Concluída no escopo elegível do segundo turno (498581 objetos, 0 falhas) | Passada semântica dos dois turnos e de 2022 (Fase 21); logs protegidos lidos só depois do congelamento da Fase 23 | [11](handoffs/task-11.md) |
 | 12 | Só AC: 2270 seções com conteúdo verificado, totais da UF batem | Outras UFs, dois turnos, assinaturas, RDV, hierarquia BR/UF/municipal/ZZ | [12](handoffs/task-12.md) |
 | 13 | Amostra do AC: um log por turno | Sessões, relógios, históricos copiados e conciliação de comparecimento nacionais | [13](handoffs/task-13.md) |
 | 14 | Só AC: 54480 linhas de features | Features nacionais, identidade entre turnos, resultados do primeiro turno | [14](handoffs/task-14.md) |
-| 15 | Protocolo do AC congelado | Protocolo nacional após a revisão do plano | [15](handoffs/task-15.md) |
+| 15 | Protocolo do AC congelado | Substituída pelo congelamento e pré-registro da Fase 23 | [15](handoffs/task-15.md) |
 | 16 | Ajuste de desenvolvimento de comparecimento no AC | Família completa de alvos/variantes, simulações com reajuste, avaliação final | [16](handoffs/task-16.md) |
 | 17 | Pacotes de casos de desenvolvimento do AC | Casos nacionais, corroboração, limites de impacto, sensibilidade do pipeline completo | [17](handoffs/task-17.md) |
 | 18 | Notebooks sobre a exportação do AC | QA no navegador, conjuntos de dados nacionais | [18](handoffs/task-18.md) |
+| 19–26 | Não iniciadas; definidas no [plano de conclusão](../../research/completion-plan.pt-BR.md#fases-revisadas) | Todas | — |
 
 ## Onde estão os resultados
 
@@ -155,7 +184,7 @@ absolutos ficam no volume de saída da máquina de referência
 | Artefato | Local |
 | --- | --- |
 | Originais brutos dos dois turnos (cópias de referência) | `raw/2026/turno-1/`, `raw/2026/turno-2/` no volume de saída |
-| Certificados de cópia, manifestos, ledgers de verificação | `2026/migration-2026-11-01/` no volume de saída |
+| Certificados de cópia, cópias certificadas dos manifestos (entradas da análise), ledgers de verificação | `2026/migration-2026-11-01/` no volume de saída |
 | Raízes e manifestos originais da coleta (preservados) | `/media/tacio/HDD/Data/tse/data/tse/2026/`, `.local-state/` |
 | Logs de execução e registros de lançamento da coleta | `data/phase10/` |
 | Release de resumos do segundo turno da Fase 11 | `2026/runoff-summary-analysis-full-20261102/` no volume de saída |
@@ -186,7 +215,7 @@ absolutos ficam no volume de saída da máquina de referência
 | Painel | `dashboard`, `dashboard_data`, `dashboard_ui`, `dashboard_development`, `election_audit/notebooks/` (Fase 18) |
 | Reprodução | `reproduction`, `pilot`, `walkthrough`; [reprodução](reproduction.md), [backfill](backfill.md) |
 | Contratos | `election_audit/resources/contracts/schema.json` e `features.json`; `contracts.py`; [dicionário do esquema](schema-dictionary.md), [prontidão de features](feature-readiness.md), [convenções de transformação](transformation-conventions.md) |
-| Documentos de pesquisa | [plano de análise](../../research/analysis-plan.pt-BR.md), [plano de conclusão](../../research/completion-plan.pt-BR.md), [fontes de download](../../research/download-sources.pt-BR.md), [trabalhos relacionados](../../research/related-work.pt-BR.md) |
+| Documentos de pesquisa | [protocolo do estudo](../../research/analysis-plan.pt-BR.md), [plano de conclusão](../../research/completion-plan.pt-BR.md), [fontes de download](../../research/download-sources.pt-BR.md), [trabalhos relacionados](../../research/related-work.pt-BR.md) |
 | Verificação de documentação | `scripts/check_docs.py` (pares, revisões, links, paridade de blocos), `scripts/check_doc_commands.py` (flags via `--help`, sintaxe SQL) |
 
 Pares em `docs/en/` e `docs/pt-BR/` compartilham Document-ID e Revision; documentos

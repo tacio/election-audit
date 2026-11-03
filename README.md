@@ -1,6 +1,6 @@
 # Election audit — 2026 Brazilian presidential election
 
-Document-ID: EA-ONBOARDING · Revision: 11 · Language: en
+Document-ID: EA-ONBOARDING · Revision: 12 · Language: en
 
 [Português](README.pt-BR.md)
 
@@ -16,10 +16,14 @@ The tooling produces no fraud labels.
   round-1 and 499177 round-2 log versions, with explicit no-log and
   unpublished-auxiliary gaps).
 - **Structural processing:** all 498581 eligible runoff logs summarized into one
-  immutable Parquet release. Round 1 is not yet processed.
+  immutable Parquet release (structural counts only; each log mixes both rounds).
+  Round 1 is not yet processed.
 - **Electoral verification, operational semantics, features, models,
   investigations and notebooks:** implemented and exercised on Acre (AC) only.
-- **Next:** revision of the analysis plan and phase definitions.
+- **Next:** Phase 19, national inputs, under the revised
+  [study protocol](research/analysis-plan.md) and
+  [completion plan](research/completion-plan.md). The protocol will be publicly
+  pre-registered before any confirmatory analysis.
 
 The [implementation index](docs/en/implementation-index.md) has the full status,
 artifact locations and interface map. Start there.
@@ -73,7 +77,7 @@ environment and credentials. See [reproduction](docs/en/reproduction.md).
 7. **Analysis** (`analyze`, `features`, `research-protocol`, `research-models`,
    `investigations`): descriptive features, frozen partitions, protected final
    evaluation and append-only ledgers. See [analysis](docs/en/analysis.md) and the
-   [analysis plan](research/analysis-plan.md).
+   [study protocol](research/analysis-plan.md).
 8. **Reproduction** (`demo`, `pilot`, `review-bundle`, `reproduce`, `backfill`).
 
 National-scale structural processing uses resource-bounded parallel summaries

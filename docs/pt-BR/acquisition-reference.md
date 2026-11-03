@@ -1,6 +1,6 @@
 # Logs da eleição presidencial de 2026 do TSE
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 2 · Language: pt-BR
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 3 · Language: pt-BR
 
 [English](../en/acquisition-reference.md)
 
@@ -26,6 +26,13 @@ Cada `coverage.json` informa `national_coverage: false` por causa das seções s
 e sem auxiliar publicado, que permanecem lacunas explícitas. Os dois acervos foram
 depois copiados para um volume maior e verificados objeto a objeto; veja o
 [índice de implementação](implementation-index.md) para os locais atuais.
+
+Os caminhos do manifesto são relativos ao diretório de saída, então as cópias não
+exigiram reescrever manifestos: o `manifest-location.json` de cada raiz copiada
+continua apontando para seu manifesto no SSD. Para análise, use as cópias dos
+manifestos certificadas por hash feitas na migração, e não os arquivos vivos no SSD; a
+raiz copiada do segundo turno também contém um `manifest.sqlite` obsoleto de antes da
+separação, que não deve ser lido.
 
 ## Inspecionar logs salvos
 

@@ -1,6 +1,6 @@
 # Trabalhos relacionados
 
-Document-ID: EA-RELATED-WORK · Revision: 2 · Language: pt-BR
+Document-ID: EA-RELATED-WORK · Revision: 3 · Language: pt-BR
 
 [English](related-work.md) · [Protocolo de pesquisa](analysis-plan.pt-BR.md) · [README](../README.pt-BR.md)
 
@@ -28,6 +28,10 @@ vinculadas aos pais. Suporte a ETL histórico não estabelece compatibilidade co
 leiaute BWEB atual. Nosso adaptador verificado também se restringe ao leiaute
 revisado do segundo turno presidencial de 2026 e à validação real do AC;
 compatibilidade mais ampla ainda precisa ser estabelecida.
+O `VotacaoZonaExtractor.get_headers()` inspecionado de Turicas rejeita anos depois de
+2018 e lê entrada Latin-1; adotamos sua disciplina de esquema, não seu caminho de
+código, e mantemos os códigos originais de valor ausente ao lado dos nulos
+normalizados.
 
 [eleicoes2026, do INEMA](https://github.com/inematds/eleicoes2026) trata da
 divulgação de resultados ao vivo. Seu [contrato de dados](https://github.com/inematds/eleicoes2026/blob/main/contrato/README.md)
@@ -37,6 +41,9 @@ representar estados diferentes da publicação. Nossas análises operam sobre
 populações explicitamente congeladas e preservam versões, correções e estados
 desconhecidos. Isso sustenta a reprodução após mudanças nas fontes ao vivo, mas
 não estabelece que nossa população derivada parcial represente o país.
+O [código de normalização](https://github.com/inematds/eleicoes2026/blob/main/coleta/nucleo.py)
+do INEMA aplica um ajuste de horário por UF; isso não basta como regra de relógio por
+seção, porque exceções municipais e locais no exterior exigem evidência explícita.
 
 ## Reconciliação dos resultados publicados
 
@@ -110,6 +117,28 @@ em triagem estatística junto às verificações de integridade. Nosso desenho s
 integridade, atipicidade condicional e possível impacto no resultado, para que uma
 triagem não se transforme silenciosamente em alegação causal ou nacional.
 
+Outros testes forenses usados no [protocolo do estudo](analysis-plan.pt-BR.md) miram
+assinaturas específicas de manipulação. [Kobak, Shpilkin e Pshenichnikov
+(2016)](https://doi.org/10.1214/16-AOAS904) buscam excesso de porcentagens inteiras,
+rastro de resultados fabricados; [Rozenas (2017)](https://doi.org/10.1017/pan.2016.9)
+testa esses picos contra um nulo reamostrado e mostra com que frequência proporções
+redondas surgem sem fraude. O modelo de mistura finita eforensics de Mebane
+([artigos de trabalho](https://public.websites.umich.edu/~wmebane/)) estima
+componentes semelhantes a fraude a partir de comparecimento e votos, e seu autor
+observa que voto estratégico e administração podem produzir os mesmos sinais. A
+estatística de varredura de [Kulldorff (1997)](https://doi.org/10.1080/03610929708831995)
+localiza agrupamentos geográficos com nulo de Monte Carlo. Usamos esses métodos como
+testes globais ou de agrupamento com nulos dependentes do tamanho, nunca como
+veredito por seção.
+
+O segundo turno brasileiro de 2022 é um caso de alerta. Um relatório do Instituto Voto
+Legal defendeu descartar os votos de modelos antigos de urna; o TSE rejeitou o pedido
+e multou a coligação que o apresentou
+([decisão](https://www.tse.jus.br/comunicacao/arquivos/voto-alexandre-de-moraes)).
+Um contraste por modelo de urna que ignora onde as urnas antigas foram instaladas
+confunde dispositivo com lugar. O protocolo reproduz esse contraste como controle
+negativo e exige que a comparação dentro do local o remova.
+
 O modelo condicional proposto se apoia nas [florestas de regressão quantílica de
 Meinshausen (2006)](https://www.jmlr.org/papers/v7/meinshausen06a.html), que estimam
 quantis condicionais dos resultados. O [protocolo de pesquisa](analysis-plan.pt-BR.md)
@@ -138,11 +167,11 @@ comprovadamente exclusiva nem um detector superior.
 | Reconciliação hierárquica | Multiverso Digital; AnaliseEleicoes | Aritmética das linhas publicadas e totais da UF do AC conferem; reconciliação nacional BR/UF/municipal/ZZ pendente. |
 | Integração de BU binário/log/assinatura | DataUrnas-BR | Fluxo de logs e resumos estruturais nacionais do segundo turno concluídos; conteúdo do BU binário do AC verificado contra o BWEB; assinaturas e RDV pendentes. |
 | Escolhas omitidas com zero votos | Cota | Desconhecidos explícitos; normalização esparsa para completa com evidências pendente. |
-| Triagem estatística condicional | Klimek et al.; Meinshausen; Bates et al. | Desenho de pesquisa, protocolo protegido e um ajuste de desenvolvimento de comparecimento no AC; sem modelo nacional ou inferência validada de fraude. |
+| Triagem estatística condicional | Klimek et al.; Kobak et al.; Rozenas; Mebane; Meinshausen; Bates et al. | Rascunho do protocolo do estudo com mapa de ameaças, família confirmatória e estudo de poder; um ajuste de desenvolvimento de comparecimento no AC; sem modelo nacional ou inferência validada de fraude. |
 
 O piloto de reconciliação do AC está feito para o segundo turno: as 2270 seções
 do AC têm conteúdo verificado entre BU binário e BWEB, com totais da UF iguais ao
-EA20. Os próximos passos são nacionais: a mesma verificação em todas as UFs e nos
+EA20. Os próximos passos, Fases 19 e 20 do [plano de conclusão](completion-plan.pt-BR.md), são nacionais: a mesma verificação em todas as UFs e nos
 dois turnos, checagens de assinatura e RDV e reconciliação da hierarquia incluindo
 ZZ. A elegibilidade deve acompanhar a evidência de cada resultado e medida. Relógios
 não resolvidos podem bloquear alegações temporais sem bloquear aritmética de

@@ -1,6 +1,6 @@
 # Related work
 
-Document-ID: EA-RELATED-WORK · Revision: 2 · Language: en
+Document-ID: EA-RELATED-WORK · Revision: 3 · Language: en
 
 [Português](related-work.pt-BR.md) · [Research protocol](analysis-plan.md) · [README](../README.md)
 
@@ -26,6 +26,9 @@ snapshots, record witnesses and immutable parent-linked releases. Historical ETL
 support does not establish compatibility with the current BWEB layout. Our
 verified adapter is itself restricted to the reviewed 2026 presidential-runoff
 layout and real AC validation; broader compatibility remains to be established.
+Turicas' inspected `VotacaoZonaExtractor.get_headers()` rejects years after 2018
+and reads Latin-1 input; we adopt its schema discipline, not its code path, and keep
+original missing-value codes beside normalized nulls.
 
 [INEMA's eleicoes2026](https://github.com/inematds/eleicoes2026) addresses live
 result dissemination. Its [data contract](https://github.com/inematds/eleicoes2026/blob/main/contrato/README.md)
@@ -35,6 +38,9 @@ different publication states. Our analyses instead operate on explicitly frozen
 populations and retain source versions, corrections and unknown states. This
 supports reproducibility after live feeds change. It does not establish that
 our current partial derived population represents the country.
+INEMA's [normalization code](https://github.com/inematds/eleicoes2026/blob/main/coleta/nucleo.py)
+applies one time adjustment per UF; that is not enough as a section-clock rule,
+because municipality exceptions and overseas locations need explicit evidence.
 
 ## Reconciliation of published returns
 
@@ -104,6 +110,27 @@ screening alongside integrity checks. Our design separates integrity, conditiona
 unusualness and possible outcome impact, so a screening result cannot silently
 become a causal or national-impact claim.
 
+Other forensic tests used in the [study protocol](analysis-plan.md) target
+specific manipulation signatures. [Kobak, Shpilkin and Pshenichnikov
+(2016)](https://doi.org/10.1214/16-AOAS904) look for an excess of integer
+percentages, a trace of fabricated results; [Rozenas
+(2017)](https://doi.org/10.1017/pan.2016.9) tests such spikes against a resampled
+null and shows how often coarse shares arise without fraud. Mebane's eforensics
+finite-mixture model ([working papers](https://public.websites.umich.edu/~wmebane/))
+estimates fraud-like components from turnout and vote counts, and its author notes
+that strategic voting and administration can produce the same signals.
+[Kulldorff's (1997)](https://doi.org/10.1080/03610929708831995) scan statistic
+locates geographic clusters with a Monte Carlo null. We use these as global or
+cluster tests with size-aware nulls, never as section-level verdicts.
+
+The 2022 Brazilian runoff provides a cautionary case. A report by Instituto Voto
+Legal argued that votes from older urn models should be discarded; the TSE rejected
+the request and fined the coalition that filed it
+([decision](https://www.tse.jus.br/comunicacao/arquivos/voto-alexandre-de-moraes)).
+A device-model contrast that ignores where older devices were deployed confounds
+device with place. The protocol reproduces this contrast as a negative control and
+requires the within-location comparison to remove it.
+
 The proposed conditional model draws on [Meinshausen's quantile regression
 forests (2006)](https://www.jmlr.org/papers/v7/meinshausen06a.html), which estimate
 conditional outcome quantiles. The [research protocol](analysis-plan.md) proposes
@@ -130,11 +157,11 @@ to the reviewed work, not a demonstrated unique feature or superior detector.
 | Hierarchical result reconciliation | Multiverso Digital; AnaliseEleicoes | AC published-row arithmetic and UF totals match; national BR/UF/municipal/ZZ reconciliation pending. |
 | Binary BU/log/signature integration | DataUrnas-BR | Log pipeline and national runoff structural summaries done; AC binary BU content verified against BWEB; signatures and RDV pending. |
 | Omitted zero-vote choices | Cota | Explicit unknowns; evidence-backed sparse-to-complete normalization pending. |
-| Conditional statistical screening | Klimek et al.; Meinshausen; Bates et al. | Research design, protected protocol and one AC development turnout fit; no national model or validated fraud inference. |
+| Conditional statistical screening | Klimek et al.; Kobak et al.; Rozenas; Mebane; Meinshausen; Bates et al. | Draft study protocol with a threat map, confirmatory family and power study; one AC development turnout fit; no national model or validated fraud inference. |
 
 The AC reconciliation pilot is done for the runoff: all 2270 AC sections are
 content-verified between binary BU and BWEB, with UF totals matching EA20. The next
-steps are national: the same verification for every UF and both rounds, signature
+steps, Phases 19 and 20 of the [completion plan](completion-plan.md), are national: the same verification for every UF and both rounds, signature
 and RDV checks, and hierarchy reconciliation including ZZ. Eligibility should follow
 the evidence for each result and measure. Unresolved clocks can block timing claims
 without blocking independently verified count arithmetic. National inference and

@@ -1,6 +1,6 @@
 # TSE 2026 presidential election logs
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 2 · Language: en
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 3 · Language: en
 
 [Português](../pt-BR/acquisition-reference.md)
 
@@ -27,6 +27,12 @@ Each `coverage.json` reports `national_coverage: false` because of the no-log an
 unpublished-auxiliary sections, which stay explicit gaps. Both stores were later
 copied to a larger volume and verified object by object; see the
 [implementation index](implementation-index.md) for current locations.
+
+Manifest paths are relative to the output directory, so the copies needed no
+manifest rewrite: each copied root's `manifest-location.json` still points at its
+SSD manifest. For analysis, use the hash-certified manifest copies made during the
+migration rather than the live SSD files; the copied round-2 root also contains a
+stale pre-split `manifest.sqlite` that must not be read.
 
 ## Inspecting saved logs
 

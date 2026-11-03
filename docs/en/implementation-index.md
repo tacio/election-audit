@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 19 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 20 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -28,6 +28,19 @@ to the output volume and every object was verified by SHA-256. The copies are th
 authoritative originals for derived processing; the original HDD roots and
 `.local-state/` manifests are preserved unchanged.
 
+The move needed no manifest rewrite: manifest paths are relative to the object
+root (`objects/xx/<sha>.<ext>`), and each new root's `manifest-location.json`
+points at its SSD manifest (`.local-state/tse-2026.sqlite` for round 2,
+`.local-state/tse-2026-t1-verified.sqlite` for round 1). The certified copies
+`migration-2026-11-01/manifest-r{1,2}.sqlite` match their certificate hashes, and
+on 3 November their files, logs, sections and runs rows were found identical to the
+live SSD manifests. Analyses pin the certified copies. Leftovers to ignore: the old
+HDD round-2 root points at the same SSD manifest; `raw/2026/turno-2/manifest.sqlite`
+is the stale pre-split database; `.local-state/tse-2026-t1.sqlite` is a superseded
+round-1 manifest; and `migration-2026-11-01/status.json` reads `FAILED_STOPPED`
+because the job chained after the verified copy was stopped, not because the copy
+failed.
+
 **Structural processing (Phase 11): finished for the eligible runoff scope.** The
 feature-oriented summary job processed all 498581 eligible runoff objects (499177
 observations minus 596 protected/stress observations and their content aliases),
@@ -36,13 +49,28 @@ budget. 498575 objects parsed completely and 6 partially (190 retained errors).
 It scanned 5032537448 structural events; about 90% fall in message classes the
 structural parser leaves `unknown`. The published release
 `55e55e91549dac53eb546a596f62033bc837e0a34e3ff9b178c4687ae9257f88`
-(`source-summary-analysis-release-v1`, 546.6 MB of Parquet) is the input for later
-phases; the 68.8 GB of grouped checkpoints are kept only for recovery and evidence.
-Round 1 has not been structurally processed. Structural summaries grant no
-scientific eligibility: sessions, clocks and copied histories still need Phase 13.
+(`source-summary-analysis-release-v1`, 546.6 MB of Parquet) holds per-log counts,
+member structure and block hashes; the 68.8 GB of grouped checkpoints are kept only
+for recovery and evidence.
 
-**Phases 12–18: Acre (AC) development artifacts only.** Each phase's tools exist
-and were exercised on real AC data, but nothing has run nationally:
+What it cannot be used for: each runoff `logd.dat` runs from setup in September
+through the first round to the runoff, so the per-log authorization and completion
+counts (252940011 and 252882361 in total) mix rounds and are not runoff measures.
+There are no sessions, clocks or timings. The 596 protected/stress logs and all of
+round 1 are unprocessed. Every operational measure needs the semantic pass of
+Phase 21.
+
+Throughput was limited by the disk, not the CPU: 91.5 GB of small objects read at
+about 2.5 MB/s with 94% I/O pressure, while the checkpoints were written to the
+same drive. Both data drives are rotational and the SSD root has about 25 GB free,
+so a naive full pass still costs about 10 hours per round. The
+[completion plan](../../research/completion-plan.md#resource-and-io-rules) sets
+the I/O rules for the next pass.
+
+**Phases 12–18: closed as Acre (AC) development pilots.** The 3 November
+methodology review replaced their definitions; the revised work is Phases 19–26.
+Their tools exist, were exercised on real AC data and are reused, but nothing ran
+nationally:
 
 - Phase 12: 2270 AC runoff sections content-verified between binary BU and BWEB;
   UF totals match. Signatures, RDV recount and national hierarchy are not done.
@@ -66,10 +94,13 @@ and `election_audit/electoral_references.py`.
 
 ## Next step
 
-The analysis plan and the Phase 12–18 definitions are being revised after the
-methodology review of 3 November 2026. Do not dispatch a new phase until
-[the analysis plan](../../research/analysis-plan.md) and
-[the completion plan](../../research/completion-plan.md) carry the revised scope.
+Phase 19 (national inputs) under the revised plan. The
+[study protocol](../../research/analysis-plan.md) (Revision 2) defines the claims,
+the threat-to-observable map, the integrity checks I1–I9, the confirmatory tests
+C1–C6, the power study and the data policy; the
+[completion plan](../../research/completion-plan.md) (Revision 10) defines
+Phases 19–26. The protocol is a draft until it is frozen and publicly
+pre-registered in Phase 23.
 
 ## Working rules
 
@@ -128,14 +159,15 @@ checks (177 tests).
 | Phase | Status | Remaining | Handoff |
 | --- | --- | --- | --- |
 | 10 | Complete: both rounds acquired, copied and SHA-256 verified | Gap sections stay explicit; BWEB, registers, RDV/signature sources for other UFs are separate imports | [10](handoffs/task-10.md) |
-| 11 | Complete for eligible runoff scope (498581 objects, 0 failures) | Round 1 structural pass; protected observations deferred by design | [11](handoffs/task-11.md) |
+| 11 | Complete for eligible runoff scope (498581 objects, 0 failures) | Semantic pass for both rounds and 2022 (Phase 21); protected logs read only after the Phase 23 freeze | [11](handoffs/task-11.md) |
 | 12 | AC only: 2270 sections content-verified, UF totals match | Other UFs, both rounds, signatures, RDV, BR/UF/municipal/ZZ hierarchy | [12](handoffs/task-12.md) |
 | 13 | AC sample: one log per round | National sessions, clocks, copied histories, attendance reconciliation | [13](handoffs/task-13.md) |
 | 14 | AC only: 54480 feature rows | National features, cross-round identity, first-round results | [14](handoffs/task-14.md) |
-| 15 | AC protocol frozen | National protocol after plan revision | [15](handoffs/task-15.md) |
+| 15 | AC protocol frozen | Replaced by the Phase 23 freeze and pre-registration | [15](handoffs/task-15.md) |
 | 16 | AC turnout development fit | Full target/variant family, refit simulations, final evaluation | [16](handoffs/task-16.md) |
 | 17 | AC development case packets | National cases, corroboration, impact bounds, full-pipeline sensitivity | [17](handoffs/task-17.md) |
 | 18 | Notebooks over AC export | Browser QA, national datasets | [18](handoffs/task-18.md) |
+| 19–26 | Not started; defined in the [completion plan](../../research/completion-plan.md#revised-phases) | All | — |
 
 ## Where results are
 
@@ -146,7 +178,7 @@ paths are on the reference machine's output volume
 | Artifact | Location |
 | --- | --- |
 | Raw originals, both rounds (authoritative copies) | `raw/2026/turno-1/`, `raw/2026/turno-2/` on the output volume |
-| Copy certificates, manifests, verification ledgers | `2026/migration-2026-11-01/` on the output volume |
+| Copy certificates, certified manifest copies (analysis inputs), verification ledgers | `2026/migration-2026-11-01/` on the output volume |
 | Original acquisition roots and manifests (preserved) | `/media/tacio/HDD/Data/tse/data/tse/2026/`, `.local-state/` |
 | Acquisition run logs and launch records | `data/phase10/` |
 | Phase 11 runoff summary release | `2026/runoff-summary-analysis-full-20261102/` on the output volume |
@@ -177,7 +209,7 @@ paths are on the reference machine's output volume
 | Dashboard | `dashboard`, `dashboard_data`, `dashboard_ui`, `dashboard_development`, `election_audit/notebooks/` (Phase 18) |
 | Reproduction | `reproduction`, `pilot`, `walkthrough`; [reproduction](reproduction.md), [backfill](backfill.md) |
 | Contracts | `election_audit/resources/contracts/schema.json` and `features.json`; `contracts.py`; [schema dictionary](schema-dictionary.md), [feature readiness](feature-readiness.md), [transformation conventions](transformation-conventions.md) |
-| Research documents | [analysis plan](../../research/analysis-plan.md), [completion plan](../../research/completion-plan.md), [download sources](../../research/download-sources.md), [related work](../../research/related-work.md) |
+| Research documents | [study protocol](../../research/analysis-plan.md), [completion plan](../../research/completion-plan.md), [download sources](../../research/download-sources.md), [related work](../../research/related-work.md) |
 | Documentation checks | `scripts/check_docs.py` (pairs, revisions, links, fenced parity), `scripts/check_doc_commands.py` (flags via `--help`, SQL syntax) |
 
 Pairs under `docs/en/` and `docs/pt-BR/` share Document-ID and Revision; research
