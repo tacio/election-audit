@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 22 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 23 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -78,6 +78,21 @@ directory is eCryptfs, so one reader re-hashes at only 56–63 MB/s. The
 [completion plan](../../research/completion-plan.md#resource-and-io-rules) sets
 the I/O rules for the next pass.
 
+**Phase 19 (national inputs): in progress.** `bulk-download` fetched, with
+SHA-256/SHA-512 and the TSE catalog JSON, the 2026 and 2022 BWEB (112 archives
+each year, all 56 per year with a published `.sha512` match). Results by section,
+voter profile and polling places, media correspondences and 2026 GEDAI logs are
+downloading to `~/data/election-audit-stage/inputs/`; the bulk BU/RDV/log archives
+(2026: 219.2 GB, 2022: 168.5 GB) to `bulk/` on the output volume. Check
+`status.json` in each root.
+
+**Phase 21 (semantic pass): national 2026 runs in progress.** `semantic-pass`
+matched the event-level adapter on 400 of 400 sampled AC objects (84469 completed
+cycles) and ran on all 1674 non-protected AC runoff objects in about 60 s with no
+errors. National runs for both rounds (6 workers, from the SSD staging) write to
+`~/data/election-audit-stage/phase21/`. 2022 logs need reviewed 2022 rules first.
+See the [semantic pass guide](semantic-pass.md).
+
 **Phases 12–18: closed as Acre (AC) development pilots.** The 3 November
 methodology review replaced their definitions; the revised work is Phases 19–26.
 Their tools exist, were exercised on real AC data and are reused, but nothing ran
@@ -100,12 +115,13 @@ No national electoral result, national margin, fitted national model or fraud
 label exists.
 
 **Checks.** The full offline gate `just check` passes (lock, format, lint,
-contracts, docs, documented commands and all 314 tests).
+contracts, docs, documented commands and all 330 tests).
 
 ## Next step
 
-Phase 19 (national inputs) under the revised plan; its first step, staging both
-rounds' raw logs on the SSD, is done. The
+Finish Phase 19 (downloads running) and Phase 21 (national runs running; 2022
+rules review pending), then Phase 20 integrity checks on the downloaded BU, RDV,
+signatures and correspondences. The
 [study protocol](../../research/analysis-plan.md) (Revision 2) defines the claims,
 the threat-to-observable map, the integrity checks I1–I9, the confirmatory tests
 C1–C6, the power study and the data policy; the
@@ -192,6 +208,9 @@ paths are on the reference machine's output volume
 | Copy certificates, certified manifest copies (analysis inputs), verification ledgers | `2026/migration-2026-11-01/` on the output volume |
 | Hash-verified SSD staging of both rounds (read these in log passes), with staging certificates | `~/data/election-audit-stage/2026/turno-1/`, `~/data/election-audit-stage/2026/turno-2/` |
 | Read-order benchmarks | `~/data/election-audit-stage/benchmarks/` |
+| Phase 19 small inputs (BWEB, results, voter profile, correspondences, GEDAI), each with catalog, manifest and status | `~/data/election-audit-stage/inputs/<dataset>/` |
+| Phase 19 bulk BU/RDV/log archives, 2026 and 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` on the output volume |
+| Phase 21 equivalence reports, AC development pass, national passes | `~/data/election-audit-stage/phase21/` |
 | Original acquisition roots and manifests (preserved) | `/media/tacio/HDD/Data/tse/data/tse/2026/`, `.local-state/` |
 | Acquisition run logs and launch records | `data/phase10/` |
 | Phase 11 runoff summary release | `2026/runoff-summary-analysis-full-20261102/` on the output volume |
@@ -208,12 +227,12 @@ paths are on the reference machine's output volume
 | Area | Modules and guides |
 | --- | --- |
 | Runtime | `pyproject.toml`, `uv.lock`, `.python-version`; `uv sync --locked` |
-| CLI | `election_audit/cli.py`. Legacy: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensions: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export stage-sources` |
+| CLI | `election_audit/cli.py`. Legacy: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensions: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export stage-sources bulk-download semantic-pass` |
 | Recipes | `justfile`; one recipe per CLI command plus `setup doctor fmt lint test contracts-check docs-check docs-command-check check` |
-| Acquisition | `scripts/download_tse_logs.py` (`--round 1` or `--round 2`), `election_audit/elections.py`; SSD staging `source_staging` (`stage-sources`); [acquisition reference](acquisition-reference.md) |
+| Acquisition | `scripts/download_tse_logs.py` (`--round 1` or `--round 2`), `election_audit/elections.py`; SSD staging `source_staging` (`stage-sources`); open-data archives `bulk_acquisition` (`bulk-download`); [acquisition reference](acquisition-reference.md) |
 | Snapshot/source/coverage | `source_inventory`, `coverage`, `snapshots`; [snapshots](snapshots.md) |
 | Structural parse | `archive_parsing` (`jez-structural-v1`); [archive parsing](archive-parsing.md) |
-| Operational reconstruction | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Phase 13); [reconstruction](reconstruction.md) |
+| Operational reconstruction | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Phase 13), `semantic_pass` (`session-aggregates-v1`, Phase 21); [reconstruction](reconstruction.md), [semantic pass](semantic-pass.md) |
 | Operational releases | `publication`, `operational_marts`, `release_tools`; [publication](publication.md) |
 | National structural processing | Summary path: `national_parallel`, `national_summary`, `national_summary_release`, `national_summary_tools`, `national_summary_tuning`, `national_resources`; [feature-oriented processing](feature-oriented-processing.md). Event-level path: `national_benchmark`, `national_tuning`, `national_workload`, `national`, `national_storage`, `national_relocation`, `national_migration`, `national_overnight`; [national processing](national-processing.md) |
 | Electoral imports and verification | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` and `electoral_verification` (Phase 12); [electoral results](electoral-results.md). `electoral_references` is an unwired, untested prototype for official reference sets |

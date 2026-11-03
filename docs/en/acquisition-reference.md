@@ -1,6 +1,6 @@
 # TSE 2026 presidential election logs
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 4 · Language: en
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 5 · Language: en
 
 [Português](../pt-BR/acquisition-reference.md)
 
@@ -193,6 +193,28 @@ just stage-sources copy \
   --manifest /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/2026/migration-2026-11-01/manifest-r2.sqlite \
   --destination ~/data/election-audit-stage/2026/turno-2 \
   --order physical --floor-gib 100
+```
+
+### Bulk open-data archives
+
+TSE open-data datasets (bulk BU/RDV/log archives, BWEB, voter profile, polling
+places, results, media correspondences, GEDAI preparation logs) come from the
+CKAN catalog at `dadosabertos.tse.jus.br`. `bulk-download fetch` keeps the exact
+catalog JSON, downloads each selected resource once into a new root (only from
+`https://cdn.tse.jus.br/estatistica/sead/`), resumes with HTTP ranges only while
+the ETag and length are unchanged, records SHA-256 and SHA-512, checks the ZIP
+central directory and makes files read-only. When the TSE publishes a sibling
+`.sha512`, it is fetched and the archive must match it; the bulk log archives have
+none. `bulk-download verify` re-hashes a finished root. Large archives go to the
+ext4 data drive and small inputs to the SSD.
+
+```sh
+just bulk-download fetch \
+  --dataset resultados-2026-arquivos-transmitidos-para-totalizacao \
+  --output /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot
+just bulk-download fetch --dataset resultados-2026-boletim-de-urna \
+  --output ~/data/election-audit-stage/inputs/resultados-2026-boletim-de-urna --reserve-gib 100
+just bulk-download verify --output /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot
 ```
 
 ## Outputs
