@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 23 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 24 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -27,8 +27,10 @@ nenhuma das execuções atende ao critério `national_coverage` do coletor; essa
 permanecem lacunas explícitas. Em 1º de novembro os dois acervos brutos (53722200971
 e 90643145031 bytes) foram copiados para o volume de saída, e cada objeto foi
 verificado por SHA-256. As cópias são os originais de referência para o
-processamento derivado; as raízes originais no HDD e os manifestos em
-`.local-state/` foram preservados sem alteração.
+processamento derivado; os manifestos em `.local-state/` foram preservados sem
+alteração. Em 3 de novembro os metadados das raízes do HDD antigo foram arquivados
+com hashes e seus objetos brutos, duplicatas das cópias certificadas, foram
+liberados para exclusão.
 
 A mudança de disco não exigiu reescrever manifestos: os caminhos nos manifestos são
 relativos à raiz de objetos (`objects/xx/<sha>.<ext>`), e o `manifest-location.json`
@@ -37,8 +39,7 @@ no segundo turno, `.local-state/tse-2026-t1-verified.sqlite` no primeiro). As c�
 certificadas `migration-2026-11-01/manifest-r{1,2}.sqlite` batem com os hashes dos
 certificados e, em 3 de novembro, suas linhas de files, logs, sections e runs se
 mostraram idênticas às dos manifestos vivos no SSD. As análises fixam as cópias
-certificadas. Sobras a ignorar: a antiga raiz do segundo turno no HDD aponta para o
-mesmo manifesto no SSD; `raw/2026/turno-2/manifest.sqlite` é o banco obsoleto de
+certificadas. Sobras a ignorar: `raw/2026/turno-2/manifest.sqlite` é o banco obsoleto de
 antes da separação; `.local-state/tse-2026-t1.sqlite` é um manifesto do primeiro
 turno superado; e `migration-2026-11-01/status.json` mostra `FAILED_STOPPED` porque
 o job encadeado depois da cópia verificada foi parado, não porque a cópia falhou.
@@ -220,7 +221,8 @@ absolutos ficam no volume de saída da máquina de referência
 | Entradas pequenas da Fase 19 (BWEB, resultados, perfil do eleitorado, correspondências, GEDAI), cada uma com catálogo, manifesto e estado | `~/data/election-audit-stage/inputs/<dataset>/` |
 | Arquivos em massa de BU/RDV/log da Fase 19, 2026 e 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` no volume de saída |
 | Relatórios de equivalência, passada de desenvolvimento do AC e passadas nacionais da Fase 21 | `~/data/election-audit-stage/phase21/` |
-| Raízes e manifestos originais da coleta (preservados) | `/media/tacio/HDD/Data/tse/data/tse/2026/`, `.local-state/` |
+| Manifestos originais da coleta (vivos) | `.local-state/` |
+| Metadados da coleta no HDD antigo (cobertura, marcadores, manifesto obsoleto anterior à divisão) e o store por evento inicial da Fase 11 do AC, verificados por hash; os objetos brutos do HDD antigo duplicavam as cópias certificadas e foram liberados para exclusão em 3 de novembro de 2026 | `archive/old-hdd-2026-11-03/` no volume de saída |
 | Logs de execução e registros de lançamento da coleta | `data/phase10/` |
 | Release de resumos do segundo turno da Fase 11 | `2026/runoff-summary-analysis-full-20261102/` no volume de saída |
 | Configuração, progresso e benchmarks do job da Fase 11 | `data/national/phase11-feature-oriented-2026-11-02/`, ponteiro `data/national/current-phase11.json` |

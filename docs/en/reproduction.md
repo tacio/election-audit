@@ -1,6 +1,6 @@
 # Reproduction and peer review
 
-Document-ID: EA-REPRODUCTION · Revision: 3 · Language: en
+Document-ID: EA-REPRODUCTION · Revision: 4 · Language: en
 
 The offline demo is SYNTHETIC throughout: deterministic tiny ZIP originals exercise mixed device dates, exact copied history, replacement devices, manual request/cancellation, unresolved clocks and malformed nested content. Reviewed session/copy/semantic assertions are generated from exact preserved synthetic line hashes. Expected members 3, unique principals 2, normalized attending voters 10, eligible electors 20 and turnout 0.5 are known fixture numbers. They do not validate real electoral data. Unknown identity links remain unavailable; a registered exploration preserves its null result and complete history without fitting.
 
@@ -37,7 +37,7 @@ config = ResourceConfig()
 The real pilot selects one available principal in each of AC, AL, DF, ES and PR, spanning five macroregions within configured AC–RJ. It opens a query-only SQLite transaction including committed WAL and uses indexed URL ranges, at most 100000 current log mappings per UF. It records each pool count/hash/truncation, selected-UF pool rows, seed diagnostic-geographic-pilot-v1, exact index hashes, eligible principal pools, municipality/zone strata, ranks and exclusions. Index principals must self-map or have no aggregation target; selected files must exist with matching size and at most 64 MiB. Snapshot creation then hashes/copies only selected assets and UF indexes, retaining full-UF expected denominators. Selection and snapshot are separate live views: frozen selected checks, inventory and later reproduction are authoritative; later downloads cannot enter the frozen calculation.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just pilot --source /media/tacio/HDD/Data/tse/data/tse/2026/turno-2 --output data/my-pilot
+rtk proxy env UV_OFFLINE=1 just pilot --source /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/raw/2026/turno-2 --output data/my-pilot
 rtk proxy env UV_OFFLINE=1 just review-bundle data/my-pilot --output data/my-pilot-review
 rtk proxy env UV_OFFLINE=1 just reproduce data/my-pilot-review --output data/my-pilot-reproduction
 ```

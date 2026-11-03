@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 23 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 24 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -25,8 +25,10 @@ Round 1 packages are all `Totalizado`; round 2 has 488333 `Totalizado` and 10844
 meets the downloader's `national_coverage` criterion; those sections stay explicit
 gaps. On 1 November both raw stores (53722200971 and 90643145031 bytes) were copied
 to the output volume and every object was verified by SHA-256. The copies are the
-authoritative originals for derived processing; the original HDD roots and
-`.local-state/` manifests are preserved unchanged.
+authoritative originals for derived processing; the `.local-state/` manifests are
+preserved unchanged. On 3 November the old-HDD roots' metadata was archived with
+hashes and their raw objects, duplicates of the certified copies, were released
+for deletion.
 
 The move needed no manifest rewrite: manifest paths are relative to the object
 root (`objects/xx/<sha>.<ext>`), and each new root's `manifest-location.json`
@@ -34,8 +36,7 @@ points at its SSD manifest (`.local-state/tse-2026.sqlite` for round 2,
 `.local-state/tse-2026-t1-verified.sqlite` for round 1). The certified copies
 `migration-2026-11-01/manifest-r{1,2}.sqlite` match their certificate hashes, and
 on 3 November their files, logs, sections and runs rows were found identical to the
-live SSD manifests. Analyses pin the certified copies. Leftovers to ignore: the old
-HDD round-2 root points at the same SSD manifest; `raw/2026/turno-2/manifest.sqlite`
+live SSD manifests. Analyses pin the certified copies. Leftovers to ignore: `raw/2026/turno-2/manifest.sqlite`
 is the stale pre-split database; `.local-state/tse-2026-t1.sqlite` is a superseded
 round-1 manifest; and `migration-2026-11-01/status.json` reads `FAILED_STOPPED`
 because the job chained after the verified copy was stopped, not because the copy
@@ -211,7 +212,8 @@ paths are on the reference machine's output volume
 | Phase 19 small inputs (BWEB, results, voter profile, correspondences, GEDAI), each with catalog, manifest and status | `~/data/election-audit-stage/inputs/<dataset>/` |
 | Phase 19 bulk BU/RDV/log archives, 2026 and 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` on the output volume |
 | Phase 21 equivalence reports, AC development pass, national passes | `~/data/election-audit-stage/phase21/` |
-| Original acquisition roots and manifests (preserved) | `/media/tacio/HDD/Data/tse/data/tse/2026/`, `.local-state/` |
+| Original acquisition manifests (live) | `.local-state/` |
+| Old-HDD acquisition metadata (coverage, markers, stale pre-split manifest) and the early Phase 11 AC event-level store, hash-verified; the old-HDD raw objects duplicated the certified copies and were released for deletion on 3 November 2026 | `archive/old-hdd-2026-11-03/` on the output volume |
 | Acquisition run logs and launch records | `data/phase10/` |
 | Phase 11 runoff summary release | `2026/runoff-summary-analysis-full-20261102/` on the output volume |
 | Phase 11 job configuration, progress and benchmarks | `data/national/phase11-feature-oriented-2026-11-02/`, pointer `data/national/current-phase11.json` |

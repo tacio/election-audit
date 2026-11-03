@@ -36,7 +36,16 @@ from election_audit.source_inventory import (
 
 VERSION = "national-structural-v1"
 DIAGNOSTIC_POLICY = "streamed-errors-event-addressable-info-v2"
-DEFAULT_STORE = Path("/media/tacio/HDD/Data/tse/audit/2026")
+# The old HDD store was archived on 3 November 2026; a store must now be explicit.
+DEFAULT_STORE = None
+
+
+def _store(store):
+    if store is None:
+        raise ValueError("An explicit --store is required")
+    return Path(store)
+
+
 DEFAULT_SCRATCH = Path(".local-state/national-scratch")
 LIMITS = {
     "workers": 4,
@@ -171,6 +180,7 @@ def guard(store, scratch, extra=0, *, reserve_bytes=None):
 def preflight(
     config, store=DEFAULT_STORE, scratch=DEFAULT_SCRATCH, *, reserve_bytes=LIMITS["reserve_bytes"]
 ):
+    store = _store(store)
     result = {
         "version": VERSION,
         "config_id": digest(config),
@@ -570,6 +580,7 @@ def resume(
     output_budget_bytes=None,
 ):
     """Freeze metadata once, then process unique content with immutable checkpoints."""
+    store = _store(store)
     if max_objects is not None and (type(max_objects) is not int or max_objects < 1):
         raise ValueError("max_objects must be positive")
     if output_budget_bytes is not None and (
@@ -714,7 +725,7 @@ def _process_object(row, store, scratch, *, reserve_bytes, output_budget_bytes):
 
 
 def status(store=DEFAULT_STORE, *, config_id=None):
-    store = Path(store)
+    store = _store(store)
     result = {
         "version": VERSION,
         "censuses": [],
@@ -793,7 +804,7 @@ def national_main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("preflight", "resume", "status"))
     parser.add_argument("--config", type=Path)
-    parser.add_argument("--store", type=Path, default=DEFAULT_STORE)
+    parser.add_argument("--store", type=Path, required=True)
     parser.add_argument("--scratch", type=Path, default=DEFAULT_SCRATCH)
     parser.add_argument(
         "--max-objects", type=int, help="Explicit diagnostic bound, never national completeness"

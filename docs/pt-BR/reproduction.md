@@ -1,6 +1,6 @@
 # Reprodução e revisão por pares
 
-Document-ID: EA-REPRODUCTION · Revision: 3 · Language: pt-BR
+Document-ID: EA-REPRODUCTION · Revision: 4 · Language: pt-BR
 
 A demonstração sem rede é inteiramente SINTÉTICA: pequenos originais ZIP determinísticos exercitam datas mistas do dispositivo, histórico copiado exato, substituição de dispositivos, solicitação manual/cancelamento, relógios não resolvidos e conteúdo aninhado malformado. Asserções revisadas de sessão/cópia/semântica são geradas com hashes exatos de linhas sintéticas preservadas. Membros esperados 3, principais únicos 2, comparecimento normalizado 10, eleitores aptos 20 e comparecimento proporcional 0.5 são números conhecidos da fixture. Não validam dados eleitorais reais. Ligações de identidade desconhecidas ficam indisponíveis; exploração registrada preserva resultado nulo e histórico completo sem ajuste de modelo.
 
@@ -37,7 +37,7 @@ config = ResourceConfig()
 O piloto real seleciona um principal disponível em cada uma de AC, AL, DF, ES e PR, abrangendo cinco macrorregiões dentro de AC–RJ configurado. Abre transação SQLite somente de consulta incluindo WAL confirmado e usa intervalos indexados de URL, com no máximo 100000 mapeamentos atuais de logs por UF. Registra contagem/hash/truncamento dos conjuntos, linhas das UFs amostradas, semente diagnostic-geographic-pilot-v1, hashes exatos dos índices, conjuntos de principais elegíveis, estratos município/zona, posições e exclusões. Principais do índice devem apontar para si ou não ter destino de agregação; arquivos selecionados devem existir, ter tamanho correspondente e no máximo 64 MiB. A criação do snapshot verifica/copia somente ativos selecionados e índices das UFs, mantendo denominadores esperados completos das UFs. Seleção e snapshot são visões ativas separadas: verificações selecionadas congeladas, inventário e reprodução posterior são autoritativos; downloads posteriores não entram no cálculo congelado.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just pilot --source /media/tacio/HDD/Data/tse/data/tse/2026/turno-2 --output data/my-pilot
+rtk proxy env UV_OFFLINE=1 just pilot --source /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/raw/2026/turno-2 --output data/my-pilot
 rtk proxy env UV_OFFLINE=1 just review-bundle data/my-pilot --output data/my-pilot-review
 rtk proxy env UV_OFFLINE=1 just reproduce data/my-pilot-review --output data/my-pilot-reproduction
 ```

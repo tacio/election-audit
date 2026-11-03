@@ -1,6 +1,6 @@
 # TSE 2026 presidential election logs
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 5 · Language: en
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 6 · Language: en
 
 [Português](../pt-BR/acquisition-reference.md)
 
@@ -147,7 +147,7 @@ current downloader, wait for it to exit, and run:
 
 ```sh
 python3 scripts/download_tse_logs.py \
-  --output /media/tacio/HDD/Data/tse/data/tse/2026/turno-2 \
+  --output /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/raw/2026/turno-2 \
   --manifest /home/tacio/code/personal/research/election-audit/.local-state/tse-2026.sqlite \
   --missing-only --workers 32 --rps 40
 ```

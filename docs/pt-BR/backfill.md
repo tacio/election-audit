@@ -1,13 +1,13 @@
 # Processamento retroativo retomável e planejamento de armazenamento
 
-Document-ID: EA-BACKFILL · Revision: 3 · Language: pt-BR
+Document-ID: EA-BACKFILL · Revision: 4 · Language: pt-BR
 
 O processamento retroativo é operação derivada explícita sobre um snapshot imutável, com um grupo limitado de reconstrução por objeto de conteúdo. Não invoca aquisição. Repetir entrada congelada, saída e configuração de recursos idênticas verifica/reutiliza cache estrutural, contexto compartilhado, fragmentos concluídos e publicação; restaura current somente para publicação verificada. Downloads posteriores exigem novo snapshot e não ampliam silenciosamente processamento existente.
 
 Os comandos abaixo para toda a população disponível estão documentados e suas receitas/opções verificadas, mas o processamento completo AC–RJ NÃO foi executado; a passagem estrutural nacional usou o caminho de resumos em [processamento orientado a features](feature-oriented-processing.md). Substitua /large-volume por armazenamento provisionado e SNAPSHOT_DIGEST pelo diretório congelado real. Entradas ausentes/não publicadas ficam explícitas; AC–RJ nunca vira completude nacional. Manifestos de coleta e raízes brutas nunca são modificados.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just snapshot --source /media/tacio/HDD/Data/tse/data/tse/2026/turno-2 --store /large-volume/audit/snapshots --ufs ac al am ap ba ce df es go ma mg ms mt pa pb pe pi pr rj --reserve-gib 10
+rtk proxy env UV_OFFLINE=1 just snapshot --source /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/raw/2026/turno-2 --store /large-volume/audit/snapshots --ufs ac al am ap ba ce df es go ma mg ms mt pa pb pe pi pr rj --reserve-gib 10
 rtk proxy env UV_OFFLINE=1 just backfill /large-volume/audit/snapshots/SNAPSHOT_DIGEST --output /large-volume/audit/backfill --max-events 100000
 rtk proxy env UV_OFFLINE=1 just backfill /large-volume/audit/snapshots/SNAPSHOT_DIGEST --output /large-volume/audit/backfill --max-events 100000
 rtk proxy env UV_OFFLINE=1 just validate /large-volume/audit/backfill/warehouse
