@@ -1,14 +1,15 @@
 # Publicação operacional e relatórios iniciais
 
-Document-ID: EA-PUBLICATION · Revision: 2 · Language: pt-BR
+Document-ID: EA-PUBLICATION · Revision: 3 · Language: pt-BR
 
 [English](../en/publication.md) · [Índice de implementação](implementation-index.md)
 
-O pipeline lê somente artefatos congelados. Logs disponíveis AC–RJ do segundo turno
-presidencial de 2026 continuam sendo um corpus nacional parcial. A aceitação usa
-fixtures sintéticas; nenhum adaptador real de mensagens, regra autoritativa de relógio
-ou piloto do corpus real foi certificado. Aquisição original, manifesto, downloader
-e bytes foram preservados.
+O pipeline lê somente artefatos congelados. Uma release cobre exatamente o snapshot
+de que foi construída; um subconjunto de UFs é cobertura nacional parcial. A aceitação
+usou fixtures sintéticas e o piloto real de cinco regiões da Fase 9; nenhuma regra
+autoritativa de relógio foi certificada. A semântica revisada de mensagens reais é um
+adaptador separado da Fase 13 (`operational_review`), fora destas releases. Coleta
+original, manifestos e bytes foram preservados.
 
 Etapas: snapshot congelado → parse/cache estrutural → grupos limitados de
 reconstrução operacional → publicação imutável DuckDB/Parquet → validação → consultas
@@ -113,5 +114,5 @@ A extensão da Fase 7 está implementada por `derivatives.publish_derivative` e
 carregador de cadeia de pais orientado pelo manifesto. `FACTS` base permanece igual;
 filhos fixam identidades/hashes relativos do pai, acrescentam armazenamento compacto/
 fatos e reutilizam Parquet do pai. Consulte [importações eleitorais](electoral-results.md)
-para contrato utilizável apenas normalizado, integração de consulta/validação/relatório
-e adaptador BU oficial verificado pendente. Sem alegação de validação de BU real.
+para o contrato normalizado, o adaptador oficial BWEB, a verificação de BU binário e a
+integração de consulta/validação/relatório.

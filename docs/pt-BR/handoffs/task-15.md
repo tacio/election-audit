@@ -1,0 +1,19 @@
+# Fase 15 — Protocolo congelado e proteção da avaliação final
+
+Document-ID: EA-HANDOFF-15 · Revision: 1 · Language: pt-BR
+
+Pré-requisitos: plano de conclusão aprovado e publicações de atributos da fase 14. O novo escopo autoriza ajuste de modelos nas fases posteriores sem alterar o significado das publicações da fundação.
+
+Implementado: `research_protocol.py` verifica o hash do catálogo de atributos, processa unidades em fluxo para catálogo SQLite congelado, agrupa locais estáveis revisados entre turnos, reserva populações municipais de estresse e preserva estados de identidade/fonte indisponíveis. Um registro persistente de inspeções com âncoras exclui locais revisados após mudança de semente. Populações de fonte e partição têm checksums; valores dos resultados não entram na seleção da partição.
+
+`research_evaluation.py` oferece registro separado de execução somente por acréscimo, com IDs/referências imutáveis, cadeia de hashes, registros exatos das unidades acessadas/avaliadas, avaliação final de uso único e snapshots atômicos do registro. O marcador final exige modelo ajustado concluído, referências coerentes de protocolo/partição/modelo e população protegida exata. Inspeção de teste isolada e marcadores legados forjados não liberam exportações do dashboard. A validação da prova final compara a população com o hash original das partições. Registros e publicações v1 são preservados.
+
+Interfaces: `publish_protocol(feature_release, output, inspected=None, seed=42)`, `load_protocol`, `record_inspection`; `open_journal`, `append_record`, `record_evaluation_units`, `record_final_evaluation`, `snapshot_journal` e `final_evaluation_complete(db, document=None)`. O adaptador CLI é `research_protocol_main`. Todo payload contém `protocol_id` e `partition_id`. Registros de modelo ajustado exigem `fitted=true`, `state=complete`; registros de acesso e avaliação finais exigem `model_run_id`, `stage=final`, `state=complete`. Chamadores confirmam transações do registro explicitamente. Diretórios imutáveis do protocolo nunca contêm o registro mutável de execução.
+
+Aceitação: seis regressões passam, cobrindo agrupamento, unidades indisponíveis, conflitos geográficos de identidade, persistência de inspeção entre sementes, corrupção do hash da fonte, populações finais exatas, uso único de acesso/avaliação, registros imutáveis, alteração de hashes/partições e bloqueio conservador do dashboard legado. Ruff e formatação passam.
+
+Protocolo AC real: `data/phase15/ac-protocol` utiliza as 2270 unidades elegíveis de `data/phase14/ac-location-development`. Contagens: treinamento 1259, calibração 399, teste protegido 340, estresse municipal 256 e development_inspected 16. Os três locais do piloto de BU binário revisados foram registrados com âncoras preservadas em `data/phase15/inspection.sqlite`; todas as 16 unidades desses locais continuam como desenvolvimento. ID do protocolo: `9128a902f94868ac0a453b199b02f37b028c5383bf9800ae8010d6bf70b2b869`; ID da partição: `ca136d404aaa98eff2c0968f7ddf068a92b0f379f6be84e026e77da7d3e48d67`.
+
+Limites: população de desenvolvimento/avaliação do segundo turno do AC, com agrupamento oficial de locais somente dentro do turno. Não se reivindicam identidade entre turnos ou análise nacional. Covariáveis ausentes do primeiro turno exigem a variante sem primeiro turno. A fase 15 não ajustou modelo nem executou avaliação final. Um notebook local não pode impedir inspeção manual externa; tais acessos devem ser registrados. Novos aliases ou fusões de locais devem propagar o registro de inspeção antes de congelar novas partições.
+
+Próximo: a fase 16 ajusta na população de treinamento elegível, calibra separadamente, registra acesso final uma vez, avalia a população protegida exata (incluindo resultados explicitamente indisponíveis) e congela um snapshot do registro. O snapshot concluído continua sendo evidência condicional de pesquisa, nunca certificado de fraude.

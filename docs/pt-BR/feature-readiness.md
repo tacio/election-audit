@@ -1,6 +1,6 @@
 # Contrato de atributos e prontidão
 
-Document-ID: EA-FEATURE-READINESS · Revision: 2 · Language: pt-BR
+Document-ID: EA-FEATURE-READINESS · Revision: 3 · Language: pt-BR
 
 [English](../en/feature-readiness.md)
 
@@ -10,7 +10,8 @@ exato, papel analítico, definição e bloqueios explícitos. É inventário de 
 não atributos calculados nem declaração de prontidão. O
 [protocolo em inglês](../../research/analysis-plan.md) e sua
 [tradução integral](../../research/analysis-plan.pt-BR.md) mantêm desenho, hipóteses
-e ressalvas. Não há ajuste de modelos nem rótulos de fraude aqui.
+e ressalvas. Não há ajuste de modelos nem rótulos de fraude aqui; o módulo
+`features` (Fase 14) materializa este registro em releases de features.
 
 Toda unidade solicitada permanece no registro de atributos/prontidão, inclusive
 excluídas. Use `not_evaluated`, `ready`, `partial`, `unavailable`, `not_applicable`;
@@ -26,8 +27,8 @@ IDs de entrada e bloqueios são versionados no registro. Logs não fornecem cont
 por candidato, eleitorado, covariáveis pré-eleitorais ou margem nacional final.
 Horários do ciclo de pacote podem existir sem importar BUs; sua semântica ainda
 exige evidência. Outros turnos e histórico 2022/2018 exigem importações explícitas
-e harmonização validada. Disponibilidade AC–RJ é cobertura nacional parcial;
-não permite inferência nacional.
+e harmonização validada. Disponibilidade em um subconjunto de UFs (como a release
+atual de features do AC) é cobertura nacional parcial; não permite inferência nacional.
 
 | Atributo / mart / alvo | IDs de entradas necessárias | Denominador / interpretação |
 | --- | --- | --- |
@@ -96,8 +97,8 @@ flowchart LR
     design --> blocked[Análise futura: hipóteses e evidências necessárias]
 ```
 
-Nenhuma seta implementa ajuste. Aquisição, reconstrução, publicação e análise
-continuam tarefas posteriores. Verificação completa de comandos executáveis fica
-para Fase 9; checagens atuais cobrem pares, revisões, links locais e exemplos
-em blocos de código idênticos; diagramas Mermaid mantêm estrutura e identificadores,
+Nenhuma seta implementa ajuste. Aquisição, reconstrução, publicação e análise são
+estágios separados. `docs-check` cobre pares, revisões, links locais e exemplos em
+blocos de código idênticos, e `docs-command-check` confere os comandos documentados
+com a saída real de `--help`; diagramas Mermaid mantêm estrutura e identificadores,
 com rótulos humanos traduzidos.

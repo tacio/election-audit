@@ -1,25 +1,106 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 12 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 19 · Language: en
 
-Read repository instructions (including `/home/tacio/.codex/RTK.md`), this index,
-the assigned task handoff and only relevant contracts. Use a separate agent per
-phase, with minimal context. Do not reopen all research or carry every prior phase
-into the next agent. Record a paired handoff after every numbered task using the
-[template](task-handoff-template.md). [Português](../pt-BR/implementation-index.md).
+[Português](../pt-BR/implementation-index.md)
 
-Scope: available 2026 presidential runoff logs, AC–RJ, partial national coverage.
-No fitting or fraud labeling. Preserve raw bytes, running acquisition and manifest.
-Other rounds/history require explicit imports; successful subsets are not national.
+This is the single current-state entry point. It says what exists, what has
+actually run, where the results are and what comes next. Guides under `docs/en/`
+describe how each tool behaves. Handoffs under `docs/en/handoffs/` are dated
+records of what each task did at the time; read them for detail, not for status.
+Plans live in `research/`. State below is as of **3 November 2026**.
 
-| Task | Complete deliverables | Handoff |
+## Current state
+
+**Acquisition (Phase 10): finished for both rounds.** The downloader collected
+every log version advertised by the TSE per-section endpoints.
+
+| Round | Pleito / election / date | Run finished (UTC) | Log versions | Aggregated | No log listed | Auxiliary file not published |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 3220 / 6257 / 2026-10-04 | 2026-10-31 23:27 | 499176 | 17931 | 31 | 41 |
+| 2 | 3221 / 6258 / 2026-10-25 | 2026-10-29 22:56 | 499177 | 17931 | 30 | 41 |
+
+Round 1 packages are all `Totalizado`; round 2 has 488333 `Totalizado` and 10844
+`Recebido`. Because of the no-log and unpublished-auxiliary sections, neither run
+meets the downloader's `national_coverage` criterion; those sections stay explicit
+gaps. On 1 November both raw stores (53722200971 and 90643145031 bytes) were copied
+to the output volume and every object was verified by SHA-256. The copies are the
+authoritative originals for derived processing; the original HDD roots and
+`.local-state/` manifests are preserved unchanged.
+
+**Structural processing (Phase 11): finished for the eligible runoff scope.** The
+feature-oriented summary job processed all 498581 eligible runoff objects (499177
+observations minus 596 protected/stress observations and their content aliases),
+with 0 failures, in 35992 seconds using three workers under the 4 GiB / half-CPU
+budget. 498575 objects parsed completely and 6 partially (190 retained errors).
+It scanned 5032537448 structural events; about 90% fall in message classes the
+structural parser leaves `unknown`. The published release
+`55e55e91549dac53eb546a596f62033bc837e0a34e3ff9b178c4687ae9257f88`
+(`source-summary-analysis-release-v1`, 546.6 MB of Parquet) is the input for later
+phases; the 68.8 GB of grouped checkpoints are kept only for recovery and evidence.
+Round 1 has not been structurally processed. Structural summaries grant no
+scientific eligibility: sessions, clocks and copied histories still need Phase 13.
+
+**Phases 12–18: Acre (AC) development artifacts only.** Each phase's tools exist
+and were exercised on real AC data, but nothing has run nationally:
+
+- Phase 12: 2270 AC runoff sections content-verified between binary BU and BWEB;
+  UF totals match. Signatures, RDV recount and national hierarchy are not done.
+- Phase 13: real-message adapter (`real-operational-v1`) run on one AC log per
+  round. Absolute clocks and attendance reconciliation are not done.
+- Phase 14: 2270 AC units, 54480 feature rows, 668 same-round location groups.
+  No cross-round identity and no first-round electoral features.
+- Phase 15: frozen AC protocol (training 1259, calibration 399, protected test
+  340, municipal stress 256, development-inspected 16).
+- Phase 16: one AC turnout fit (`no_first_round` variant) evaluated on
+  calibration data only. The protected test set has not been opened.
+- Phase 17: 126 AC development case packets (20 + 20 ranked, 86 unflagged controls).
+- Phase 18: four marimo notebooks over the AC export; browser QA not done.
+
+No national electoral result, national margin, fitted national model or fraud
+label exists.
+
+**Checks.** All 306 offline tests pass. `just check` currently stops at
+`ruff format --check`, which would reformat `election_audit/research_models.py`
+and `election_audit/electoral_references.py`.
+
+## Next step
+
+The analysis plan and the Phase 12–18 definitions are being revised after the
+methodology review of 3 November 2026. Do not dispatch a new phase until
+[the analysis plan](../../research/analysis-plan.md) and
+[the completion plan](../../research/completion-plan.md) carry the revised scope.
+
+## Working rules
+
+Read the repository `CLAUDE.md`, this index, the assigned handoff and only the
+relevant contracts. Run one phase at a time. After each numbered task, write a
+paired handoff from the [template](task-handoff-template.md) and update this
+index in both languages. Keep processing within half the CPU, 4 GiB of aggregate
+RAM and one library thread per process.
+
+The 596 protected/stress runoff observations stay excluded before any semantic or
+cache access. Inspection histories in `data/phase15/inspection.sqlite`,
+`data/national/phase11-protection-2026-10-31/` and the Phase 11 tranche registries
+remain binding: any location they list is development data, never untouched test
+data. Missing cross-round identity stays unavailable.
+
+## Phase status
+
+Foundation tasks 1.1–9.4 are complete. Their acceptance (29 October 2026): 166
+offline tests, lock, Ruff, contracts and paired-document checks; a frozen
+five-region real pilot (AC/AL/DF/ES/PR) with every session, cycle and clock left
+unresolved. Task 7.1 later added the official BWEB adapter with real AC arithmetic
+checks (177 tests).
+
+| Task | Deliverables | Handoff |
 | --- | --- | --- |
 | 1.1 | Python 3.14, uv lock, package/CLI, DuckDB/PyArrow | [1.1](handoffs/task-1.1.md) |
 | 1.2 | Ruff, mechanical legacy formatting | [1.2](handoffs/task-1.2.md) |
 | 1.3 | just recipes, paired onboarding, index/template | [1.3](handoffs/task-1.3.md) |
 | 2.1 | 30 dimensional contracts, dictionary, lineage, safe joins | [2.1](handoffs/task-2.1.md) |
 | 2.2 | 21 feature/readiness contracts, denominators and blockers | [2.2](handoffs/task-2.2.md) |
-| 2.3 | Full paired research/acquisition translations, glossary/diagrams, docs checks | [2.3](handoffs/task-2.3.md) |
+| 2.3 | Paired research/acquisition translations, glossary/diagrams, docs checks | [2.3](handoffs/task-2.3.md) |
 | 3.1 | Read-only selected source inventory, WAL isolation, honest historical unknowns | [3.1](handoffs/task-3.1.md) |
 | 3.2 | Frozen expected indexes, member/principal coverage and bounded asset selection | [3.2](handoffs/task-3.2.md) |
 | 3.3 | Atomic immutable copies, snapshot/inspection CLI, frozen provenance and guide | [3.3](handoffs/task-3.3.md) |
@@ -32,51 +113,73 @@ Other rounds/history require explicit imports; successful subsets are not nation
 | 5.4 | Operational denominators, immutable bounded shards/shared context, CLI/API | [5.4](handoffs/task-5.4.md) |
 | 6.1 | Immutable bounded DuckDB/Parquet releases, resource limits, atomic current | [6.1](handoffs/task-6.1.md) |
 | 6.2 | Coverage/session/lifecycle availability/late-voting marts, clock uncertainty | [6.2](handoffs/task-6.2.md) |
-| 6.3 | Build/validate/read-only query/bilingual reports; Phase 7 extension seam | [6.3](handoffs/task-6.3.md) |
-| 7.1 | Strict normalized imports plus pinned official BWEB adapter; real AC layout and published-row arithmetic verified | [7.1](handoffs/task-7.1.md) |
-| 7.2 | Immutable parent-pinned derivatives, evidenced canonical selection, arithmetic/hierarchy reconciliation | [7.2](handoffs/task-7.2.md) |
-| 7.3 | Four electoral marts, bounded SELECT, validation and paired reports; real final reconciliation unavailable | [7.3](handoffs/task-7.3.md) |
-| 8.1 | Versioned 21-contract feature registry, streamed descriptive outputs and explicit scientific blockers | [8.1](handoffs/task-8.1.md) |
-| 8.2 | Persisted seeded reviewed stable-location populations, geographic strata and municipal stress holdouts | [8.2](handoffs/task-8.2.md) |
-| 8.3 | Immutable protocol/exploration/null/investigation/scenario ledgers, test access history, CLI and paired reports | [8.3](handoffs/task-8.3.md) |
-| 9.1 | Production synthetic offline walkthrough, four immutable stages and paired marked reports | [9.1](handoffs/task-9.1.md) |
-| 9.2 | Frozen five-region real diagnostic pilot, exact pools/ranks/denominators and unresolved messages/clocks | [9.2](handoffs/task-9.2.md) |
-| 9.3 | Relocatable whitelisted review bundles, frozen replay/logical digests, safe command/SQL checks | [9.3](handoffs/task-9.3.md) |
-| 9.4 | Verified bounded restart, honest backfill/storage guide and updated bilingual onboarding | [9.4](handoffs/task-9.4.md) |
+| 6.3 | Build/validate/read-only query/bilingual reports | [6.3](handoffs/task-6.3.md) |
+| 7.1 | Normalized imports plus pinned official BWEB adapter; real AC arithmetic verified | [7.1](handoffs/task-7.1.md) |
+| 7.2 | Immutable parent-pinned derivatives, evidenced canonical selection, reconciliation | [7.2](handoffs/task-7.2.md) |
+| 7.3 | Four electoral marts, bounded SELECT, validation and paired reports | [7.3](handoffs/task-7.3.md) |
+| 8.1 | Versioned 21-contract feature registry and streamed descriptive outputs | [8.1](handoffs/task-8.1.md) |
+| 8.2 | Seeded reviewed stable-location partitions, strata and municipal holdouts | [8.2](handoffs/task-8.2.md) |
+| 8.3 | Immutable protocol/exploration/investigation/scenario ledgers and test access history | [8.3](handoffs/task-8.3.md) |
+| 9.1 | Synthetic offline walkthrough, four immutable stages and paired reports | [9.1](handoffs/task-9.1.md) |
+| 9.2 | Frozen five-region real diagnostic pilot | [9.2](handoffs/task-9.2.md) |
+| 9.3 | Relocatable review bundles, frozen replay/logical digests | [9.3](handoffs/task-9.3.md) |
+| 9.4 | Verified bounded restart and backfill/storage guide | [9.4](handoffs/task-9.4.md) |
 
-Acceptance: 166 offline tests passed (160 prior + 6 Phase 9); lock, Ruff,
-contracts, paired docs and harmless command/SQL checks pass. Actual frozen pilot:
-five principals AC/AL/DF/ES/PR; full five-UF expected denominator 54166;
-49235 events, 44403 unknown; all 34 sessions, 2328 cycles and clocks unresolved.
-Pipeline 162.549 seconds, full pilot 406.437 seconds; measured run bytes 1084083961.
-`data/phase9/` retains demo, pilot, review bundles, fresh reproduction results,
-paired reports and verification evidence. No full backfill, model fitting,
-candidate attribution, national margin or fraud label. Task 7.1 now has an official BWEB adapter with real AC published-row arithmetic validation. Final status/completeness/hierarchy remain unverified. Earlier handoffs describe historical acceptance; the current 7.1 handoff supersedes their source-access blocker.
+| Phase | Status | Remaining | Handoff |
+| --- | --- | --- | --- |
+| 10 | Complete: both rounds acquired, copied and SHA-256 verified | Gap sections stay explicit; BWEB, registers, RDV/signature sources for other UFs are separate imports | [10](handoffs/task-10.md) |
+| 11 | Complete for eligible runoff scope (498581 objects, 0 failures) | Round 1 structural pass; protected observations deferred by design | [11](handoffs/task-11.md) |
+| 12 | AC only: 2270 sections content-verified, UF totals match | Other UFs, both rounds, signatures, RDV, BR/UF/municipal/ZZ hierarchy | [12](handoffs/task-12.md) |
+| 13 | AC sample: one log per round | National sessions, clocks, copied histories, attendance reconciliation | [13](handoffs/task-13.md) |
+| 14 | AC only: 54480 feature rows | National features, cross-round identity, first-round results | [14](handoffs/task-14.md) |
+| 15 | AC protocol frozen | National protocol after plan revision | [15](handoffs/task-15.md) |
+| 16 | AC turnout development fit | Full target/variant family, refit simulations, final evaluation | [16](handoffs/task-16.md) |
+| 17 | AC development case packets | National cases, corroboration, impact bounds, full-pipeline sensitivity | [17](handoffs/task-17.md) |
+| 18 | Notebooks over AC export | Browser QA, national datasets | [18](handoffs/task-18.md) |
 
-Current Task 7.1 acceptance: `rtk just check` passed with 177 offline tests. Real AC source validation and immutable derivative reports are under `data/official-bu/ac-runoff-2026-10-30/`; see the current [handoff](handoffs/task-7.1.md).
+## Where results are
 
-| Interface | Relevant source / contract |
+Paths under `data/` are relative to the repository and ignored by Git. Absolute
+paths are on the reference machine's output volume
+`/media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/`.
+
+| Artifact | Location |
+| --- | --- |
+| Raw originals, both rounds (authoritative copies) | `raw/2026/turno-1/`, `raw/2026/turno-2/` on the output volume |
+| Copy certificates, manifests, verification ledgers | `2026/migration-2026-11-01/` on the output volume |
+| Original acquisition roots and manifests (preserved) | `/media/tacio/HDD/Data/tse/data/tse/2026/`, `.local-state/` |
+| Acquisition run logs and launch records | `data/phase10/` |
+| Phase 11 runoff summary release | `2026/runoff-summary-analysis-full-20261102/` on the output volume |
+| Phase 11 job configuration, progress and benchmarks | `data/national/phase11-feature-oriented-2026-11-02/`, pointer `data/national/current-phase11.json` |
+| Superseded event-level job (stopped 2 November at 15425 objects) | `data/national/phase11-overnight-2026-11-01/`; do not resume |
+| Earlier Phase 11 tuning, tranches, capacity and protection reviews | `data/national/phase11-*-2026-10-31/` |
+| Foundation demo, pilot and review bundles | `data/phase9/` |
+| Official AC BWEB import | `data/official-bu/ac-runoff-2026-10-30/` |
+| AC development artifacts, Phases 12–17 | `data/phase12/` … `data/phase17/` |
+| Dashboard datasets | `data/dashboard-ac-2026-10-30/`, `data/dashboard-development-2026-10-30/` |
+
+## Interface map
+
+| Area | Modules and guides |
 | --- | --- |
 | Runtime | `pyproject.toml`, `uv.lock`, `.python-version`; `uv sync --locked` |
-| CLI | `election_audit/cli.py`; legacy `download resume inspect doctor`; `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill docs-command-check` |
-| Acquisition | `scripts/download_tse_logs.py`; `manifest_path(root)` follows `manifest-location.json`; original storage/lock/layout preserved |
-| Snapshot/source/coverage | `election_audit/resources/contracts/schema.json`; `source_object`, `source_observation`, `source_package`, `package_observation`, `package_asset`, `snapshot`, `snapshot_observation`, `coverage_ledger`, `record_lineage` |
-| Frozen input APIs | `source_inventory.inventory_sources`, `coverage.build_population`, `snapshots.create_snapshot/publish_snapshot/inspect_snapshot/snapshot_tables`; [guide](snapshots.md) |
-| Structural parse APIs | `archive_parsing.parse_snapshot/inspect_parse/iter_event_witnesses/iter_lineage/iter_parsing_issues`; [archive guide](archive-parsing.md); version `jez-structural-v1`; exact `source_line_sha256`, unresolved contexts, content cache separate from all publisher witnesses |
-| Operational reconstruction | `reconstruction.reconstruct_parse/inspect_reconstruction/iter_reconstruction_rows/load_reconstruction_context`; [guide](reconstruction.md); `operational-v1`; `FrozenParseReader` for bounded groups, shared full population context, explicit uncertainty |
-| Operational releases | `publication`, `operational_marts`, `release_tools`; [publication guide](publication.md); immutable DuckDB/Parquet, SELECT-only queries and paired reports |
-| Electoral derivatives | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`; [guide](electoral-results.md); normalized and official BWEB imports, partial national; final reconciliation remains unavailable |
-| Analysis foundation | `analysis`, `analysis_partitions`, `analysis_ledgers`, `analysis_reports`; [guide](analysis.md); `analyze`, `validate`, `query`, `report` |
-| Structural validator | `election_audit/contracts.py`; `load_contract`, `validate_contracts`, `validate_rows`; packaged resources; semantic/relational checks remain publication work |
-| Grains/joins/time | [Dictionary](schema-dictionary.md), [conventions](transformation-conventions.md); separate totals/choices, unique canonical versions, no member/session/witness multiplication |
-| Features | `election_audit/resources/contracts/features.json`; [readiness guide](feature-readiness.md); unknown is not zero, AC–RJ partial, after17 Brasilia, strict unanimity |
-| Research | `research/analysis-plan.md`, `research/download-sources.md`, linked full `.pt-BR.md` counterparts; [acquisition reference](acquisition-reference.md) |
-| Docs check | `scripts/check_docs.py`; `check_docs(root)`; metadata/revisions/local links/fenced parity; safe separate help/command/SQL syntax checks |
-| Recipes | `justfile`; `setup doctor fmt lint test contracts-check docs-check check download resume inspect snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill docs-command-check` |
+| CLI | `election_audit/cli.py`. Legacy: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensions: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export` |
+| Recipes | `justfile`; one recipe per CLI command plus `setup doctor fmt lint test contracts-check docs-check docs-command-check check` |
+| Acquisition | `scripts/download_tse_logs.py` (`--round 1` or `--round 2`), `election_audit/elections.py`; [acquisition reference](acquisition-reference.md) |
+| Snapshot/source/coverage | `source_inventory`, `coverage`, `snapshots`; [snapshots](snapshots.md) |
+| Structural parse | `archive_parsing` (`jez-structural-v1`); [archive parsing](archive-parsing.md) |
+| Operational reconstruction | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Phase 13); [reconstruction](reconstruction.md) |
+| Operational releases | `publication`, `operational_marts`, `release_tools`; [publication](publication.md) |
+| National structural processing | Summary path: `national_parallel`, `national_summary`, `national_summary_release`, `national_summary_tools`, `national_summary_tuning`, `national_resources`; [feature-oriented processing](feature-oriented-processing.md). Event-level path: `national_benchmark`, `national_tuning`, `national_workload`, `national`, `national_storage`, `national_relocation`, `national_migration`, `national_overnight`; [national processing](national-processing.md) |
+| Electoral imports and verification | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` and `electoral_verification` (Phase 12); [electoral results](electoral-results.md). `electoral_references` is an unwired, untested prototype for official reference sets |
+| Analysis foundation | `analysis`, `analysis_partitions`, `analysis_ledgers`, `analysis_reports`; [analysis](analysis.md) |
+| Research path | `features` (Phase 14), `research_protocol` and `research_evaluation` (Phase 15), `research_models` (Phase 16), `investigations` (Phase 17); see their handoffs |
+| Dashboard | `dashboard`, `dashboard_data`, `dashboard_ui`, `dashboard_development`, `election_audit/notebooks/` (Phase 18) |
+| Reproduction | `reproduction`, `pilot`, `walkthrough`; [reproduction](reproduction.md), [backfill](backfill.md) |
+| Contracts | `election_audit/resources/contracts/schema.json` and `features.json`; `contracts.py`; [schema dictionary](schema-dictionary.md), [feature readiness](feature-readiness.md), [transformation conventions](transformation-conventions.md) |
+| Research documents | [analysis plan](../../research/analysis-plan.md), [completion plan](../../research/completion-plan.md), [download sources](../../research/download-sources.md), [related work](../../research/related-work.md) |
+| Documentation checks | `scripts/check_docs.py` (pairs, revisions, links, fenced parity), `scripts/check_doc_commands.py` (flags via `--help`, SQL syntax) |
 
-Next: obtain explicit totalization/supersession linkage, complete choice evidence and independent final references for real results. The official BWEB import gap is closed for the verified AC layout. Use [electoral guide](electoral-results.md), [reproduction](reproduction.md) and [backfill](backfill.md). New raw logs require new frozen snapshots; existing pilot releases remain partial. Review message/session/clock evidence before granting eligibility. No fitting is authorized.
-
-Pairs under `docs/en/` and `docs/pt-BR/` share Document-ID/Revision; research keeps
-English paths plus `.pt-BR.md` counterparts. Bump both revisions together. Code,
-commands, SQL, formulas and numerical examples stay identical. Human translation
-review complements mechanical parity; Phase 9 extends executable doc validation.
+Pairs under `docs/en/` and `docs/pt-BR/` share Document-ID and Revision; research
+documents keep English paths with `.pt-BR.md` counterparts. Bump both revisions
+together. Code, commands, SQL, formulas and numbers stay byte-identical.

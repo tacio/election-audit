@@ -1,6 +1,6 @@
 # Task handoff template
 
-Document-ID: EA-HANDOFF-TEMPLATE · Revision: 1 · Language: en
+Document-ID: EA-HANDOFF-TEMPLATE · Revision: 2 · Language: en
 
 Copy into `docs/en/handoffs/task-<ID>.md` and its `docs/pt-BR/` counterpart.
 Replace all placeholders. Keep the same document ID/revision and exact commands,
@@ -19,6 +19,7 @@ index after completing the task; send only this compact handoff to the next agen
 - Exact next task: phase/task ID and the minimal files/contracts the next agent needs.
 
 Preserve acquisition state and original bytes. Never claim full national coverage
-from AC–RJ or a passing subset. Never fit a model as part of this pipeline scope.
+from a UF subset, a development population or a passing sample. Fit models only
+in authorized research phases, under a frozen protocol.
 Record unavailable Git state and network access without inventing commit IDs,
 download checks, hashes or acceptance results.

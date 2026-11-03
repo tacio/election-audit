@@ -1,6 +1,6 @@
 # Convenções de transformação
 
-Document-ID: EA-TRANSFORMATION-CONVENTIONS · Revision: 1 · Language: pt-BR
+Document-ID: EA-TRANSFORMATION-CONVENTIONS · Revision: 2 · Language: pt-BR
 
 [English](../en/transformation-conventions.md)
 
@@ -66,10 +66,11 @@ Document-ID: EA-TRANSFORMATION-CONVENTIONS · Revision: 1 · Language: pt-BR
 9. **Publicar disponibilidade.** Conte integrantes esperadas e principais únicas
    separadamente; registre instaladas/não instaladas, ausentes, falhas, exclusões e
    desconhecidos. Sem descarte silencioso nem conversão de nulo em zero. Prontidão
-   é por atributo/unidade; registre denominador e motivo. A ordem de aquisição AC–RJ
-   oferece cobertura nacional parcial, insuficiente à inferência nacional. Outros
-   turnos/histórico exigem importação explícita com esquema validado. Sem ajuste de
-   modelos ou rótulos de fraude nesta fase do pipeline.
+   é por atributo/unidade; registre denominador e motivo. Um subconjunto de UFs ou uma
+   população de desenvolvimento (por exemplo, o AC) é cobertura nacional parcial,
+   insuficiente à inferência nacional. Histórico exige importação explícita com
+   esquema validado. Estágios do pipeline não ajustam modelos nem produzem rótulos de
+   fraude; o ajuste pertence às fases de pesquisa.
 
 Um exemplo sintético fixa a contabilidade. Um resultado tem eleitorado `100`,
 comparecimento `80`, candidatos `45` e `30`, branco `3`, nulo `2` e

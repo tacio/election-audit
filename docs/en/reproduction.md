@@ -1,8 +1,6 @@
 # Reproduction and peer review
 
-Document-ID: EA-REPRODUCTION · Revision: 2 · Language: en
-
-Current source status: Task 7.1 now provides the official BWEB adapter, verified with real AC runoff bytes and published-row arithmetic. Final totalization linkage, complete choice evidence and independent final references remain unavailable; no scientific eligibility follows. Earlier descriptions of a missing adapter below record the prior acceptance state. See [current electoral guide](electoral-results.md).
+Document-ID: EA-REPRODUCTION · Revision: 3 · Language: en
 
 The offline demo is SYNTHETIC throughout: deterministic tiny ZIP originals exercise mixed device dates, exact copied history, replacement devices, manual request/cancellation, unresolved clocks and malformed nested content. Reviewed session/copy/semantic assertions are generated from exact preserved synthetic line hashes. Expected members 3, unique principals 2, normalized attending voters 10, eligible electors 20 and turnout 0.5 are known fixture numbers. They do not validate real electoral data. Unknown identity links remain unavailable; a registered exploration preserves its null result and complete history without fitting.
 
@@ -44,7 +42,7 @@ rtk proxy env UV_OFFLINE=1 just review-bundle data/my-pilot --output data/my-pil
 rtk proxy env UV_OFFLINE=1 just reproduce data/my-pilot-review --output data/my-pilot-reproduction
 ```
 
-This is a diagnostic geographic design, not a probability-weighted or national estimate. Unsampled/unavailable UFs, outside-selection members and unknown denominators remain explicit. Real device dates do not independently attribute a round. Only three exact baseline message classes are decoded automatically; unknown text remains unknown, with safe original line/hash locators retained. No official session, clock, candidate attribution or new message adapter is inferred. Missing real BU/official adapter remains task 7.1 and does not become operational validation.
+This is a diagnostic geographic design, not a probability-weighted or national estimate. Unsampled/unavailable UFs, outside-selection members and unknown denominators remain explicit. Real device dates do not independently attribute a round. Only three exact baseline message classes are decoded automatically; unknown text remains unknown, with safe original line/hash locators retained. No official session, clock, candidate attribution or new message adapter is inferred. Official BU validation is a separate electoral path (see the [electoral guide](electoral-results.md)) and never becomes operational validation.
 
 Both-language reports share calculations, SQL, coverage, availability, exclusions and challenging evidence. Review original bytes and anchors, contradictory official message meanings, missing/aggregated principals, clock rules, copied/replacement histories, official BU/corrections and ZZ coverage. Reconstructed cycles are not reconciled votes. Source availability remains unknown, numeric feature eligibility unavailable, and no model/exchangeability/final national margin is supplied.
 

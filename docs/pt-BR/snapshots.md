@@ -1,6 +1,6 @@
 # Snapshots congelados e cobertura
 
-Document-ID: EA-SNAPSHOTS · Revision: 1 · Language: pt-BR
+Document-ID: EA-SNAPSHOTS · Revision: 2 · Language: pt-BR
 
 [English](../en/snapshots.md) · [Índice de implementação](implementation-index.md)
 
@@ -13,8 +13,10 @@ compactados, importação eleitoral ou publicação DuckDB.
 Seleção padrão: segundo turno presidencial federal de 2026, pleito `3221`, eleição
 `6258`, turno `2`, data `2026-10-25` e as 19 UFs alfabéticas AC–RJ. A cobertura
 nacional é **parcial**. `--ufs` permite selecionar explicitamente qualquer UF,
-incluindo ZZ, em snapshot posterior. Outros turnos/histórico exigem adaptadores
-futuros. Índices ausentes e UFs indisponíveis nunca viram população zero.
+incluindo ZZ, em snapshot posterior. `--round 1` seleciona o primeiro turno (pleito
+`3220`, eleição `6257`, `2026-10-04`); `--source-manifest` substitui o manifesto
+encontrado pelo marcador de localização da raiz. Histórico exige adaptadores de
+importação explícitos. Índices ausentes e UFs indisponíveis nunca viram população zero.
 
 Para piloto limitado, selecione seções explicitamente. Somente seus objetos e os
 objetos de índice/configuração das UFs selecionadas são lidos para hash/cópia;
@@ -103,5 +105,6 @@ originais e segmentos de arquivo `[]`; intervalos desconhecidos ficam nulos.
 `document["payload"]["tables"]` para fontes/seções/cobertura/linhagem e
 `snapshot_tables` para incluir `snapshot`/`snapshot_observation`. Esquema congelado:
 `document["payload"]["schema"]`. Essas linhas JSON não são publicação DuckDB ou
-Parquet. Fase 4 deve ler este guia e [registro 3.3](handoffs/task-3.3.md), depois
-interpretar somente objetos congelados, preservando ocorrências de membros aninhados.
+Parquet. O [analisador estrutural](archive-parsing.md) lê somente localizadores de
+objetos congelados e preserva ocorrências de membros aninhados; veja o
+[registro 3.3](handoffs/task-3.3.md) para detalhes do aceite.

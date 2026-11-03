@@ -1,6 +1,6 @@
 # Feature and readiness contract
 
-Document-ID: EA-FEATURE-READINESS · Revision: 2 · Language: en
+Document-ID: EA-FEATURE-READINESS · Revision: 3 · Language: en
 
 [Português](../pt-BR/feature-readiness.md)
 
@@ -10,7 +10,8 @@ analytical role, definition and explicit blockers. It is a design inventory, not
 computed features or a claim that any input is ready. The English
 [research protocol](../../research/analysis-plan.md) and its full
 [Portuguese translation](../../research/analysis-plan.pt-BR.md) retain the design,
-assumptions and caveats. There is no model fitting or fraud labeling here.
+assumptions and caveats. There is no model fitting or fraud labeling here; the
+`features` module (Phase 14) materializes this registry into feature releases.
 
 Every requested unit remains in a feature/readiness ledger, including exclusions.
 Use `not_evaluated`, `ready`, `partial`, `unavailable`, `not_applicable`; preserve
@@ -26,8 +27,9 @@ Input IDs and blockers are versioned in the registry. Logs alone cannot supply
 candidate counts, electorate, pre-election covariates or final national margin.
 Package lifecycle timestamps can be available without importing BUs; their
 semantics still require evidence. Other rounds and 2022/2018 history require
-explicit imports and validated harmonization. AC–RJ availability is partial
-national coverage; no national inference follows from it.
+explicit imports and validated harmonization. Availability for a UF subset (such
+as the current AC feature release) is partial national coverage; no national
+inference follows from it.
 
 | Feature / mart / target | Required input IDs | Denominator / interpretation |
 | --- | --- | --- |
@@ -97,7 +99,7 @@ flowchart LR
 ```
 
 No arrow in this diagram implements fitting. Source acquisition, reconstruction,
-publication and analysis remain later tasks. Full executable command checking is
-reserved for Phase 9; current documentation checks cover pairing, revisions, local
-links and identical code examples; Mermaid diagrams preserve structure and IDs
-while human labels are translated.
+publication and analysis are separate stages. `docs-check` covers pairing,
+revisions, local links and identical code examples, and `docs-command-check` checks
+documented commands against real `--help` output; Mermaid diagrams preserve
+structure and IDs while human labels are translated.

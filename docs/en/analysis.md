@@ -1,12 +1,10 @@
 # Statistical analysis foundation
 
-Document-ID: EA-ANALYSIS · Revision: 2 · Language: en
-
-Current source status: Task 7.1 now provides the official BWEB adapter, verified with real AC runoff bytes and published-row arithmetic. Final totalization linkage, complete choice evidence and independent final references remain unavailable; no scientific eligibility follows. Earlier descriptions of a missing adapter below record the prior acceptance state. See [current electoral guide](electoral-results.md).
+Document-ID: EA-ANALYSIS · Revision: 3 · Language: en
 
 [Português](../pt-BR/analysis.md) · [Index](implementation-index.md) · [Electoral parent](electoral-results.md)
 
-Phase 8 publishes descriptive foundations from an immutable operational or normalized electoral parent. It fits no model and applies no automatic fraud labels. AC–RJ coverage is partial national. The official TSE BU adapter and real BU validation remain outstanding (task 7.1); every numeric feature retains this source-quality blocker, unknown temporal availability and unavailable scientific eligibility. No exchangeability or coherent final national margin is asserted.
+Phase 8 publishes descriptive foundations from an immutable operational or electoral derivative release. It fits no model and applies no automatic fraud labels. Any UF subset, including the default AC–RJ snapshot, is partial national coverage. Every numeric feature retains its source-quality blockers (final totalization linkage, complete choice evidence and independent final references are still unavailable), unknown temporal availability and unavailable scientific eligibility. No exchangeability or coherent final national margin is asserted. Model fitting happens only in the later research path (`features`, `research_protocol`, `research_models`, `investigations`; Phases 14–17), documented in its handoffs.
 
 Use a local explicit configuration, at most 8 MiB. The optional candidate_a/candidate_b fields must be distinct official contest-scoped candidacy IDs fixed together; neither is inferred. Empty links preserve every unknown location as ineligible. Configuration bytes are preserved and pinned in the new child.
 
@@ -91,4 +89,4 @@ impact records require one exact snapshot/election/contest and distinct candidat
 
 Reports default to en and pt-BR, share identical calculations in findings.json, and include feature availability, partition/access summaries, ledger counts, conditional scenario bounds, exact SQL, configuration, validation and complete parent-chain file/table pins. `--language en|pt-BR|both` changes human labels only. Reports must be outside every immutable parent and child.
 
-Phase 9: use [8.3 handoff](handoffs/task-8.3.md), this guide, the index, public CLI and the synthetic integration fixtures. Build a small reproducible demo/review bundle with the complete relative chain, source evidence, SQL, configuration, limits and null findings. Then run only an explicitly selected bounded frozen AC–RJ raw pilot, preserving running acquisition and original bytes; review real-message semantics and the outstanding official BU adapter before claiming real electoral validation. No national download, fitted model or fraud labeling is authorized by Phase 8 acceptance.
+The research path builds on these ledgers: Phase 14 publishes feature releases, Phase 15 freezes protocols and the protected final-evaluation journal, Phase 16 fits models and Phase 17 builds investigation packets. See their [handoffs](implementation-index.md#phase-status). Acceptance of this foundation does not authorize model fitting or fraud labeling.

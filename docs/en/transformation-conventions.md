@@ -1,6 +1,6 @@
 # Transformation conventions
 
-Document-ID: EA-TRANSFORMATION-CONVENTIONS · Revision: 1 · Language: en
+Document-ID: EA-TRANSFORMATION-CONVENTIONS · Revision: 2 · Language: en
 
 [Português](../pt-BR/transformation-conventions.md)
 
@@ -64,9 +64,10 @@ Document-ID: EA-TRANSFORMATION-CONVENTIONS · Revision: 1 · Language: en
 9. **Publish availability.** Count expected members and unique principals separately;
    record installed/non-installed, missing, parser failures, exclusions and unknowns.
    No silent drop or null-to-zero imputation. Readiness is per feature/unit; record
-   denominator and missing reason. AC–RJ acquisition order is partial national
-   coverage and cannot support national inference. Other rounds/history need explicit
-   schema-validated imports. No fitting or fraud labels in this pipeline phase.
+   denominator and missing reason. A UF subset or development population (for
+   example AC) is partial national coverage and cannot support national inference.
+   History needs explicit schema-validated imports. Pipeline stages fit no models and
+   produce no fraud labels; fitting belongs to the research phases.
 
 A synthetic join example fixes the accounting rule. One result has electorate
 `100`, attendance `80`, candidate counts `45` and `30`, blank `3`, null `2`, and

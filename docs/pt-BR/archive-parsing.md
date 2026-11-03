@@ -1,6 +1,6 @@
 # Análise sintática de arquivos congelados
 
-Document-ID: EA-ARCHIVE-PARSING · Revision: 1 · Language: pt-BR
+Document-ID: EA-ARCHIVE-PARSING · Revision: 2 · Language: pt-BR
 
 [English](../en/archive-parsing.md) · [Índice de implementação](implementation-index.md)
 
@@ -8,10 +8,12 @@ A Fase 4 lê somente [snapshots](snapshots.md) concluídos. `parse_snapshot` cha
 `inspect_snapshot(..., verify_objects=True)` e `snapshot_tables`, depois abre
 o `source_object.storage_locator` relativo congelado. Os caminhos originais de
 aquisição em `payload.inventory` são evidências, nunca entradas do analisador.
-Os bytes da aquisição e do snapshot permanecem intactos. Não houve análise do
-acervo real; o piloto limitado com dados reais pertence à Fase 9. AC–RJ continua
-com cobertura nacional parcial, e amostras de seções conservam o denominador
-congelado da UF inteira.
+Os bytes da aquisição e do snapshot permanecem intactos. O piloto de cinco regiões
+da Fase 9 executou este analisador sobre objetos reais. A passagem nacional do segundo
+turno usou o analisador fundido de resumos em
+[processamento orientado a features](feature-oriented-processing.md), que mantém as
+mesmas proteções e classes de mensagem. Um subconjunto de UFs é cobertura nacional
+parcial, e amostras de seções conservam o denominador congelado da UF inteira.
 
 ```sh
 rtk proxy env UV_OFFLINE=1 just parse /path/to/derived/SNAPSHOT_DIGEST --store /path/to/parsed
@@ -86,8 +88,9 @@ diagnósticos.
 Essas são as únicas três classes decodificadas em `jez-structural-v1`. Todas as
 outras mensagens/aplicações ficam como `unknown` com evidência
 `unsupported_message_class`. Cada evento mantém `selection_state=context_unresolved`,
-inclusive contextos de preparação e datas/turnos misturados. Semânticas posteriores
-exigem extensões versionadas do adaptador com base na evidência original. Uma
+inclusive contextos de preparação e datas/turnos misturados. A semântica revisada de
+mensagens reais fica no adaptador separado da Fase 13, `real-operational-v1`
+(`operational_review`), ancorado na evidência original. Uma
 solicitação manual não é uma habilitação nem um ciclo concluído. Mensagens de
 conclusão não são totais reconciliados de votos.
 
@@ -140,9 +143,9 @@ A aceitação usou somente fixtures sintéticas isoladas: membros aninhados/dupl
 corrupção de CRC, logs ausentes, linhas malformadas/excessivas, todos os limites,
 mensagens iguais repetidas, contextos misturados, minimização de dados, hashes
 distintos de mensagens desconhecidas, cache danificado, interrupção, leitura
-exclusiva de congelados e associações de múltiplos pacotes/snapshots. Passaram as
-15 fixtures do analisador e todos os 83 testes do repositório; a ajuda da receita
-também passou.
+exclusiva de congelados e associações de múltiplos pacotes/snapshots. No aceite da Fase 4
+passaram as 15 fixtures do analisador e todos os 83 testes do repositório; a ajuda
+da receita também passou.
 
 ```sh
 rtk proxy env UV_OFFLINE=1 UV_CACHE_DIR=/tmp/election-audit-uv-cache uv run --locked python -m unittest discover -s tests -p test_archive_parsing.py -v

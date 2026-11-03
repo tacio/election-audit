@@ -1,6 +1,6 @@
 # Electoral imports and derivative releases
 
-Document-ID: EA-ELECTORAL-RESULTS · Revision: 2 · Language: en
+Document-ID: EA-ELECTORAL-RESULTS · Revision: 3 · Language: en
 
 [Português](../pt-BR/electoral-results.md) · [Index](implementation-index.md) · [Publication](publication.md)
 
@@ -111,7 +111,7 @@ expected contest choice set, including explicit zero rows. A missing row is unkn
 Final references use zone/municipality/uf/national levels, an exact principal list,
 and nonempty metrics keyed by totals contract fields; unused geography fields are
 empty strings. An explicitly national population includes overseas units (ZZ);
-its declared list is not inferred from this partial corpus.
+its declared list is never inferred from the available records.
 
 ```sh
 rtk proxy env UV_OFFLINE=1 just import-results /ssd/audit/releases/PARENT_DIGEST --bundle /ssd/normalized/bundle.json --store /ssd/audit
@@ -168,6 +168,20 @@ Round comparison requires disjoint whole-principal populations, reviewed composi
 transfers and electorate, complete results, same-year presidential contest pair and
 exact snapshot linkage. It aggregates each round before joining, preserves separate
 candidate IDs and electorate changes, and makes no individual transfer inference.
+
+## Binary BU content verification (Phase 12)
+
+`binary_bu` decodes official binary BUs with the pinned ASN.1 schema, and
+`electoral_verification` (CLI `electoral-verify`) streams BWEB records, preserves
+the EA18/EA20 objects and matches section, location, urn, emission and choices
+exactly between binary BU and BWEB. It writes resumable per-section checkpoints and
+a checksummed `evidence.sqlite`. `content_verified` certifies that linkage only:
+signature trust and RDV recount stay `not_verified`, and national completeness is
+not implied. The official ASN.1 ZIP returned HTTP 403; the reviewed public schema
+mirror is pinned by SHA-256. The real run covers the 2270 AC runoff principals in
+`data/phase12/ac-round2/`, with UF counts matching EA20. The
+[Phase 12 handoff](handoffs/task-12.md) has the compatibility rule for 374 early
+records and the remaining gaps.
 
 Phase 8 input: use the pinned derivative path and the four marts plus operational
 parent views, checking availability and denominators before analysis. To add new

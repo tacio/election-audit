@@ -1,0 +1,13 @@
+# Fase 16 — Modelos condicionais e avaliação protegida
+
+Document-ID: EA-HANDOFF-16 · Revision: 1 · Language: pt-BR
+
+[English](../../en/handoffs/task-16.md)
+
+Implementado `research_models.py`: matrizes compactas limitadas, treinamento esparso e previsão densa em blocos de 64 linhas para a biblioteca fixada, validação geográfica em três partes somente no treinamento, referências empíricas pareadas por eleitorado e florestas quantílicas. Padrões: 256 árvores, profundidade 24, folhas 25/100, quatro trabalhadores e semente 42; alvo/variante e identidades de fonte/catálogo/protocolo são fixados. Artefatos contêm hashes do modelo e configuração, diagnósticos de calibração, resíduos com sinal e posições de cauda descritivas. O acesso final usa o registro separado da fase 15; a execução real AC não acessou resultados de teste.
+
+Ajuste real de desenvolvimento AC: `data/phase16/ac-turnout`, 1259 unidades de treinamento e 399 de calibração; floresta selecionada com folha 25. Perda quantílica de calibração 0.013169431860532732 versus referência 0.015507040245676146; cobertura do intervalo nominal de 95% igual a 0.9448621553884712. São diagnósticos retrospectivos de desenvolvimento, não avaliação final ou evidência de fraude. Previsões de calibração: `data/phase16/ac-turnout-development`.
+
+Validação: quatro testes passam, cobrindo configurações/métricas ajustadas reproduzíveis, separação treinamento/teste, fontes fixadas imutáveis, avaliação final única, corrupção do modelo, limites de contagens, injeção em histórico redigido e identidade do callback na retomada. Ruff passa. `run_mechanism_validation` fornece perturbações em votos reconciliados e históricos redigidos a um callback fixado de ajuste/calibração/pontuação completa, com checkpoints SQLite por semente. O chamador deve fornecer o fluxo completo; resultados do teste do callback não são apresentados como poder medido do detector. O CLI `simulate` é rotulado separadamente como sensibilidade a perturbações de atributos sem reajuste e não deve ser relatado como validação de mecanismo em votos.
+
+Restante: completar a família congelada de alvos/variantes, validar mecanismos/reajuste de ponta a ponta em cópias de validação derivadas das fontes reais, avaliação final reservada, processamento nacional e pressupostos inferenciais defensáveis. Alvos operacionais exigem atributos elegíveis derivados de eventos. Variantes/alvos sem suporte falham com mensagens explícitas de entradas ausentes. Sem rótulos automáticos de fraude, valores-p certificados, alegação de FDR ou efeito causal. Próxima fase: 17 investigação consome previsões de desenvolvimento verificadas por hash e registro de partições da fase 15.

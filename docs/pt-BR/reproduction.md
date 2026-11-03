@@ -1,8 +1,6 @@
 # Reprodução e revisão por pares
 
-Document-ID: EA-REPRODUCTION · Revision: 2 · Language: pt-BR
-
-Situação atual da fonte: a tarefa 7.1 agora fornece adaptador BWEB oficial, verificado com bytes reais AC do segundo turno e aritmética das linhas publicadas. Vínculo de totalização final, evidência completa de escolhas e referências finais independentes continuam indisponíveis; não há elegibilidade científica. Descrições abaixo de adaptador ausente registram a aceitação anterior. Consulte o [guia eleitoral atual](electoral-results.md).
+Document-ID: EA-REPRODUCTION · Revision: 3 · Language: pt-BR
 
 A demonstração sem rede é inteiramente SINTÉTICA: pequenos originais ZIP determinísticos exercitam datas mistas do dispositivo, histórico copiado exato, substituição de dispositivos, solicitação manual/cancelamento, relógios não resolvidos e conteúdo aninhado malformado. Asserções revisadas de sessão/cópia/semântica são geradas com hashes exatos de linhas sintéticas preservadas. Membros esperados 3, principais únicos 2, comparecimento normalizado 10, eleitores aptos 20 e comparecimento proporcional 0.5 são números conhecidos da fixture. Não validam dados eleitorais reais. Ligações de identidade desconhecidas ficam indisponíveis; exploração registrada preserva resultado nulo e histórico completo sem ajuste de modelo.
 
@@ -44,7 +42,7 @@ rtk proxy env UV_OFFLINE=1 just review-bundle data/my-pilot --output data/my-pil
 rtk proxy env UV_OFFLINE=1 just reproduce data/my-pilot-review --output data/my-pilot-reproduction
 ```
 
-É desenho geográfico diagnóstico, não estimativa ponderada por probabilidades ou nacional. UFs não amostradas/indisponíveis, membros fora da seleção e denominadores desconhecidos permanecem explícitos. Datas reais do dispositivo não atribuem turno independentemente. Somente três classes básicas exatas de mensagens são decodificadas automaticamente; texto desconhecido permanece desconhecido, com localizadores seguros de linha/hash preservados. Não se infere sessão oficial, relógio, atribuição de candidato ou adaptador novo. BU real/adaptador oficial ausente permanece tarefa 7.1 e não vira validação operacional.
+É desenho geográfico diagnóstico, não estimativa ponderada por probabilidades ou nacional. UFs não amostradas/indisponíveis, membros fora da seleção e denominadores desconhecidos permanecem explícitos. Datas reais do dispositivo não atribuem turno independentemente. Somente três classes básicas exatas de mensagens são decodificadas automaticamente; texto desconhecido permanece desconhecido, com localizadores seguros de linha/hash preservados. Não se infere sessão oficial, relógio, atribuição de candidato ou adaptador novo. A validação oficial de BU é um caminho eleitoral separado (veja o [guia eleitoral](electoral-results.md)) e nunca vira validação operacional.
 
 Relatórios nos dois idiomas compartilham cálculos, SQL, cobertura, disponibilidade, exclusões e evidências contestadoras. Revise bytes originais e âncoras, significados oficiais contraditórios, principais ausentes/agregados, regras de relógio, históricos copiados/substituição, BU/correções oficiais e cobertura ZZ. Ciclos reconstruídos não são votos reconciliados. Disponibilidade temporal da origem permanece desconhecida, elegibilidade numérica indisponível, e não há modelo/permutabilidade/margem nacional final.
 

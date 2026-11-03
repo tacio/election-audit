@@ -1,12 +1,10 @@
 # Fundação de análise estatística
 
-Document-ID: EA-ANALYSIS · Revision: 2 · Language: pt-BR
-
-Situação atual da fonte: a tarefa 7.1 agora fornece adaptador BWEB oficial, verificado com bytes reais AC do segundo turno e aritmética das linhas publicadas. Vínculo de totalização final, evidência completa de escolhas e referências finais independentes continuam indisponíveis; não há elegibilidade científica. Descrições abaixo de adaptador ausente registram a aceitação anterior. Consulte o [guia eleitoral atual](electoral-results.md).
+Document-ID: EA-ANALYSIS · Revision: 3 · Language: pt-BR
 
 [English](../en/analysis.md) · [Índice](implementation-index.md) · [Pai eleitoral](electoral-results.md)
 
-A fase 8 publica fundamentos descritivos a partir de um pai operacional ou eleitoral normalizado imutável. Não ajusta modelos nem aplica rótulos automáticos de fraude. A cobertura AC–RJ é nacional parcial. Adaptador BU oficial TSE e validação real de BU continuam pendentes (tarefa 7.1); cada variável numérica preserva esse bloqueio de qualidade, disponibilidade temporal desconhecida e elegibilidade científica indisponível. Não se afirma permutabilidade ou margem nacional final coerente.
+A fase 8 publica fundamentos descritivos a partir de uma release derivada operacional ou eleitoral imutável. Não ajusta modelos nem aplica rótulos automáticos de fraude. Qualquer subconjunto de UFs, incluindo o snapshot padrão AC–RJ, é cobertura nacional parcial. Cada variável numérica preserva seus bloqueios de qualidade da fonte (vínculo de totalização final, evidência completa de escolhas e referências finais independentes continuam indisponíveis), disponibilidade temporal desconhecida e elegibilidade científica indisponível. Não se afirma permutabilidade ou margem nacional final coerente. O ajuste de modelos ocorre só no caminho de pesquisa posterior (`features`, `research_protocol`, `research_models`, `investigations`; Fases 14–17), documentado em seus handoffs.
 
 Use configuração local explícita, com até 8 MiB. Os campos opcionais candidate_a/candidate_b devem ser IDs oficiais de candidatura da disputa, distintos e fixados juntos; nenhum é inferido. Vínculos vazios preservam cada local desconhecido como inelegível. Os bytes da configuração são preservados e fixados no novo filho.
 
@@ -91,4 +89,4 @@ Registros impact exigem um único snapshot/eleição/disputa e IDs distintos de 
 
 Relatórios usam en e pt-BR por padrão, compartilham cálculos idênticos em findings.json e incluem disponibilidade de variáveis, resumos de partição/acesso, contagens de registros, limites condicionais, SQL exato, configuração, validação e fixações de arquivos/tabelas de toda a cadeia de pais. `--language en|pt-BR|both` muda somente rótulos humanos. Relatórios devem ficar fora de cada pai e filho imutável.
 
-Fase 9: use [handoff 8.3](handoffs/task-8.3.md), este guia, índice, CLI pública e fixtures sintéticas de integração. Construa demonstração/pacote de revisão pequeno e reproduzível com cadeia relativa completa, evidências, SQL, configuração, limites e resultados nulos. Depois execute somente piloto bruto AC–RJ congelado explicitamente selecionado e limitado, preservando aquisição em execução e bytes originais; revise semântica das mensagens reais e adaptador BU oficial pendente antes de afirmar validação eleitoral real. Aceitação da fase 8 não autoriza download nacional, ajuste de modelo ou rotulagem de fraude.
+O caminho de pesquisa se apoia nesses ledgers: a Fase 14 publica releases de features, a Fase 15 congela protocolos e o diário protegido de avaliação final, a Fase 16 ajusta modelos e a Fase 17 monta pacotes de investigação. Veja seus [handoffs](implementation-index.md#estado-das-fases). A aceitação desta fundação não autoriza ajuste de modelos nem rotulagem de fraude.

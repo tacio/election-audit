@@ -1,6 +1,6 @@
 # Frozen snapshots and coverage
 
-Document-ID: EA-SNAPSHOTS · Revision: 1 · Language: en
+Document-ID: EA-SNAPSHOTS · Revision: 2 · Language: en
 
 [Português](../pt-BR/snapshots.md) · [Implementation index](implementation-index.md)
 
@@ -13,8 +13,10 @@ electoral import or DuckDB publication occurs.
 The default selection is the 2026 federal presidential runoff, pleito `3221`,
 election `6258`, round `2`, date `2026-10-25`, and the 19 alphabetical UFs AC–RJ.
 This is **partial national coverage**. `--ufs` can explicitly select any official
-UF including ZZ in a later snapshot. Other rounds/history need later import
-adapters. Missing indexes and unavailable UFs never become zero population.
+UF including ZZ in a later snapshot. `--round 1` selects the first round (pleito
+`3220`, election `6257`, `2026-10-04`); `--source-manifest` overrides the manifest
+found through the root's location marker. History needs explicit import adapters.
+Missing indexes and unavailable UFs never become zero population.
 
 For a bounded pilot, explicitly select sections. Only those section objects and
 selected-UF index/configuration objects are hashed/copied; original object
@@ -104,5 +106,6 @@ pointers and archive segments `[]`; unknown byte/line spans remain null.
 `document["payload"]["tables"]` for source/section/coverage/lineage rows, and
 `snapshot_tables` to include `snapshot`/`snapshot_observation`. The stored schema
 is `document["payload"]["schema"]`. These JSON contract rows are not a DuckDB or
-Parquet publication. Phase 4 should read this guide and [3.3 handoff](handoffs/task-3.3.md),
-then parse only frozen object locators while preserving nested member occurrences.
+Parquet publication. The [structural parser](archive-parsing.md) reads only frozen
+object locators and preserves nested member occurrences; see the
+[3.3 handoff](handoffs/task-3.3.md) for acceptance detail.

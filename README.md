@@ -1,12 +1,34 @@
-# Election audit — 2026 presidential runoff
+# Election audit — 2026 Brazilian presidential election
 
-Document-ID: EA-ONBOARDING · Revision: 5 · Language: en
+Document-ID: EA-ONBOARDING · Revision: 11 · Language: en
 
 [Português](README.pt-BR.md)
 
-This project preserves original acquisition bytes and publishes frozen snapshots → structural parses → operational reconstruction → immutable DuckDB/Parquet releases → normalized electoral imports → descriptive features, partitions and immutable analysis ledgers. Raw log acquisition now spans all UFs and ZZ, with explicit unpublished/no-log gaps; frozen derived releases retain their original partial populations. No model is fitted and no fraud label is produced.
+Reproducible audit tooling for the TSE logs and ballot reports (BUs) of both rounds
+of the 2026 presidential election. Original bytes are preserved, every stage reads
+only frozen inputs and writes a new immutable output that pins its parent, and
+unknown or partial values stay explicitly unavailable instead of being guessed.
+The tooling produces no fraud labels.
 
-Install uv, just and rtk. Python 3.14, DuckDB 1.5.3, PyArrow 24.0.0 and Ruff are pinned in the lockfile. Recipes use `/tmp/election-audit-uv-cache`; offline setup needs an existing populated cache. Checks never acquire election data.
+## Status (3 November 2026)
+
+- **Acquisition:** both rounds collected from TSE and verified by SHA-256 (499176
+  round-1 and 499177 round-2 log versions, with explicit no-log and
+  unpublished-auxiliary gaps).
+- **Structural processing:** all 498581 eligible runoff logs summarized into one
+  immutable Parquet release. Round 1 is not yet processed.
+- **Electoral verification, operational semantics, features, models,
+  investigations and notebooks:** implemented and exercised on Acre (AC) only.
+- **Next:** revision of the analysis plan and phase definitions.
+
+The [implementation index](docs/en/implementation-index.md) has the full status,
+artifact locations and interface map. Start there.
+
+## Setup and checks
+
+Install uv, just and rtk. Python 3.14, DuckDB, PyArrow and Ruff are pinned in the
+lockfile. Recipes use `/tmp/election-audit-uv-cache`; offline setup needs that cache
+populated. Checks never acquire election data.
 
 ```sh
 rtk proxy just setup
@@ -14,7 +36,12 @@ rtk proxy just doctor
 rtk proxy env UV_OFFLINE=1 just check
 ```
 
-The small offline walkthrough creates explicitly SYNTHETIC originals, a mixed-date archive, replacement/copied history, manual request/cancellation, unresolved clocks and malformed nested content. It publishes the complete operational → normalized electoral → partition → null-result ledger chain and both reports. Every output directory below must be new.
+## Try it offline
+
+The walkthrough builds explicitly SYNTHETIC originals (mixed-date archive,
+replacement and copied history, manual request/cancellation, unresolved clocks,
+malformed nested content) and publishes the full operational → electoral →
+partition → ledger chain with both reports. Every output directory must be new.
 
 ```sh
 rtk proxy env UV_OFFLINE=1 just demo --output data/my-demo
@@ -23,9 +50,36 @@ rtk proxy env UV_OFFLINE=1 just review-bundle data/my-review --verify
 rtk proxy env UV_OFFLINE=1 just reproduce data/my-review --output data/my-reproduction
 ```
 
-The review bundle contains frozen selected originals, the complete relative release parent chain, exact configurations, source and dependency lock, SQL, validation and logical output digests. It excludes the live manifest, acquisition root, environment and credentials. Offline reproduction requires the pinned dependencies already installed or cached; wheels/cache are not bundled. Container bytes and creation times can differ; frozen input identities and normalized logical payloads are checked.
+A review bundle contains the frozen selected originals, the complete relative
+release chain, exact configurations, source tree, dependency lock, SQL, validation
+and logical output digests. It excludes live manifests, acquisition roots, the
+environment and credentials. See [reproduction](docs/en/reproduction.md).
 
-Use the [reproduction and peer-review guide](docs/en/reproduction.md) for the bounded real pilot, evidence review and reproducibility limits; use the [backfill guide](docs/en/backfill.md) for resource planning and restart. Commands operate on frozen inputs unless an explicit acquisition command is invoked.
+## Pipeline
+
+1. **Acquisition** (`download`, `resume`, `inspect`): raw TSE objects plus a SQLite
+   manifest. See the [acquisition reference](docs/en/acquisition-reference.md).
+2. **Snapshot** (`snapshot`): freezes selected objects and expected-coverage
+   denominators. See [snapshots](docs/en/snapshots.md).
+3. **Structural parse** (`parse`): bounded nested JEZ/ZIP decoding into ordered
+   events. See [archive parsing](docs/en/archive-parsing.md).
+4. **Operational reconstruction** (`reconstruct`, `operational-review`): sessions,
+   anonymous vote cycles and clock rules with explicit uncertainty. See
+   [reconstruction](docs/en/reconstruction.md).
+5. **Releases** (`build`, `validate`, `query`, `report`): immutable DuckDB/Parquet.
+   See [publication](docs/en/publication.md).
+6. **Electoral results** (`import-results`, `electoral-verify`): BWEB and binary BU
+   imports and verification. See [electoral results](docs/en/electoral-results.md).
+7. **Analysis** (`analyze`, `features`, `research-protocol`, `research-models`,
+   `investigations`): descriptive features, frozen partitions, protected final
+   evaluation and append-only ledgers. See [analysis](docs/en/analysis.md) and the
+   [analysis plan](research/analysis-plan.md).
+8. **Reproduction** (`demo`, `pilot`, `review-bundle`, `reproduce`, `backfill`).
+
+National-scale structural processing uses resource-bounded parallel summaries
+instead of materializing every event; see
+[feature-oriented processing](docs/en/feature-oriented-processing.md).
+Each command documents itself:
 
 ```sh
 rtk proxy env UV_OFFLINE=1 just snapshot --help
@@ -43,8 +97,22 @@ rtk proxy just resume --help
 rtk proxy just inspect --help
 ```
 
-Task 7.1 now includes the official `tse-bweb-2026-v1` adapter, verified against real AC runoff bytes and the bundled dictionary. All 2270 presidential sections pass published-row arithmetic checks. Missing choice rows, official totalization linkage, independent final totals and clocks remain unresolved; no canonical result or scientific eligibility is inferred. See the [electoral guide](docs/en/electoral-results.md).
+## Notebooks
 
-Legacy downloader flags, object layout, authoritative `manifest-location.json` and live WAL behavior are preserved. Keep one downloader per raw root. Fresh snapshot capture observes current committed state; reproduce an existing frozen snapshot to avoid changing source observation identities. Additional UFs/ZZ and rounds/history require explicit snapshots/imports.
+The local marimo workspace has coverage, electoral, operational and research
+notebooks. Install the optional dashboard dependencies and supply an explicit
+checksummed dataset. Protected research outcomes stay withheld until a validated
+final evaluation exists. The current dataset covers AC only.
 
-Further work starts at the [implementation index](docs/en/implementation-index.md). See [snapshots](docs/en/snapshots.md), [archive parsing](docs/en/archive-parsing.md), [reconstruction](docs/en/reconstruction.md), [publication](docs/en/publication.md), [electoral imports](docs/en/electoral-results.md), [analysis](docs/en/analysis.md), [research protocol](research/analysis-plan.md) and [acquisition reference](docs/en/acquisition-reference.md). English and Portuguese documents share IDs/revisions and exact commands, SQL, formulas and numerical examples. Mechanical checks complement human translation review.
+```sh
+rtk proxy uv sync --locked --extra dashboard
+rtk proxy just dashboard --dataset data/dashboard-ac-2026-10-30/dataset.json
+```
+
+## Documentation
+
+English and Portuguese documents share IDs, revisions and byte-identical commands,
+SQL, formulas and numbers; `just docs-check` enforces this. See also
+[related work](research/related-work.md), the
+[completion plan](research/completion-plan.md) and the
+[glossary](docs/en/glossary.md).

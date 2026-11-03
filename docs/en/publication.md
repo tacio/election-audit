@@ -1,13 +1,15 @@
 # Operational publication and initial reports
 
-Document-ID: EA-PUBLICATION · Revision: 2 · Language: en
+Document-ID: EA-PUBLICATION · Revision: 3 · Language: en
 
 [Português](../pt-BR/publication.md) · [Implementation index](implementation-index.md)
 
-The pipeline reads frozen artifacts only. Available AC–RJ 2026 presidential runoff
-logs remain a partial national corpus. Acceptance uses synthetic fixtures; no real
-message adapter, authoritative clock rules or real-corpus pilot has been certified.
-Original acquisition, manifest, downloader and bytes are preserved.
+The pipeline reads frozen artifacts only. A release covers exactly the snapshot it
+was built from; a UF subset is partial national coverage. Acceptance used synthetic
+fixtures plus the Phase 9 five-region real pilot; no authoritative clock rules have
+been certified. Reviewed real-message semantics are a separate Phase 13 adapter
+(`operational_review`), not part of these releases. Original acquisition, manifests
+and bytes are preserved.
 
 Stages: frozen snapshot → structural parse/cache → bounded operational
 reconstruction groups → immutable DuckDB/Parquet release → validation → read-only
@@ -106,6 +108,5 @@ Electoral validation is unavailable; reconstructed cycles are not reconciled vot
 Phase 7 extension is implemented through `derivatives.publish_derivative` and a
 manifest-driven parent-chain loader. Base `FACTS` remains unchanged; children pin
 relative parent identities/hashes, add compact/fact storage and reuse parent Parquet.
-See [electoral imports](electoral-results.md) for the usable normalized-only contract,
-query/validation/report integration and the outstanding verified official BU adapter.
-No real BU validation is claimed.
+See [electoral imports](electoral-results.md) for the normalized contract, the official
+BWEB adapter, binary BU verification and query/validation/report integration.

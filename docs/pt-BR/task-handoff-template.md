@@ -1,6 +1,6 @@
 # Modelo de handoff de tarefa
 
-Document-ID: EA-HANDOFF-TEMPLATE · Revision: 1 · Language: pt-BR
+Document-ID: EA-HANDOFF-TEMPLATE · Revision: 2 · Language: pt-BR
 
 Copie para `docs/en/handoffs/task-<ID>.md` e seu correspondente em `docs/pt-BR/`.
 Substitua todos os marcadores. Mantenha o mesmo ID/revisão e comandos, identificadores,
@@ -19,6 +19,8 @@ envie somente este handoff compacto ao próximo agente.
 - Próxima tarefa exata: ID da fase/tarefa e arquivos/contratos mínimos necessários.
 
 Preserve o estado de aquisição e os bytes originais. Nunca alegue cobertura nacional
-integral com AC–RJ ou um subconjunto aprovado. Nunca ajuste modelos neste pipeline.
+integral com um subconjunto de UFs, uma população de desenvolvimento ou uma amostra
+aprovada. Ajuste modelos somente em fases de pesquisa autorizadas, sob protocolo
+congelado.
 Registre indisponibilidade de Git e rede sem inventar commits, verificações de
 download, hashes ou resultados de aceitação.

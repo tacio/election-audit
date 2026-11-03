@@ -1,26 +1,36 @@
-# TSE 2026 presidential runoff logs
+# TSE 2026 presidential election logs
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 1 · Language: en
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 2 · Language: en
 
 [Português](../pt-BR/acquisition-reference.md)
 
-Historical reference preserved from the original README. Dated counts below are
-observations at that time; use `rtk proxy just check` for current checks.
+Reference for the per-section log collector `scripts/download_tse_logs.py`. It
+collects the original section/urn logs of either round of the 2026 presidential
+election, for all 27 states and **ZZ (voting abroad)**: `--round 1` for the
+4 October first round and `--round 2` (the default) for the **25 October 2026**
+runoff. The standalone collector and diagnostic scripts use only the Python
+standard library; the project environment is described in the
+[README](../../README.md).
 
-Collect the original section/urn logs for the **25 October 2026** presidential
-runoff, including all 27 states and **ZZ (voting abroad)**. The standalone collection and diagnostic scripts use only the Python 3.10+
-standard library; the project environment is described above.
+## Retrieval status
 
-## Statistical analysis
+Both rounds are fully collected. These are the final runs; earlier runs were
+interrupted by DNS outages and resumed with `--missing-only`. Run records and logs
+are in `data/phase10/`.
 
-The [analysis protocol](../../research/analysis-plan.md) reviews the Turicas and INEMA
-repositories and specifies a non-parametric statistical audit, required inputs,
-validation, multiplicity controls and conditional outcome-impact bounds. It is a
-research design; the national model has not been fitted and no fraud finding has
-been made. Candidate results from BUs and additional reconciliation are required
-alongside the logs.
+| Round | Pleito / election | Finished (UTC) | Log versions | Aggregated | No log listed | Auxiliary not published | Object bytes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 3220 / 6257 | 2026-10-31 23:27 | 499176 | 17931 | 31 | 41 | 53722200971 |
+| 2 | 3221 / 6258 | 2026-10-29 22:56 | 499177 | 17931 | 30 | 41 | 90643145031 |
 
-Inspect a small sample of the logs already saved, while acquisition continues:
+Each `coverage.json` reports `national_coverage: false` because of the no-log and
+unpublished-auxiliary sections, which stay explicit gaps. Both stores were later
+copied to a larger volume and verified object by object; see the
+[implementation index](implementation-index.md) for current locations.
+
+## Inspecting saved logs
+
+Inspect a small sample of the logs already saved:
 
 ```sh
 python3 scripts/inspect_tse_logs.py --per-uf 2
@@ -36,8 +46,6 @@ sessions, normalize timezones or attribute votes to candidates.
 correction and anonymous-ballot impact bounds. These mathematical helpers do not
 establish the null assumptions or estimate fraudulent votes.
 
-Run all checks with `python3 -m unittest discover -s tests -v` (34 tests currently).
-
 ## Download
 
 ```sh
@@ -49,6 +57,9 @@ Start with a small live check if desired:
 ```sh
 python3 scripts/download_tse_logs.py --ufs ac --limit 5
 ```
+
+Add `--round 1` to any command to collect the first round. Without `--output`, the
+collector writes to `data/tse/2026/turno-<round>/`.
 
 Rerun the full command to refresh all sections; individual cached logs are checked
 against SHA-256 before reuse. Metadata is fetched again to discover newly
@@ -82,9 +93,9 @@ and creates no per-section download tasks. There is no blind state-level skip.
 Omit `--missing-only` to refresh all section auxiliary files, including updates
 which might not have changed the UF index yet.
 
-### Faster parallel downloads
+### Parallel downloads
 
-The collector now defaults to 16 concurrent section workers, with a rolling work
+The collector defaults to 16 concurrent section workers, with a rolling work
 queue that does not wait for a full batch to finish. Request-rate waits use a
 separate lock from file storage. All workers share a single request budget;
 adding workers hides network latency without multiplying that budget.
@@ -106,25 +117,20 @@ new-log counts, not processed-section counts, indicate actual log downloads.
 The coverage report includes global request/download counters and per-state
 activity plus resume-scan time.
 
-Run one downloader process. Separate processes would have separate budgets and
-could exceed the server's aggregate limit or race on the output files. New runs
-take an OS lock on `.download.lock` in the output directory and reject another
-downloader for that directory. This POSIX lock is released automatically on exit;
-the empty file remains and does not mean a process is still running. Older script
-versions do not take the lock, so let any existing old process exit first. A process
-already running continues using its original code/settings until restarted.
-The throughput gain has not been benchmarked against the live TSE service.
+Run one downloader process per output directory. Separate processes would have
+separate budgets and could exceed the server's aggregate limit or race on the
+output files. Each run takes an OS lock on `.download.lock` in the output directory
+and rejects another downloader for that directory. This POSIX lock is released
+automatically on exit; the empty file remains and does not mean a process is still
+running.
 
-Manifest reads and writes now use one SQLite connection guarded by short locks,
-with one immediate write transaction at a time. This avoids competing worker
+Manifest reads and writes use one SQLite connection guarded by short locks, with
+one immediate write transaction at a time. This avoids competing worker
 connections and repeated WAL initialization while retaining parallel network
-requests, checksum checks and archive validation. The database schema and stored
-paths are unchanged; resume with the existing output directory after a lock error.
-The single-connection path passes a 32-worker test with a 1 ms busy timeout on the
-test filesystem; it has not been live-tested on the external HDD.
+requests, checksum checks and archive validation.
 
 Mirror availability and verification requirements are recorded in
-[download-sources.md](../../research/download-sources.md). No raw 2026 runoff mirror
+[download-sources.md](../../research/download-sources.md). No raw 2026 mirror
 has been verified or enabled.
 
 ### Keep the manifest on SSD and logs on HDD
@@ -153,17 +159,14 @@ database available when moving or backing up the data directory. If the recorded
 path is unavailable, the downloader refuses to silently create an empty manifest.
 An existing destination is never overwritten. `.local-state/` is git-ignored.
 
-This change targets manifest I/O; creating the log files still uses the HDD, and
-the actual end-to-end speedup must be measured after restarting.
-
-To use a larger disk, pass `--output /path/on/that/disk/2026-turno-2`.
-The collector reserves 2 GiB of free space and keeps logs compressed. The complete
-collection's size is unknown until retrieval; it may exceed this workspace's
-available space. There is no background download service.
+To use a larger disk, pass `--output /path/on/that/disk/2026-turno-2`. The
+collector keeps a free-space reserve (`--reserve-gib`, default 2) and keeps logs
+compressed. A complete round occupies roughly 54 GB (round 1) to 91 GB (round 2)
+of object bytes, plus the manifest. There is no background download service.
 
 ## Outputs
 
-Under `data/tse/2026/turno-2/`:
+Under the output directory:
 
 - `objects/`: exact downloaded bytes, addressed by SHA-256; original JSON metadata
   and compressed `.jez` logs. JEZ ZIP CRCs are checked before saving.
@@ -191,12 +194,15 @@ choosing the analysis population. The package identifier in the URL is recorded
 separately from our locally calculated SHA-256. Checksums establish reproducible
 bytes; they do not verify TSE digital signatures.
 
-The collector discovers the runoff identifiers from the official configuration
-and requires the federal presidential second round dated 25/10/2026. Official
-documentation currently identifies pleito **3221** and election **6258**.
-It uses 20 requests/second globally by default, below TSE's documented maximum
-of 100. It stops on 403/429 and on an unexpected section error; investigate before
-rerunning. It does not retry a block, missing URL or DNS failure continuously.
+The collector discovers identifiers from the official configuration and requires
+the federal presidential round selected by `--round`: pleito **3220**/election
+**6257** dated 04/10/2026, or pleito **3221**/election **6258** dated 25/10/2026.
+It rejects wrong-round package URLs before resuming. It uses 20 requests/second
+globally by default, below TSE's documented maximum of 100. Network errors,
+timeouts, HTTP 408 and 5xx responses are retried up to four attempts with 1, 2 and
+4 second backoff; a request that still fails stops the run for investigation.
+HTTP 403 and 429 stop immediately to avoid extending a block, and other 4xx
+responses are not retried.
 
 ## Sources and coverage limits
 
@@ -212,21 +218,3 @@ records all log packages currently advertised by TSE. TSE can update auxiliary
 files, and its documentation says they can initially contain only the last
 received package: this is a snapshot of published availability, not a guarantee of
 every historical transmission or every replacement urn ever used.
-
-## Retrieval status on 29 October 2026
-
-The initial smoke test could not resolve TSE's hostname. A subsequent collection
-saved **10,107 log versions**, completing 10,107 principal sections and recording
-359 aggregated sections before stopping in Amazonas. The manifest identified five
-auxiliary files with uppercase `"f": "O"`; the previous phase check incorrectly
-rejected them. Another 210 error rows were cancellation fallout. Both lowercase
-and uppercase official phase flags are now accepted, and cancellation no longer
-hides the original failure or creates error rows for unattempted sections.
-
-Retry with `--missing-only` to continue. Inspect `coverage.json` before analysis;
-this partial collection does not establish national coverage.
-
-Eleven offline tests pass (`python3 -m unittest discover -s tests -v`), covering
-missing-only resumption, corrupted/deleted-object repair, changed metadata,
-multiple package versions, aggregation, official phase casing, cancellation,
-invalid archives, rate-limit stops, disk reserves and election/index selection.

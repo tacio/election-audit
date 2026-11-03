@@ -1,6 +1,6 @@
 # Importações eleitorais e publicações derivadas
 
-Document-ID: EA-ELECTORAL-RESULTS · Revision: 2 · Language: pt-BR
+Document-ID: EA-ELECTORAL-RESULTS · Revision: 3 · Language: pt-BR
 
 [English](../en/electoral-results.md) · [Índice](implementation-index.md) · [Publicação](publication.md)
 
@@ -114,7 +114,7 @@ da disputa, incluindo linhas zero explícitas. Linha ausente é desconhecida.
 Referências finais usam níveis zone/municipality/uf/national, lista exata de
 principais e métricas não vazias de campos do contrato de totais; geografia não usada
 fica como string vazia. População explicitamente nacional inclui exterior (ZZ);
-sua lista declarada não é inferida deste corpus parcial.
+sua lista declarada nunca é inferida dos registros disponíveis.
 
 ```sh
 rtk proxy env UV_OFFLINE=1 just import-results /ssd/audit/releases/PARENT_DIGEST --bundle /ssd/normalized/bundle.json --store /ssd/audit
@@ -174,6 +174,20 @@ Comparação de turnos exige populações disjuntas de principais inteiros, comp
 transferências e eleitorado revisados, resultados completos, par presidencial do
 mesmo ano e ligação exata ao snapshot. Agrega cada turno antes de juntar, preserva
 IDs separados de candidatos e mudanças de eleitorado, sem inferir transferência individual.
+
+## Verificação de conteúdo do BU binário (Fase 12)
+
+`binary_bu` decodifica BUs binários oficiais com o esquema ASN.1 fixado, e
+`electoral_verification` (CLI `electoral-verify`) lê registros BWEB em fluxo,
+preserva os objetos EA18/EA20 e compara exatamente seção, local, urna, emissão e
+escolhas entre BU binário e BWEB. Grava checkpoints retomáveis por seção e um
+`evidence.sqlite` com checksum. `content_verified` certifica somente esse vínculo:
+confiança na assinatura e recontagem do RDV continuam `not_verified`, e não se
+implica completude nacional. O ZIP oficial do ASN.1 retornou HTTP 403; o espelho
+público revisado do esquema está fixado por SHA-256. A execução real cobre as 2270
+seções principais do segundo turno no AC em `data/phase12/ac-round2/`, com contagens
+da UF iguais ao EA20. O [handoff da Fase 12](handoffs/task-12.md) traz a regra de
+compatibilidade para 374 registros antigos e as lacunas restantes.
 
 Entrada da Fase 8: usar caminho fixado da derivada e quatro marts mais visões
 operacionais do pai, verificando disponibilidade e denominadores antes de analisar.

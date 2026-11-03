@@ -1,6 +1,6 @@
 # Reconstrução operacional
 
-Document-ID: EA-RECONSTRUCTION · Revision: 1 · Language: pt-BR
+Document-ID: EA-RECONSTRUCTION · Revision: 2 · Language: pt-BR
 
 [English](../en/reconstruction.md) · [Índice de implementação](implementation-index.md)
 
@@ -9,8 +9,10 @@ nunca a aquisição ativa. `operational-v1` produz sessões candidatas, eventos 
 ordem original, ciclos anônimos, linhagem, problemas originais da análise e resumos
 operacionais. Preserva todas as testemunhas do publicador sem multiplicar eventos
 do conteúdo. As contagens são ciclos anônimos reconstruídos, nunca votos
-reconciliados nem associações com candidatos/RDV. A aceitação é inteiramente
-sintética; nenhum adaptador de mensagens reais ou piloto ativo foi validado. O
+reconciliados nem associações com candidatos/RDV. A aceitação usou
+fixtures sintéticas e o piloto real da Fase 9, em que todas as sessões, ciclos e
+relógios ficaram não resolvidos; regras revisadas de mensagens reais são o adaptador
+separado da Fase 13, `real-operational-v1` (`operational_review`). O
 analisador estrutural de três classes permanece `jez-structural-v1`.
 
 ```sh
@@ -40,8 +42,8 @@ ou tokens. Campos desconhecidos são rejeitados. A correspondência de evento/ha
 valida a proveniência, mas não demonstra que a interpretação humana está correta.
 `reviewed` é uma afirmação de revisão fornecida, não um certificado criptográfico.
 Afirmações não verificadas são preservadas nos metadados sem alterar seleção,
-semântica ou relógios. A Fase 9 deve revisar o significado das fontes e criar
-adaptadores reais testados e versionados.
+semântica ou relógios. Regras testadas e versionadas de mensagens reais
+pertencem a `operational_review` (Fase 13).
 
 | Lista de afirmações | Campos além da revisão/âncoras comuns | Significado |
 | --- | --- | --- |
@@ -150,7 +152,7 @@ com suporte e intervalos de interrupção resolvidos; subtraem-se os segundos de
 interrupção sustentados. Limites desconhecidos, problemas de análise, históricos
 copiados ambíguos ou contexto operacional impedem prontidão de exposição/contagem
 do alvo. Cobertura original completa e ativos ausentes do snapshot permanecem na
-publicação. AC–RJ e qualquer amostra de objetos/seções continuam com cobertura
+publicação. Um subconjunto de UFs e qualquer amostra de objetos/seções continuam com cobertura
 nacional parcial e denominador congelado do índice completo.
 
 ## Interface imutável e grupos limitados

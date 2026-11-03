@@ -1,6 +1,6 @@
 # Operational reconstruction
 
-Document-ID: EA-RECONSTRUCTION · Revision: 1 · Language: en
+Document-ID: EA-RECONSTRUCTION · Revision: 2 · Language: en
 
 [Português](../pt-BR/reconstruction.md) · [Implementation index](implementation-index.md)
 
@@ -9,8 +9,9 @@ acquisition. `operational-v1` emits candidate sessions, ordered events, anonymou
 cycles, lineage, original parser issues and operational summaries. It preserves
 all publisher witnesses without multiplying content events. Counts are anonymous
 reconstructed cycles, never reconciled votes or candidate/RDV associations.
-Acceptance is entirely synthetic; no real message adapter or live pilot has been
-validated. The existing three-class structural parser stays `jez-structural-v1`.
+Acceptance used synthetic fixtures and the Phase 9 real pilot, where every session,
+cycle and clock stayed unresolved; reviewed real-message rules are the separate
+Phase 13 adapter `real-operational-v1` (`operational_review`). The existing three-class structural parser stays `jez-structural-v1`.
 
 ```sh
 rtk proxy env UV_OFFLINE=1 just reconstruct /path/to/parsed/parses/PARSE_DIGEST --store /path/to/operations
@@ -38,7 +39,7 @@ Unknown fields are rejected. Original-event/hash matching validates provenance;
 it cannot establish that a human interpretation is correct. `reviewed` is a
 supplied review assertion, not a cryptographic certificate. Unverified claims are
 retained in metadata and do not alter session selection, semantics or clocks.
-Phase 9 must review source meaning and build tested, versioned real adapters.
+Tested, versioned real-message rules belong to `operational_review` (Phase 13).
 
 | Claim list | Supported fields beyond common review/anchors | Meaning |
 | --- | --- | --- |
@@ -140,7 +141,7 @@ opening/closing at the interval boundaries, supported continuous clocks and
 resolved interruption intervals; subtract supported interruption seconds. Unknown
 boundaries, parse issues, ambiguous copied histories or operational context block
 target exposure/count readiness. Full original snapshot coverage and missing
-assets remain in the publication. AC–RJ and any object/section sample remain
+assets remain in the publication. A UF subset and any object/section sample remain
 partial national coverage with the frozen full-index denominator.
 
 ## Immutable interface and bounded shards

@@ -1,6 +1,6 @@
 # Frozen archive parsing
 
-Document-ID: EA-ARCHIVE-PARSING · Revision: 1 · Language: en
+Document-ID: EA-ARCHIVE-PARSING · Revision: 2 · Language: en
 
 [Português](../pt-BR/archive-parsing.md) · [Implementation index](implementation-index.md)
 
@@ -8,9 +8,11 @@ Phase 4 reads only completed [snapshots](snapshots.md). `parse_snapshot` calls
 `inspect_snapshot(..., verify_objects=True)` and `snapshot_tables`, then opens
 the frozen relative `source_object.storage_locator`. Original acquisition paths
 under `payload.inventory` are evidence, never parser inputs. Acquisition and
-snapshot bytes remain unchanged. No real corpus parsing has been run; the bounded
-real-data pilot belongs to Phase 9. AC–RJ remains partial national coverage, and
-section samples retain the frozen whole-UF denominator.
+snapshot bytes remain unchanged. The Phase 9 five-region pilot ran this parser on
+real objects. The national runoff pass used the fused summary parser in
+[feature-oriented processing](feature-oriented-processing.md), which keeps the same
+guards and message classes. A UF subset is partial national coverage, and section
+samples retain the frozen whole-UF denominator.
 
 ```sh
 rtk proxy env UV_OFFLINE=1 just parse /path/to/derived/SNAPSHOT_DIGEST --store /path/to/parsed
@@ -78,8 +80,8 @@ bodies and sensitive tokens are never selected into events or diagnostics.
 These are the only three decoded classes in `jez-structural-v1`. All other
 messages/applications remain `unknown` with `unsupported_message_class` evidence.
 Every event keeps `selection_state=context_unresolved`, including setup and mixed
-date/round contexts. Later semantics require versioned adapter extensions against
-original evidence. A manual request is not a completed authorization or cycle.
+date/round contexts. Reviewed real-message semantics live in the separate Phase 13
+adapter `real-operational-v1` (`operational_review`), anchored to original evidence. A manual request is not a completed authorization or cycle.
 Completion messages are not reconciled vote totals.
 
 `source_line_sha256` hashes the exact original physical line, including its
@@ -127,8 +129,9 @@ DuckDB/Parquet publication, feature fitting or fraud labeling occurs here.
 Acceptance used only isolated synthetic fixtures: nested/duplicate members, CRC
 corruption, missing logs, malformed/oversized lines, all guards, repeated equal
 messages, mixed contexts, redaction, distinct unknown fingerprints, cache damage,
-interruption, frozen-only reads and multiple package/snapshot associations. All
-15 parser fixtures and all 83 repository tests passed; recipe help also passed.
+interruption, frozen-only reads and multiple package/snapshot associations. At
+Phase 4 acceptance all 15 parser fixtures and all 83 repository tests passed; recipe
+help also passed.
 
 ```sh
 rtk proxy env UV_OFFLINE=1 UV_CACHE_DIR=/tmp/election-audit-uv-cache uv run --locked python -m unittest discover -s tests -p test_archive_parsing.py -v
