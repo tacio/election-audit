@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 20 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 21 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -93,9 +93,8 @@ reutilizadas, mas nada foi executado em escala nacional:
 Não existe resultado eleitoral nacional, margem nacional, modelo nacional ajustado
 nem rótulo de fraude.
 
-**Verificações.** Os 306 testes offline passam. `just check` hoje para em
-`ruff format --check`, que reformataria `election_audit/research_models.py`
-e `election_audit/electoral_references.py`.
+**Verificações.** A verificação offline completa `just check` passa (lock, formato,
+lint, contratos, documentos, comandos documentados e todos os 306 testes).
 
 ## Próximo passo
 

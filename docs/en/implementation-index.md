@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 20 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 21 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -88,9 +88,8 @@ nationally:
 No national electoral result, national margin, fitted national model or fraud
 label exists.
 
-**Checks.** All 306 offline tests pass. `just check` currently stops at
-`ruff format --check`, which would reformat `election_audit/research_models.py`
-and `election_audit/electoral_references.py`.
+**Checks.** The full offline gate `just check` passes (lock, format, lint,
+contracts, docs, documented commands and all 306 tests).
 
 ## Next step
 

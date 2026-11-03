@@ -597,7 +597,15 @@ def perturb_mechanism(records, mechanism, *, seed, fraction, concentration):
 
 
 def run_mechanism_validation(
-    training, calibration, evaluation, output, *, fit_calibrate_score, callback_id, specification, max_experiments=None
+    training,
+    calibration,
+    evaluation,
+    output,
+    *,
+    fit_calibrate_score,
+    callback_id,
+    specification,
+    max_experiments=None,
 ):
     """Resume per-mechanism/seed refit experiments; callback must run the complete estimator pipeline.
 
@@ -800,7 +808,14 @@ def mechanism_refit_callback(manifest):
 
 
 def validate_mechanisms(
-    features, protocol, model_path, output, *, max_experiments=None, histories=None
+    features,
+    protocol,
+    model_path,
+    output,
+    *,
+    max_experiments=None,
+    histories=None,
+    repetitions=None,
 ):
     """Refit on reconciled development-copy injections, never the protected test set."""
     document = load_protocol(protocol)
@@ -861,8 +876,9 @@ def validate_mechanisms(
         raise ValueError("Need separate development calibration and injection evaluation locations")
     spec = dict(document["identity"]["design"]["simulations"])
     if repetitions is not None:
-        if not 1<=repetitions<=spec["repetitions"]:raise ValueError("Invalid bounded repetition subset")
-        spec["repetitions"]=repetitions
+        if not 1 <= repetitions <= spec["repetitions"]:
+            raise ValueError("Invalid bounded repetition subset")
+        spec["repetitions"] = repetitions
     callback_id = digest(
         [
             VERSION,
@@ -895,7 +911,7 @@ def research_models_main(argv=None):
     parser.add_argument("--variant", default="no_first_round")
     parser.add_argument("--final", action="store_true")
     parser.add_argument("--max-experiments", type=int)
-    parser.add_argument("--repetitions",type=int)
+    parser.add_argument("--repetitions", type=int)
     parser.add_argument("--sanitized-histories", type=Path)
     args = parser.parse_args(argv)
     if args.action == "fit":
