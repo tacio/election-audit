@@ -124,6 +124,10 @@ docs-command-check:
 national *args:
     rtk proxy uv run --locked election-audit national "$@"
 
+# Benchmark read orders or stage certified raw objects onto a new verified root.
+stage-sources *args:
+    rtk proxy uv run --locked election-audit stage-sources "$@"
+
 # Open the local marimo notebook gallery against an explicit dataset.
 dashboard *args:
     rtk proxy uv run --locked --extra dashboard election-audit dashboard "$@"

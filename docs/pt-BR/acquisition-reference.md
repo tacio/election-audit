@@ -1,6 +1,6 @@
 # Logs da eleição presidencial de 2026 do TSE
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 3 · Language: pt-BR
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 4 · Language: pt-BR
 
 [English](../en/acquisition-reference.md)
 
@@ -165,6 +165,31 @@ mantém uma reserva de espaço livre (`--reserve-gib`, padrão 2) e guarda os lo
 comprimidos. Um turno completo ocupa de cerca de 54 GB (primeiro turno) a 91 GB
 (segundo turno) em bytes de objetos, além do manifesto. Não há serviço de download
 em segundo plano.
+
+### Cópia certificada dos objetos para o SSD
+
+Passadas sobre os logs brutos leem uma cópia verificada por hash no SSD, não o disco
+rotacional. `stage-sources copy` copia cada objeto de uma cópia certificada do
+manifesto para uma nova raiz, com os mesmos caminhos relativos. Confere cada corpo de
+origem com o SHA-256 do manifesto durante a leitura, descarrega no disco, recalcula o
+hash de cada corpo copiado e recusa arquivos faltantes ou extras. Retoma com
+`--resume`, mantém um piso de espaço livre e grava na raiz a cópia do manifesto,
+`staging-ledger.sqlite` e `staging-certificate.json`. `stage-sources benchmark`
+compara antes as ordens de leitura em janelas novas e disjuntas; no disco de dados
+rotacional, leia em ordem física, nunca em ordem de seção (URL do manifesto).
+
+```sh
+just stage-sources benchmark \
+  --certificate /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/2026/migration-2026-11-01/certificate-r2.json \
+  --manifest /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/2026/migration-2026-11-01/manifest-r2.sqlite \
+  --output ~/data/election-audit-stage/benchmarks/20261103-r2-url/results.json \
+  --window 2000 --orders url path physical --seed 7
+just stage-sources copy \
+  --certificate /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/2026/migration-2026-11-01/certificate-r2.json \
+  --manifest /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/2026/migration-2026-11-01/manifest-r2.sqlite \
+  --destination ~/data/election-audit-stage/2026/turno-2 \
+  --order physical --floor-gib 100
+```
 
 ## Saídas
 

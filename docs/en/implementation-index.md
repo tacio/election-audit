@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 21 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 22 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -60,10 +60,21 @@ There are no sessions, clocks or timings. The 596 protected/stress logs and all 
 round 1 are unprocessed. Every operational measure needs the semantic pass of
 Phase 21.
 
-Throughput was limited by the disk, not the CPU: 91.5 GB of small objects read at
-about 2.5 MB/s with 94% I/O pressure, while the checkpoints were written to the
-same drive. Both data drives are rotational and the SSD root has about 25 GB free,
-so a naive full pass still costs about 10 hours per round. The
+Phase 11 read 91.5 GB of small objects at about 2.5 MB/s with 94% I/O pressure,
+while writing checkpoints to the same drive. The 3 November benchmark
+(`stage-sources benchmark`, 2000-object windows, both rounds) found the cause: read
+order. The certified copies were written in path order, so section (manifest URL)
+order reads at 1.9–3.5 MB/s, path order at 41–61 MB/s and physical (FIEMAP) order
+at 73–92 MB/s.
+
+**SSD staging (3 November): done for both rounds.** Every raw object was copied in
+physical order to `~/data/election-audit-stage/2026/turno-1/` and `turno-2/`
+(998412 and 998413 objects, 53722200971 and 90643145031 bytes), each source body
+checked against the certified manifest SHA-256, then every staged body re-hashed
+on the SSD. The copies took 931 s and 1587 s (about 57 MB/s), the re-hashes 954 s
+and 1431 s; 86 minutes in all. Each root holds its manifest copy, a ledger and a
+`staging-certificate.json` bound to the certified manifest digest. The home
+directory is eCryptfs, so one reader re-hashes at only 56–63 MB/s. The
 [completion plan](../../research/completion-plan.md#resource-and-io-rules) sets
 the I/O rules for the next pass.
 
@@ -89,15 +100,16 @@ No national electoral result, national margin, fitted national model or fraud
 label exists.
 
 **Checks.** The full offline gate `just check` passes (lock, format, lint,
-contracts, docs, documented commands and all 306 tests).
+contracts, docs, documented commands and all 314 tests).
 
 ## Next step
 
-Phase 19 (national inputs) under the revised plan. The
+Phase 19 (national inputs) under the revised plan; its first step, staging both
+rounds' raw logs on the SSD, is done. The
 [study protocol](../../research/analysis-plan.md) (Revision 2) defines the claims,
 the threat-to-observable map, the integrity checks I1–I9, the confirmatory tests
 C1–C6, the power study and the data policy; the
-[completion plan](../../research/completion-plan.md) (Revision 10) defines
+[completion plan](../../research/completion-plan.md) (Revision 11) defines
 Phases 19–26. The protocol is a draft until it is frozen and publicly
 pre-registered in Phase 23.
 
@@ -178,6 +190,8 @@ paths are on the reference machine's output volume
 | --- | --- |
 | Raw originals, both rounds (authoritative copies) | `raw/2026/turno-1/`, `raw/2026/turno-2/` on the output volume |
 | Copy certificates, certified manifest copies (analysis inputs), verification ledgers | `2026/migration-2026-11-01/` on the output volume |
+| Hash-verified SSD staging of both rounds (read these in log passes), with staging certificates | `~/data/election-audit-stage/2026/turno-1/`, `~/data/election-audit-stage/2026/turno-2/` |
+| Read-order benchmarks | `~/data/election-audit-stage/benchmarks/` |
 | Original acquisition roots and manifests (preserved) | `/media/tacio/HDD/Data/tse/data/tse/2026/`, `.local-state/` |
 | Acquisition run logs and launch records | `data/phase10/` |
 | Phase 11 runoff summary release | `2026/runoff-summary-analysis-full-20261102/` on the output volume |
@@ -194,9 +208,9 @@ paths are on the reference machine's output volume
 | Area | Modules and guides |
 | --- | --- |
 | Runtime | `pyproject.toml`, `uv.lock`, `.python-version`; `uv sync --locked` |
-| CLI | `election_audit/cli.py`. Legacy: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensions: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export` |
+| CLI | `election_audit/cli.py`. Legacy: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensions: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export stage-sources` |
 | Recipes | `justfile`; one recipe per CLI command plus `setup doctor fmt lint test contracts-check docs-check docs-command-check check` |
-| Acquisition | `scripts/download_tse_logs.py` (`--round 1` or `--round 2`), `election_audit/elections.py`; [acquisition reference](acquisition-reference.md) |
+| Acquisition | `scripts/download_tse_logs.py` (`--round 1` or `--round 2`), `election_audit/elections.py`; SSD staging `source_staging` (`stage-sources`); [acquisition reference](acquisition-reference.md) |
 | Snapshot/source/coverage | `source_inventory`, `coverage`, `snapshots`; [snapshots](snapshots.md) |
 | Structural parse | `archive_parsing` (`jez-structural-v1`); [archive parsing](archive-parsing.md) |
 | Operational reconstruction | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Phase 13); [reconstruction](reconstruction.md) |

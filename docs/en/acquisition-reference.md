@@ -1,6 +1,6 @@
 # TSE 2026 presidential election logs
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 3 · Language: en
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 4 · Language: en
 
 [Português](../pt-BR/acquisition-reference.md)
 
@@ -169,6 +169,31 @@ To use a larger disk, pass `--output /path/on/that/disk/2026-turno-2`. The
 collector keeps a free-space reserve (`--reserve-gib`, default 2) and keeps logs
 compressed. A complete round occupies roughly 54 GB (round 1) to 91 GB (round 2)
 of object bytes, plus the manifest. There is no background download service.
+
+### Stage certified objects on the SSD
+
+Passes over the raw logs read a hash-verified copy on the SSD, not the rotational
+drive. `stage-sources copy` copies every object of a certified manifest copy into a
+new root under the same relative paths. It checks each source body against the
+manifest SHA-256 while reading, flushes, re-hashes every staged body and refuses
+missing or extra files. It resumes with `--resume`, keeps a free-space floor and
+writes the manifest copy, `staging-ledger.sqlite` and `staging-certificate.json`
+into the root. `stage-sources benchmark` first compares read orders on fresh,
+disjoint windows; on the rotational data drive, read in physical order, never in
+section (manifest URL) order.
+
+```sh
+just stage-sources benchmark \
+  --certificate /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/2026/migration-2026-11-01/certificate-r2.json \
+  --manifest /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/2026/migration-2026-11-01/manifest-r2.sqlite \
+  --output ~/data/election-audit-stage/benchmarks/20261103-r2-url/results.json \
+  --window 2000 --orders url path physical --seed 7
+just stage-sources copy \
+  --certificate /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/2026/migration-2026-11-01/certificate-r2.json \
+  --manifest /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/2026/migration-2026-11-01/manifest-r2.sqlite \
+  --destination ~/data/election-audit-stage/2026/turno-2 \
+  --order physical --floor-gib 100
+```
 
 ## Outputs
 

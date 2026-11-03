@@ -1,6 +1,6 @@
 # 2026 audit completion plan
 
-Document-ID: EA-COMPLETION-PLAN · Revision: 10 · Language: en
+Document-ID: EA-COMPLETION-PLAN · Revision: 11 · Language: en
 
 [Português](completion-plan.pt-BR.md) · [Study protocol](analysis-plan.md)
 
@@ -46,18 +46,25 @@ semantic pass of Phase 21.
 
 ## Resource and I/O rules
 
-The machine has two rotational data drives and an SSD root with about 25 GB free.
-Phase 11 read 91.5 GB at about 2.5 MB/s with 94% I/O pressure, while writing
-68.8 GB of checkpoints to the same drive to produce a 547 MB release. Small random reads, not CPU, set the pace.
-Every full pass must therefore:
+The machine has two rotational data drives and an NVMe root (eCryptfs home, about
+241 GB free on 3 November after staging). Phase 11 read 91.5 GB at about 2.5 MB/s
+with 94% I/O pressure, while writing 68.8 GB of checkpoints to the same drive to
+produce a 547 MB release. The 3 November benchmark traced this to read order: on
+the data drive, section (manifest URL) order reads at 1.9–3.5 MB/s and physical
+order at 73–92 MB/s. Both 2026 rounds are now staged on the SSD with hash
+certificates (144.4 GB in 86 minutes). Every full pass must therefore:
 
-- benchmark the read order first (manifest order vs on-disk order) on a sample;
-- keep checkpoint and output volume proportional to the result, on a different
-  spindle from the source being read;
-- consider fusing a one-time sequential repack of the raw objects onto the other
-  drive into the first pass, so later passes read sequentially;
+- read raw objects from the certified SSD staging or, on a rotational drive, in
+  physical or path order, never in section order, and group results afterwards;
+- benchmark parallel reads on the SSD before choosing worker counts (one reader
+  re-hashed at 56–63 MB/s through eCryptfs);
+- keep checkpoint and output volume proportional to the result, off the drive
+  being read;
+- write large, sequentially read archives (bulk TSE zips) to the ext4 data drive,
+  not to the SSD or the shared NTFS drive;
 - stay within half the CPU, 4 GiB of aggregate RAM and one library thread per
-  process, with explicit SSD and HDD free-space floors.
+  process, with explicit SSD and HDD free-space floors (staging used 100 GiB on the
+  SSD).
 
 ## Data policy
 

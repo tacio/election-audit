@@ -39,6 +39,7 @@ def main(argv=None):
         "investigations": ("election_audit.investigations", "investigations_main"),
         "dashboard": ("election_audit.dashboard", "dashboard_main"),
         "dashboard-export": ("election_audit.dashboard", "dashboard_export_main"),
+        "stage-sources": ("election_audit.source_staging", "stage_sources_main"),
     }
     if args and args[0] in extension_commands:
         module, function = extension_commands[args[0]]

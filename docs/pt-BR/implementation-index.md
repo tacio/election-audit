@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 21 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 22 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -63,11 +63,23 @@ não são medidas do segundo turno. Não há sessões, relógios nem tempos. Os 
 protegidos/de estresse e todo o primeiro turno não foram processados. Toda medida
 operacional precisa da passada semântica da Fase 21.
 
-O disco, não a CPU, limitou a vazão: 91.5 GB de objetos pequenos lidos a cerca de
-2.5 MB/s com 94% de pressão de E/S, enquanto os checkpoints eram gravados no mesmo
-disco. Os dois discos de dados são rotacionais e a raiz SSD tem cerca de 25 GB
-livres, então uma passada completa ingênua ainda custa cerca de 10 horas por turno.
-O [plano de conclusão](../../research/completion-plan.pt-BR.md#regras-de-recursos-e-es)
+A Fase 11 leu 91.5 GB de objetos pequenos a cerca de 2.5 MB/s com 94% de pressão
+de E/S, enquanto gravava checkpoints no mesmo disco. O benchmark de 3 de novembro
+(`stage-sources benchmark`, janelas de 2000 objetos, os dois turnos) achou a causa:
+a ordem de leitura. As cópias certificadas foram gravadas em ordem de caminho, então
+a ordem de seção (URL do manifesto) lê a 1.9–3.5 MB/s, a ordem de caminho a
+41–61 MB/s e a ordem física (FIEMAP) a 73–92 MB/s.
+
+**Cópia para o SSD (3 de novembro): concluída nos dois turnos.** Todo objeto bruto
+foi copiado em ordem física para `~/data/election-audit-stage/2026/turno-1/` e
+`turno-2/` (998412 e 998413 objetos, 53722200971 e 90643145031 bytes); cada corpo de
+origem foi conferido com o SHA-256 do manifesto certificado e depois cada corpo
+copiado foi recalculado no SSD. As cópias levaram 931 s e 1587 s (cerca de
+57 MB/s), as reverificações 954 s e 1431 s; 86 minutos no total. Cada raiz guarda
+sua cópia do manifesto, um ledger e um `staging-certificate.json` vinculado ao hash
+do manifesto certificado. O diretório home é eCryptfs, então um único leitor
+reverifica a apenas 56–63 MB/s. O
+[plano de conclusão](../../research/completion-plan.pt-BR.md#regras-de-recursos-e-es)
 define as regras de E/S para a próxima passada.
 
 **Fases 12–18: encerradas como pilotos de desenvolvimento do Acre (AC).** A revisão
@@ -94,15 +106,16 @@ Não existe resultado eleitoral nacional, margem nacional, modelo nacional ajust
 nem rótulo de fraude.
 
 **Verificações.** A verificação offline completa `just check` passa (lock, formato,
-lint, contratos, documentos, comandos documentados e todos os 306 testes).
+lint, contratos, documentos, comandos documentados e todos os 314 testes).
 
 ## Próximo passo
 
-Fase 19 (entradas nacionais) no plano revisado. O
+Fase 19 (entradas nacionais) no plano revisado; seu primeiro passo, copiar os logs
+brutos dos dois turnos para o SSD, está concluído. O
 [protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 2) define as
 afirmações, o mapa de ameaças e observáveis, as verificações de integridade I1–I9, os
 testes confirmatórios C1–C6, o estudo de poder e a política de dados; o
-[plano de conclusão](../../research/completion-plan.pt-BR.md) (Revisão 10) define as
+[plano de conclusão](../../research/completion-plan.pt-BR.md) (Revisão 11) define as
 Fases 19–26. O protocolo é um rascunho até ser congelado e pré-registrado
 publicamente na Fase 23.
 
@@ -184,6 +197,8 @@ absolutos ficam no volume de saída da máquina de referência
 | --- | --- |
 | Originais brutos dos dois turnos (cópias de referência) | `raw/2026/turno-1/`, `raw/2026/turno-2/` no volume de saída |
 | Certificados de cópia, cópias certificadas dos manifestos (entradas da análise), ledgers de verificação | `2026/migration-2026-11-01/` no volume de saída |
+| Cópia verificada por hash dos dois turnos no SSD (leia estas nas passadas de logs), com certificados | `~/data/election-audit-stage/2026/turno-1/`, `~/data/election-audit-stage/2026/turno-2/` |
+| Benchmarks de ordem de leitura | `~/data/election-audit-stage/benchmarks/` |
 | Raízes e manifestos originais da coleta (preservados) | `/media/tacio/HDD/Data/tse/data/tse/2026/`, `.local-state/` |
 | Logs de execução e registros de lançamento da coleta | `data/phase10/` |
 | Release de resumos do segundo turno da Fase 11 | `2026/runoff-summary-analysis-full-20261102/` no volume de saída |
@@ -200,9 +215,9 @@ absolutos ficam no volume de saída da máquina de referência
 | Área | Módulos e guias |
 | --- | --- |
 | Ambiente | `pyproject.toml`, `uv.lock`, `.python-version`; `uv sync --locked` |
-| CLI | `election_audit/cli.py`. Legados: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensões: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export` |
+| CLI | `election_audit/cli.py`. Legados: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensões: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export stage-sources` |
 | Receitas | `justfile`; uma receita por comando da CLI, mais `setup doctor fmt lint test contracts-check docs-check docs-command-check check` |
-| Coleta | `scripts/download_tse_logs.py` (`--round 1` ou `--round 2`), `election_audit/elections.py`; [referência de coleta](acquisition-reference.md) |
+| Coleta | `scripts/download_tse_logs.py` (`--round 1` ou `--round 2`), `election_audit/elections.py`; cópia para SSD `source_staging` (`stage-sources`); [referência de coleta](acquisition-reference.md) |
 | Snapshot/origem/cobertura | `source_inventory`, `coverage`, `snapshots`; [snapshots](snapshots.md) |
 | Parse estrutural | `archive_parsing` (`jez-structural-v1`); [parse de arquivos](archive-parsing.md) |
 | Reconstrução operacional | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Fase 13); [reconstrução](reconstruction.md) |

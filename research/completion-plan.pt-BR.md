@@ -1,6 +1,6 @@
 # Plano de conclusão da auditoria de 2026
 
-Document-ID: EA-COMPLETION-PLAN · Revision: 10 · Language: pt-BR
+Document-ID: EA-COMPLETION-PLAN · Revision: 11 · Language: pt-BR
 
 [English](completion-plan.md) · [Protocolo do estudo](analysis-plan.pt-BR.md)
 
@@ -46,19 +46,26 @@ operacional precisa, portanto, da passada semântica da Fase 21.
 
 ## Regras de recursos e E/S
 
-A máquina tem dois discos de dados rotacionais e uma raiz SSD com cerca de 25 GB
-livres. A Fase 11 leu 91.5 GB a cerca de 2.5 MB/s com 94% de pressão de E/S,
-enquanto gravava 68.8 GB de checkpoints no mesmo disco para produzir uma release de
-547 MB. Leituras aleatórias pequenas, não a CPU, ditam o ritmo. Toda passada completa deve, portanto:
+A máquina tem dois discos de dados rotacionais e uma raiz NVMe (home em eCryptfs,
+cerca de 241 GB livres em 3 de novembro depois da cópia). A Fase 11 leu 91.5 GB a
+cerca de 2.5 MB/s com 94% de pressão de E/S, enquanto gravava 68.8 GB de checkpoints
+no mesmo disco para produzir uma release de 547 MB. O benchmark de 3 de novembro
+atribuiu isso à ordem de leitura: no disco de dados, a ordem de seção (URL do
+manifesto) lê a 1.9–3.5 MB/s e a ordem física a 73–92 MB/s. Os dois turnos de 2026
+estão agora copiados no SSD com certificados de hash (144.4 GB em 86 minutos). Toda
+passada completa deve, portanto:
 
-- medir antes a ordem de leitura (ordem do manifesto vs ordem no disco) numa
-  amostra;
-- manter o volume de checkpoints e saídas proporcional ao resultado, num disco
-  diferente do que está sendo lido;
-- considerar fundir à primeira passada um reempacotamento sequencial único dos
-  objetos brutos no outro disco, para que passadas seguintes leiam em sequência;
+- ler objetos brutos da cópia certificada no SSD ou, num disco rotacional, em ordem
+  física ou de caminho, nunca em ordem de seção, e agrupar os resultados depois;
+- medir leituras paralelas no SSD antes de escolher o número de workers (um leitor
+  reverificou a 56–63 MB/s pelo eCryptfs);
+- manter o volume de checkpoints e saídas proporcional ao resultado, fora do disco
+  que está sendo lido;
+- gravar arquivos grandes de leitura sequencial (zips em massa do TSE) no disco de
+  dados ext4, não no SSD nem no disco NTFS compartilhado;
 - ficar dentro de metade da CPU, 4 GiB de RAM agregada e uma thread de biblioteca por
-  processo, com pisos explícitos de espaço livre no SSD e no HDD.
+  processo, com pisos explícitos de espaço livre no SSD e no HDD (a cópia usou
+  100 GiB no SSD).
 
 ## Política de dados
 
