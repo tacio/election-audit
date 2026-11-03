@@ -16,6 +16,20 @@ dependencies = [
 [project.scripts]
 election-audit = "election_audit.cli:main"
 
+[project.optional-dependencies]
+dashboard = [
+    "altair==6.3.0",
+    "marimo==0.25.0",
+]
+research = [
+    "quantile-forest==1.4.2",
+    "scikit-learn>=1.9.1",
+]
+verification = [
+    "asn1tools>=0.169.0",
+    "cryptography>=50.0.2",
+]
+
 [dependency-groups]
 dev = ["ruff==0.17.0"]
 

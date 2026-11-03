@@ -86,6 +86,10 @@ class _Parser:
         self.incomplete = False
         self.log_members = 0
 
+    def member_buffer(self):
+        """Seekable member storage; subclasses may provide a bounded RAM spool."""
+        return tempfile.TemporaryFile(dir=self.directory)
+
     def issue(self, code, segments, *, line=None, severity="error", **details):
         # No exception text, raw messages, line samples, tokens or personal IDs.
         self.incomplete |= severity == "error"
@@ -219,7 +223,7 @@ class _Parser:
                         self.issue("expanded_size_limit", nested, limit=self.config.max_total_bytes)
                         continue
                     # Seekable nested ZIPs use disk, never archive-sized memory buffers.
-                    with tempfile.TemporaryFile(dir=self.directory) as body:
+                    with self.member_buffer() as body:
                         try:
                             with archive.open(member) as source:
                                 size = 0

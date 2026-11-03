@@ -119,3 +119,39 @@ backfill *args:
 # Inspect example commands/flags and SQL syntax, invoking only harmless CLI --help.
 docs-command-check:
     rtk proxy uv run --locked python -m scripts.check_doc_commands
+
+# Preflight, resume or inspect bounded national processing.
+national *args:
+    rtk proxy uv run --locked election-audit national "$@"
+
+# Open the local marimo notebook gallery against an explicit dataset.
+dashboard *args:
+    rtk proxy uv run --locked --extra dashboard election-audit dashboard "$@"
+
+# Export a checksummed portable exploration dataset.
+dashboard-export *args:
+    rtk proxy uv run --locked election-audit dashboard-export "$@"
+
+# Verify binary BU linkage and electoral evidence.
+electoral-verify *args:
+    rtk proxy uv run --locked --extra verification election-audit electoral-verify "$@"
+
+# Review real operational rules over structural shards.
+operational-review *args:
+    rtk proxy uv run --locked election-audit operational-review "$@"
+
+# Produce harmonized feature ledgers.
+features *args:
+    rtk proxy uv run --locked election-audit features "$@"
+
+# Freeze a grouped research protocol and protected evaluation population.
+research-protocol *args:
+    rtk proxy uv run --locked election-audit research-protocol "$@"
+
+# Fit, evaluate or simulate a frozen research specification.
+research-models *args:
+    rtk proxy uv run --locked --extra research election-audit research-models "$@"
+
+# Build evidence packets and explicitly conditional impact scenarios.
+investigations *args:
+    rtk proxy uv run --locked --extra research election-audit investigations "$@"

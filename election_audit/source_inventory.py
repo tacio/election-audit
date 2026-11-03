@@ -15,7 +15,8 @@ from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
-from scripts.download_tse_logs import BASE, manifest_path
+from election_audit.elections import coerce_election
+from scripts.download_tse_logs import BASE, manifest_path, validate_manifest_round
 
 INVENTORY_VERSION = "legacy-manifest-inventory-v1"
 IDENTITY_VERSION = "canonical-json-sha256-v1"
@@ -23,13 +24,7 @@ DEFAULT_UFS = tuple("ac al am ap ba ce df es go ma mg ms mt pa pb pe pi pr rj".s
 ALL_UFS = tuple(
     "ac al am ap ba ce df es go ma mg ms mt pa pb pe pi pr rj rn ro rr rs sc se sp to zz".split()
 )
-ELECTION = {
-    "year": 2026,
-    "pleito_code": "3221",
-    "election_code": "6258",
-    "round": 2,
-    "election_date": "2026-10-25",
-}
+ELECTION = coerce_election().as_dict()
 
 
 def canonical(value) -> bytes:
@@ -54,18 +49,21 @@ def section_key(row) -> tuple[str, str, str, str]:
     return row["uf"], row["municipality"], row["zone"], row["section"]
 
 
-def section_directory(key) -> str:
+def section_directory(key, election=None) -> str:
+    pleito = coerce_election(election).pleito_code
     uf, municipality, zone, section = key
-    return f"{BASE}/ele2026/arquivo-urna/3221/dados/{uf}/{municipality}/{zone}/{section}"
+    return f"{BASE}/ele2026/arquivo-urna/{pleito}/dados/{uf}/{municipality}/{zone}/{section}"
 
 
-def aux_url(key) -> str:
+def aux_url(key, election=None) -> str:
+    pleito = coerce_election(election).pleito_code
     uf, municipality, zone, section = key
-    return f"{section_directory(key)}/p003221-{uf}-m{municipality}-z{zone}-s{section}-aux.json"
+    return f"{section_directory(key, election)}/p{int(pleito):06d}-{uf}-m{municipality}-z{zone}-s{section}-aux.json"
 
 
-def index_url(uf: str) -> str:
-    return f"{BASE}/ele2026/arquivo-urna/3221/config/{uf}/{uf}-p003221-cs.json"
+def index_url(uf: str, election=None) -> str:
+    pleito = coerce_election(election).pleito_code
+    return f"{BASE}/ele2026/arquivo-urna/{pleito}/config/{uf}/{uf}-p{int(pleito):06d}-cs.json"
 
 
 def safe_source(root: Path, relative: str) -> Path:
@@ -89,13 +87,17 @@ def hash_file(path: Path) -> tuple[str, int]:
     return hasher.hexdigest(), length
 
 
-def read_manifest(root: Path, ufs=DEFAULT_UFS, *, section_keys=None) -> dict:
+def read_manifest(
+    root: Path, ufs=DEFAULT_UFS, *, section_keys=None, election=None, source_manifest=None
+) -> dict:
     """Freeze selected rows in one read transaction, including committed WAL.
 
     ``mode=ro`` intentionally does not use SQLite's ``immutable`` flag, which
     would ignore a live WAL. No collector lock or write transaction is taken.
     Running rows mean unfinished at capture; they do not prove process liveness.
     """
+    election = coerce_election(election)
+    pleito = election.pleito_code
     root = Path(root).resolve()
     ufs = tuple(sorted(set(ufs)))
     if not ufs or not set(ufs) <= set(ALL_UFS):
@@ -116,7 +118,9 @@ def read_manifest(root: Path, ufs=DEFAULT_UFS, *, section_keys=None) -> dict:
         raise ValueError(
             "Section keys require selected UF and zero-padded municipality/zone/section"
         )
-    manifest = manifest_path(root).resolve()
+    manifest = (
+        Path(source_manifest) if source_manifest is not None else manifest_path(root)
+    ).resolve()
     placeholders = ",".join("?" for _ in ufs)
     with closing(sqlite3.connect(manifest.as_uri() + "?mode=ro", uri=True)) as connection:
         connection.row_factory = sqlite3.Row
@@ -124,6 +128,7 @@ def read_manifest(root: Path, ufs=DEFAULT_UFS, *, section_keys=None) -> dict:
         connection.execute("BEGIN")
         # First SELECT establishes the consistent read view, before any other table.
         runs = [dict(row) for row in connection.execute("SELECT * FROM runs ORDER BY id")]
+        validate_manifest_round(connection, pleito)
         captured_at = utc_now()
         predicate = f"uf IN ({placeholders})"
         parameters = ufs
@@ -148,16 +153,16 @@ def read_manifest(root: Path, ufs=DEFAULT_UFS, *, section_keys=None) -> dict:
         ]
         urls = {
             f"{BASE}/comum/config/ele-c.json",
-            *(index_url(uf) for uf in ufs),
+            *(index_url(uf, election) for uf in ufs),
             *(row["url"] for row in logs),
-            *(aux_url(section_key(row)) for row in sections),
+            *(aux_url(section_key(row), election) for row in sections),
         }
         # Include current files even if collection stopped before recording logs.
         # An explicit section selection bounds raw-object reads for later pilots.
         prefixes = (
-            [f"{section_directory(key)}/" for key in selected]
+            [f"{section_directory(key, election)}/" for key in selected]
             if selected is not None
-            else [f"{BASE}/ele2026/arquivo-urna/3221/dados/{uf}/" for uf in ufs]
+            else [f"{BASE}/ele2026/arquivo-urna/{pleito}/dados/{uf}/" for uf in ufs]
         )
         files = {}
         for url in sorted(urls):
@@ -182,20 +187,24 @@ def read_manifest(root: Path, ufs=DEFAULT_UFS, *, section_keys=None) -> dict:
         "source_root": str(root),
         "manifest_locator": str(manifest),
         "manifest_captured_at": captured_at,
-        "selection": {"election": ELECTION, "ufs": list(ufs), "section_keys": selected},
+        "selection": {"election": election.as_dict(), "ufs": list(ufs), "section_keys": selected},
         "manifest_rows_sha256": digest(evidence),
         "manifest_rows": evidence,
     }
 
 
-def inventory_sources(root: Path, ufs=DEFAULT_UFS, *, section_keys=None) -> dict:
+def inventory_sources(
+    root: Path, ufs=DEFAULT_UFS, *, section_keys=None, election=None, source_manifest=None
+) -> dict:
     """Hash selected current mappings, preserving failed/unknown historical cases.
 
     Current source observations are *new local inventory observations*, not HTTP
     requests. Their run and time describe this inventory. Original fetch times and
     validators remain verbatim in ``manifest_rows``. No HTTP status is invented.
     """
-    inventory = read_manifest(root, ufs, section_keys=section_keys)
+    inventory = read_manifest(
+        root, ufs, section_keys=section_keys, election=election, source_manifest=source_manifest
+    )
     capture_run = identity(
         "inventory-run", [inventory["manifest_rows_sha256"], inventory["manifest_captured_at"]]
     )

@@ -29,6 +29,20 @@ def doctor():
 def main(argv=None):
     """Forward script options unchanged, including each script's --help."""
     args = list(sys.argv[1:] if argv is None else argv)
+    extension_commands = {
+        "national": ("election_audit.national", "national_main"),
+        "electoral-verify": ("election_audit.electoral_verification", "electoral_verify_main"),
+        "operational-review": ("election_audit.operational_review", "operational_review_main"),
+        "features": ("election_audit.features", "features_main"),
+        "research-protocol": ("election_audit.research_protocol", "research_protocol_main"),
+        "research-models": ("election_audit.research_models", "research_models_main"),
+        "investigations": ("election_audit.investigations", "investigations_main"),
+        "dashboard": ("election_audit.dashboard", "dashboard_main"),
+        "dashboard-export": ("election_audit.dashboard", "dashboard_export_main"),
+    }
+    if args and args[0] in extension_commands:
+        module, function = extension_commands[args[0]]
+        return getattr(import_module(module), function)(args[1:])
     if args and args[0] == "pilot":
         from election_audit.pilot import pilot_main
 
@@ -82,6 +96,7 @@ def main(argv=None):
         "command",
         choices=[
             *commands,
+            *extension_commands,
             "doctor",
             "snapshot",
             "snapshot-inspect",

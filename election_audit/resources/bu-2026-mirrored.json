@@ -1,0 +1,9 @@
+{
+  "version": "mirrored-bu-schema-v1",
+  "sha256": "e53e28e9812bb7e19cc4bcc77b6ce48f25c413f62a60369a91c4f269e19b7ed6",
+  "retrieval_url": "https://raw.githubusercontent.com/alissonlinneker/DataUrnas-BR/main/spec/v2/bu.asn1",
+  "official_url": "https://www.tse.jus.br/eleicoes/eleicoes-2026-content/arquivos/formato-arquivos-de-bu-rdv-e-assinatura-digital",
+  "official_acquisition_status": "HTTP403 at resource, download attachment and display attachment",
+  "provenance": "public mirror attributed to TSE; original official ZIP not independently acquired",
+  "verification": "schema reviewed against 2026 fields and exact decoded AC sample; no original-ZIP certification"
+}

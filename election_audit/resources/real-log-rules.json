@@ -1,0 +1,26 @@
+{
+  "version": "tse-real-log-rules-v1",
+  "source_url": "https://www.tse.jus.br/eleicoes/eleicoes-2026-content/arquivos/log-do-ecossistema",
+  "source_revision": "September 2026",
+  "supported_software": "10.23.0.0",
+  "review": "exact semantic templates reviewed against official examples; absent messages remain unknown",
+  "pages": {
+    "format": 7,
+    "authorization": 16,
+    "suspension": 19,
+    "closing": 19
+  },
+  "exact": {
+    "Eleitor foi habilitado": "authorization",
+    "O voto do eleitor foi computado": "completion",
+    "Solicitação de dado pessoal do eleitor para habilitação manual": "manual_request",
+    "Tipo de habilitação do eleitor [biométrica]": "method_biometric",
+    "Eleitor foi suspenso e não confirmou nenhum voto": "suspension_full",
+    "Eleitor votou parcialmente e em seguida foi suspenso": "suspension_partial",
+    "Procedimento de encerramento confirmado": "session_closing",
+    "Finalização de aplicativo": "application_exit",
+    "Identificador do eleitor digitado inválido": "authorization_failed",
+    "O eleitor identificado já votou": "authorization_failed",
+    "Eleitor voltou a digitar enquanto estava sendo suspenso": "resumption"
+  }
+}

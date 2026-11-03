@@ -9,9 +9,9 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from urllib.parse import quote
 
+from election_audit.elections import coerce_election
 from election_audit.source_inventory import (
     ALL_UFS,
-    ELECTION,
     aux_url,
     canonical,
     identity,
@@ -29,12 +29,12 @@ PACKAGE_STATUS_MAP = {"Totalizado": "totalized"}
 PENDING_SNAPSHOT = "pending-snapshot"
 
 
-def election_id():
-    return identity("election", ELECTION)
+def election_id(election=None):
+    return identity("election", coerce_election(election).as_dict())
 
 
-def section_id(key):
-    return identity("section", [election_id(), *key])
+def section_id(key, election=None):
+    return identity("section", [election_id(election), *key])
 
 
 def verified_json(inventory, url, checks=None):
@@ -70,9 +70,9 @@ def _lineage(table, key, check, pointer):
     }
 
 
-def _index_records(config, uf):
+def _index_records(config, uf, election=None):
     # Reuse the acquisition adapter's phase/pleito/UF checks, preserving raw records.
-    validated = list(sections(config, uf, "3221"))
+    validated = list(sections(config, uf, coerce_election(election).pleito_code))
     pointers = []
     for ai, area in enumerate(config["abr"]):
         for mi, municipality in enumerate(area["mu"]):
@@ -89,12 +89,18 @@ def build_population(inventory: dict) -> dict:
     sampled asset selection. Observed manifest-only sections are retained, but
     never silently counted as an authoritative expected population.
     """
+    election = coerce_election(inventory["selection"]["election"])
+    selected_election_id = election_id(election)
+
+    def selected_section_id(key):
+        return section_id(key, election)
+
     indexes, issues, candidates, index_checks = {}, [], defaultdict(list), {}
     checks = {row["url"]: row for row in inventory["object_checks"]}
     for uf in inventory["selection"]["ufs"]:
         try:
-            config, check = verified_json(inventory, index_url(uf), checks)
-            records = _index_records(config, uf)
+            config, check = verified_json(inventory, index_url(uf, election), checks)
+            records = _index_records(config, uf, election)
             if not records:
                 raise ValueError("empty_index")
             keys = [tuple(item[:4]) for item, _ in records]
@@ -122,7 +128,7 @@ def build_population(inventory: dict) -> dict:
     file_keys, current_log_urls = set(), defaultdict(set)
     for row in inventory["manifest_rows"]["files"]:
         match = re.fullmatch(
-            r"https://resultados\.tse\.jus\.br/oficial/ele2026/arquivo-urna/3221/dados/([a-z]{2})/(\d{5})/(\d{4})/(\d{4})/.+",
+            rf"https://resultados\.tse\.jus\.br/oficial/ele2026/arquivo-urna/{election.pleito_code}/dados/([a-z]{{2}})/(\d{{5}})/(\d{{4}})/(\d{{4}})/.+",
             row["url"],
         )
         if match:
@@ -189,7 +195,7 @@ def build_population(inventory: dict) -> dict:
         if selected is not None and key not in requested:
             continue
         try:
-            aux, check = verified_json(inventory, aux_url(key), checks)
+            aux, check = verified_json(inventory, aux_url(key, election), checks)
             if str(aux.get("f", "")).lower() != "o":
                 raise ValueError("nonofficial_auxiliary")
             entries, seen = [], set()
@@ -203,15 +209,15 @@ def build_population(inventory: dict) -> dict:
                         or not package
                     ):
                         raise ValueError("invalid_package_asset")
-                    url = f"{section_directory(key)}/{quote(str(package), safe='')}/{quote(name, safe='')}"
+                    url = f"{section_directory(key, election)}/{quote(str(package), safe='')}/{quote(name, safe='')}"
                     if str(asset.get("tp", "")).lower() == "log" or name.lower().endswith(
                         ("-log.jez", "-log.dat")
                     ):
                         entries.append(url)
-                    pid = identity("package", [section_id(key), package])
+                    pid = identity("package", [selected_section_id(key), package])
                     packages[pid] = {
                         "package_id": pid,
-                        "section_id": section_id(key),
+                        "section_id": selected_section_id(key),
                         "official_package_id": str(package),
                     }
                     mid = check["observation_id"]
@@ -283,11 +289,11 @@ def build_population(inventory: dict) -> dict:
     section_rows, coverage, composition, evidence = [], [], [], []
     states = Counter()
     for key in keys:
-        sid, principal = section_id(key), principals.get(key)
+        sid, principal = selected_section_id(key), principals.get(key)
         section_rows.append(
             {
                 "section_id": sid,
-                "election_id": election_id(),
+                "election_id": selected_election_id,
                 "uf": key[0],
                 "municipality_tse": key[1],
                 "zone": key[2],
@@ -324,7 +330,7 @@ def build_population(inventory: dict) -> dict:
         row = {
             "snapshot_id": PENDING_SNAPSHOT,
             "section_id": sid,
-            "principal_section_id": section_id(principal) if principal else None,
+            "principal_section_id": selected_section_id(principal) if principal else None,
             "installation_state": "unknown",
             "log_availability": availability,
             "bu_availability": "unknown",
@@ -343,7 +349,7 @@ def build_population(inventory: dict) -> dict:
                 {
                     "snapshot_id": PENDING_SNAPSHOT,
                     "member_section_id": sid,
-                    "principal_section_id": section_id(principal),
+                    "principal_section_id": selected_section_id(principal),
                     "location_id": None,
                     "field_states": {"location_id": "unknown"},
                 }
@@ -392,7 +398,7 @@ def build_population(inventory: dict) -> dict:
     expected_members = (
         sum(row["expected_members"] for row in indexes.values()) if authoritative else None
     )
-    resolved = {section_id(value) for value in principals.values()}
+    resolved = {selected_section_id(value) for value in principals.values()}
     expected_principals = len(resolved) if authoritative and complete_composition else None
     all_ufs = set(inventory["selection"]["ufs"]) == set(ALL_UFS)
     summary = {
@@ -434,7 +440,7 @@ def build_population(inventory: dict) -> dict:
         summary["national_status"] = "complete_indexed_local_assets"
     return {
         "tables": {
-            "election": [{"election_id": election_id(), **ELECTION}],
+            "election": [{"election_id": selected_election_id, **election.as_dict()}],
             "source_object": inventory["source_object"],
             "source_observation": observations,
             "source_package": sorted(packages.values(), key=lambda row: row["package_id"]),

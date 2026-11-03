@@ -28,6 +28,7 @@ from election_audit.coverage import (
     SELECTION_VERSION,
     build_population,
 )
+from election_audit.elections import election_for_round
 from election_audit.source_inventory import (
     ALL_UFS,
     DEFAULT_UFS,
@@ -263,9 +264,18 @@ def publish_snapshot(inventory: dict, population: dict, store: Path, *, reserve_
 
 
 def create_snapshot(
-    root: Path, store: Path, ufs=DEFAULT_UFS, *, section_keys=None, reserve_bytes=0
+    root: Path,
+    store: Path,
+    ufs=DEFAULT_UFS,
+    *,
+    section_keys=None,
+    reserve_bytes=0,
+    election=None,
+    source_manifest=None,
 ) -> Path:
-    inventory = inventory_sources(root, ufs, section_keys=section_keys)
+    inventory = inventory_sources(
+        root, ufs, section_keys=section_keys, election=election, source_manifest=source_manifest
+    )
     return publish_snapshot(
         inventory, build_population(inventory), store, reserve_bytes=reserve_bytes
     )
@@ -303,6 +313,8 @@ def snapshot_main(argv=None):
     parser.add_argument(
         "--store", type=Path, required=True, help="Derived snapshot store outside the raw root"
     )
+    parser.add_argument("--round", type=int, choices=(1, 2), default=2)
+    parser.add_argument("--source-manifest", type=Path)
     parser.add_argument("--ufs", nargs="+", choices=ALL_UFS, default=DEFAULT_UFS)
     parser.add_argument(
         "--section",
@@ -326,6 +338,8 @@ def snapshot_main(argv=None):
             args.ufs,
             section_keys=selected,
             reserve_bytes=int(args.reserve_gib * 1024**3),
+            election=election_for_round(args.round),
+            source_manifest=args.source_manifest,
         )
     except (ValueError, OSError, sqlite3.Error) as exc:
         parser.error(str(exc))

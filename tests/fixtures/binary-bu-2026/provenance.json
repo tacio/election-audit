@@ -1,0 +1,36 @@
+{
+  "binary_samples": [
+    {
+      "interpretation": "downloaded from totalized EA18 package; content not yet decoded or signature verified",
+      "key": [
+        "01007",
+        "0009",
+        "0001"
+      ],
+      "package_id": "586f4f39774250616f5574624e487a3164396e593136596c6937327875694d6a6b396a455943414f5743733d",
+      "sha256": "fc7675fe7a5bc4e5683f44b0bfa10f128f1e6bf6e6edcabe2f6c11fe20ecd576"
+    },
+    {
+      "interpretation": "downloaded from totalized EA18 package; content not yet decoded or signature verified",
+      "key": [
+        "01007",
+        "0009",
+        "0007"
+      ],
+      "package_id": "677162665844617172414a4a4870357a505254356a2b346d544f7438363131546269626a31366c6864396f3d",
+      "sha256": "f997c1a6c4213fcb68f22e05863c01b28eac1b2cccb62093d93727b4c6bda202"
+    },
+    {
+      "interpretation": "downloaded from totalized EA18 package; content not yet decoded or signature verified",
+      "key": [
+        "01015",
+        "0002",
+        "0087"
+      ],
+      "package_id": "7365652b704f794e6d51726c78575644796662534549436d6238444a766b636c4759456d4654734a6968493d",
+      "sha256": "2a9e300a9de748f15519d3bf7cf5535a6557f248bee38dfc15158a33e8003769"
+    }
+  ],
+  "BWEB_archive_sha256": "35c1f1676e04d0824eb57df158f40d3c1e943926fd4754933a9d2863ccf06e1b",
+  "source": "official TSE totalized packages preserved by pilot; no voter identifiers"
+}

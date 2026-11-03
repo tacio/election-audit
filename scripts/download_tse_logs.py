@@ -115,21 +115,48 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def runoff(config):
+def presidential_election(config, round_number=2):
+    from election_audit.elections import election_for_round
+
+    descriptor = election_for_round(round_number)
     matches = [
         (p, e)
         for p in config["pl"]
         if p["c"] == "ele2026"
         for e in p["e"]
-        if e.get("t") == "2"
+        if e.get("t") == str(round_number)
         and e.get("tp") == "8"
         and any(c["cd"] == "1" for a in e["abr"] for c in a.get("cp", []))
     ]
-    if len(matches) != 1 or matches[0][0]["dt"] != "25/10/2026":
+    if (
+        len(matches) != 1
+        or matches[0][0]["dt"] != "/".join(reversed(descriptor.election_date.split("-")))
+        or str(matches[0][0]["cd"]) != descriptor.pleito_code
+        or str(matches[0][1]["cd"]) != descriptor.election_code
+    ):
         raise ValueError(
-            "Configuration does not uniquely identify the 25/10/2026 presidential runoff"
+            f"Configuration does not uniquely identify 2026 presidential round {round_number}"
         )
     return str(matches[0][0]["cd"]), str(matches[0][1]["cd"])
+
+
+def runoff(config):
+    """Backward-compatible selector for the presidential runoff."""
+    return presidential_election(config, 2)
+
+
+def validate_manifest_round(connection, pleito):
+    """Reject mixed/wrong-round stores before resume can reuse section keys."""
+    prefix = f"{BASE}/ele2026/arquivo-urna/"
+    expected = prefix + pleito + "/"
+    row = connection.execute(
+        "SELECT url FROM files WHERE url >= ? AND url < ? AND NOT (url >= ? AND url < ?) LIMIT 1",
+        (prefix, prefix + "\uffff", expected, expected + "\uffff"),
+    ).fetchone()
+    if row is not None:
+        raise ValueError(
+            "Manifest contains package URLs for a different election round; use a separate manifest and raw root"
+        )
 
 
 def sections(config, uf, pleito):
@@ -234,6 +261,10 @@ class Collector:
                 fetched_at TEXT, etag TEXT, last_modified TEXT);
             CREATE TABLE IF NOT EXISTS runs (
                 id TEXT PRIMARY KEY, started_at TEXT, finished_at TEXT, status TEXT);
+            CREATE TABLE IF NOT EXISTS run_identity (
+                run TEXT PRIMARY KEY, election_descriptor TEXT NOT NULL,
+                source_root TEXT NOT NULL, manifest_path TEXT NOT NULL,
+                identity_sha256 TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS sections (
                 run TEXT, uf TEXT, municipality TEXT, zone TEXT, section TEXT,
                 status TEXT, metadata TEXT, details TEXT,
@@ -606,7 +637,8 @@ class Collector:
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=Path("data/tse/2026/turno-2"))
+    parser.add_argument("--round", type=int, choices=(1, 2), default=2)
+    parser.add_argument("--output", type=Path, default=None)
     parser.add_argument(
         "--manifest",
         type=Path,
@@ -634,6 +666,8 @@ def main():
         help="With --missing-only, also rehash saved logs (slower, detects same-size corruption)",
     )
     args = parser.parse_args()
+    if args.output is None:
+        args.output = Path(f"data/tse/2026/turno-{args.round}")
     if (
         not 0 < args.rps <= 50
         or not 1 <= args.workers <= 64
@@ -657,16 +691,42 @@ def main():
 
 
 def run_collection(args, collector):
+    from election_audit.elections import election_for_round
+
+    round_number = getattr(args, "round", 2)
+    descriptor = election_for_round(round_number)
+    validate_manifest_round(collector.db(), descriptor.pleito_code)
     run = now()
+    run_identity = {
+        "run": run,
+        "election": descriptor.as_dict(),
+        "source_root": str(collector.root.resolve()),
+        "manifest_path": str(collector.manifest.resolve()),
+    }
+    identity_sha = hashlib.sha256(
+        json.dumps(run_identity, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
     with collector.transaction() as db:
         db.execute("INSERT INTO runs VALUES (?,?,NULL,?)", (run, run, "running"))
+        db.execute(
+            "INSERT INTO run_identity VALUES (?,?,?,?,?)",
+            (
+                run,
+                json.dumps(descriptor.as_dict(), sort_keys=True),
+                run_identity["source_root"],
+                run_identity["manifest_path"],
+                identity_sha,
+            ),
+        )
     outcome = "interrupted"
     error = None
     state_progress = {}
     try:
-        pleito, election = runoff(collector.json(f"{BASE}/comum/config/ele-c.json"))
+        pleito, election = presidential_election(
+            collector.json(f"{BASE}/comum/config/ele-c.json"), round_number
+        )
         logger.info(
-            f"Official runoff: pleito={pleito}, election={election}; "
+            f"Official round {round_number}: pleito={pleito}, election={election}; "
             f"workers={args.workers}, max_rps={args.rps}; "
             f"resume_check={'SHA-256' if args.verify_existing else 'existence+size'}; UFs={','.join(args.ufs)}",
         )
