@@ -40,6 +40,8 @@ def main(argv=None):
         "dashboard": ("election_audit.dashboard", "dashboard_main"),
         "dashboard-export": ("election_audit.dashboard", "dashboard_export_main"),
         "stage-sources": ("election_audit.source_staging", "stage_sources_main"),
+        "bulk-download": ("election_audit.bulk_acquisition", "bulk_download_main"),
+        "semantic-pass": ("election_audit.semantic_pass", "semantic_pass_main"),
     }
     if args and args[0] in extension_commands:
         module, function = extension_commands[args[0]]

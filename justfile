@@ -124,6 +124,14 @@ docs-command-check:
 national *args:
     rtk proxy uv run --locked election-audit national "$@"
 
+# Acquire or verify TSE open-data bulk archives into a new checksummed root.
+bulk-download *args:
+    rtk proxy uv run --locked election-audit bulk-download "$@"
+
+# Phase 21 streaming per-session aggregates and adapter equivalence over staged logs.
+semantic-pass *args:
+    rtk proxy uv run --locked election-audit semantic-pass "$@"
+
 # Benchmark read orders or stage certified raw objects onto a new verified root.
 stage-sources *args:
     rtk proxy uv run --locked election-audit stage-sources "$@"
