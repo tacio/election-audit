@@ -1,6 +1,6 @@
 # Auditoria estatística da eleição presidencial de 2026: protocolo do estudo
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 2 · Language: pt-BR
+Document-ID: EA-ANALYSIS-PLAN · Revision: 3 · Language: pt-BR
 
 [English](analysis-plan.md) · [Plano de conclusão](completion-plan.pt-BR.md) · [Trabalhos relacionados](related-work.pt-BR.md)
 
@@ -77,7 +77,7 @@ família confirmatória.
 | --- | --- | --- | --- |
 | Resultados alterados ou substituídos depois da urna (transmissão, totalização, publicação) | Assinatura do BU; BU binário vs BWEB vs totais hierárquicos; cópias impressas do BU | I1, I2, I4, I8 | Nada dentro da cadeia eletrônica se as próprias chaves de assinatura forem comprometidas; cópias impressas são a verificação fora da cadeia |
 | Software que altera votos dentro da urna, com BU, RDV e log todos consistentes | Nenhum rastro no log; só padrões agregados de resultado | Testes de integridade do TSE no dia da eleição (evidência externa, seção 4); C1, C2, C4, C6 | Uma troca pequena e espacialmente uniforme que imita a variação comum; seu tamanho é limitado pela manipulação mínima detectável |
-| Enchimento de urna ou personificação por mesários | Habilitações manuais (não biométricas), ciclos fora do horário normal, rajadas de ciclos rápidos; picos de comparecimento e de proporção | I5; C2, C3, C5 | Enchimento diluído em muitas seções, em horários normais e com habilitação biométrica |
+| Enchimento de urna ou personificação por mesários | Habilitações não biométricas, ciclos fora do horário normal, rajadas de ciclos rápidos; picos de comparecimento e de proporção | I5; C2, C3, C5 | Enchimento diluído em muitas seções, em horários normais e com habilitação biométrica |
 | Supressão ou obstrução de eleitores | Queda de comparecimento do primeiro para o segundo turno em relação aos pares; longas pausas, suspensões, abertura tardia, troca de urna | C1 (comparecimento), C4, C5 | Causas fora do local de votação; causas legítimas (transporte, clima) produzem o mesmo sinal |
 | Logs adulterados, copiados ou fabricados | Hashes de blocos; o trecho do primeiro turno dentro de cada log do segundo turno vs o log do primeiro turno; descontinuidades de relógio | I6, I7 | Uma cadeia de artefatos completa e reassinada de forma consistente |
 | Erros na publicação ou neste pipeline | Qualquer falha de reconciliação | I1–I9 | — |
@@ -162,6 +162,12 @@ impressas são a única evidência fora da cadeia, e são divulgados com essa re
 - Conte ciclos de eleitor concluídos, não mensagens. Um pedido de dado manual pode
   ser cancelado; não é um voto manual concluído. Ciclos não resolvidos ficam
   desconhecidos.
+- Divida a habilitação em biométrica e não biométrica. A coincidência biométrica é
+  o único caminho em que a urna confere o eleitor com uma digital cadastrada;
+  métodos manuais, sem biometria e indeterminados dependem do mesário e são
+  agrupados. O marcador biométrico é idêntico em 2026 e 2022, então a divisão é
+  medida do mesmo modo nos dois anos; os logs de 2022 não têm marcador manual
+  explícito.
 - Horários são leituras ingênuas do relógio do dispositivo. Guarde a leitura
   original, o deslocamento atribuído, os ajustes, a regra de conversão e sua
   confiança. Não infira fuso a partir de um primeiro voto cedo ou tarde. Relógios não
@@ -192,7 +198,8 @@ marcadas como incomparáveis. Desfechos:
   há votos válidos; todo teste roda nas duas direções (A e B), com A e B fixados por
   identificadores oficiais de candidatura;
 - proporções de brancos e nulos, com denominadores próprios;
-- medidas operacionais: proporção de habilitações manuais entre ciclos concluídos,
+- medidas operacionais: proporção não biométrica dos ciclos concluídos (nível
+  esperado a partir do cadastro biométrico e do perfil do eleitorado),
   proporção de ciclos depois do horário oficial de encerramento e cadência de ciclos
   (ciclos concluídos por minuto ativo).
 
@@ -240,7 +247,7 @@ modelo ajustado, com reamostragem de locais inteiros.
 | C2 | Distribuição conjunta comparecimento × proporção comparada ao nulo implicado pelo modelo, no espírito de [Klimek et al. 2012](https://doi.org/10.1073/pnas.1210722109) | Enchimento que eleva comparecimento e um candidato juntos | Comunidades homogêneas fortemente mobilizadas |
 | C3 | Excesso de porcentagens inteiras em relação a um nulo dependente do tamanho ([Kobak et al. 2016](https://doi.org/10.1214/16-AOAS904); [Rozenas 2017](https://doi.org/10.1017/pan.2016.9)) | Resultados fabricados ou arredondados | Seções pequenas; testado contra o nulo discreto exato |
 | C4 | Estatística de varredura sobre locais de votação e municípios nos resíduos ([Kulldorff 1997](https://doi.org/10.1080/03610929708831995)) | Manipulação geograficamente concentrada | Eventos políticos locais; revistos com evidência de origem |
-| C5 | Associação entre excesso operacional (proporção manual, ciclos tardios, cadência) e resíduo de proporção, nas duas direções | Enchimento ou personificação ligados a um candidato | Baixo cadastro biométrico, acessibilidade, filas |
+| C5 | Associação entre excesso operacional (proporção não biométrica, ciclos tardios, cadência) e resíduo de proporção, nas duas direções | Enchimento ou personificação ligados a um candidato | Baixo cadastro biométrico, acessibilidade, filas |
 | C6 | Resíduo de variação por modelo de urna e versão de software, dentro do local | Manipulação de software específica de dispositivo | Composição dos locais que usam urnas mais antigas (o erro do Instituto Voto Legal em 2022; seção 7.6) |
 
 A multiplicidade é controlada nessa família por Benjamini–Yekutieli a 5% de FDR

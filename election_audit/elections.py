@@ -1,6 +1,19 @@
-"""Validated 2026 presidential election identities, independent of storage names."""
+"""Validated presidential election identities, independent of storage names.
+
+2026 is the audited election and the default everywhere. 2022 is the negative control
+(analysis plan section 7.6); its rounds are known so its logs can be read with their own
+reviewed rules.
+"""
 
 from dataclasses import asdict, dataclass
+
+# (year, round) -> (pleito, election, election date)
+ELECTIONS = {
+    (2026, 1): ("3220", "6257", "2026-10-04"),
+    (2026, 2): ("3221", "6258", "2026-10-25"),
+    (2022, 1): ("406", "544", "2022-10-02"),
+    (2022, 2): ("407", "545", "2022-10-30"),
+}
 
 
 @dataclass(frozen=True)
@@ -12,10 +25,10 @@ class ElectionDescriptor:
     election_date: str
 
     def __post_init__(self):
-        expected = {1: ("3220", "6257", "2026-10-04"), 2: ("3221", "6258", "2026-10-25")}
-        if type(self.round) is not int or self.year != 2026 or self.round not in expected:
-            raise ValueError("Only 2026 presidential rounds 1 and 2 are supported")
-        if (self.pleito_code, self.election_code, self.election_date) != expected[self.round]:
+        key = (self.year, self.round)
+        if type(self.round) is not int or type(self.year) is not int or key not in ELECTIONS:
+            raise ValueError("Only 2026 and 2022 presidential rounds 1 and 2 are supported")
+        if (self.pleito_code, self.election_code, self.election_date) != ELECTIONS[key]:
             raise ValueError("Election descriptor identifiers/date disagree")
 
     @property
@@ -26,13 +39,13 @@ class ElectionDescriptor:
         return asdict(self)
 
 
-def election_for_round(round_number=2):
+def election_for_round(round_number=2, year=2026):
     if type(round_number) is not int or round_number not in (1, 2):
         raise ValueError("Round must be 1 or 2")
-    pleito, election, date = {1: ("3220", "6257", "2026-10-04"), 2: ("3221", "6258", "2026-10-25")}[
-        round_number
-    ]
-    return ElectionDescriptor(2026, pleito, election, round_number, date)
+    if (year, round_number) not in ELECTIONS:
+        raise ValueError(f"Unsupported election year: {year!r}")
+    pleito, election, date = ELECTIONS[(year, round_number)]
+    return ElectionDescriptor(year, pleito, election, round_number, date)
 
 
 def coerce_election(value=None):

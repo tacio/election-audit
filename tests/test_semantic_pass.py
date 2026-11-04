@@ -11,8 +11,10 @@ import zipfile
 from pathlib import Path
 
 import pyarrow.parquet as pq
+from test_sevenzip import make_7z
 
 from election_audit import semantic_pass as sp
+from election_audit.elections import election_for_round
 
 TOKEN = "ABCDEF0123456789"
 VOTER = "000012345678"
@@ -212,6 +214,170 @@ class PassTests(unittest.TestCase):
                 exclusions_path=self.exclusions,
                 workers=10_000,
             )
+
+
+def log_body_2022(messages, *, round_number=2, date="30/10/2022", device="12345678", start=0):
+    """A 2022 (8.26.0.0) log: same machine, different round and software markers."""
+    label = "SEGUNDO" if round_number == 2 else "PRIMEIRO"
+    records = [
+        ("GAP", f"Iniciando aplicação - Oficial - {round_number}º turno"),
+        (
+            "GAP",
+            f"Iniciando aplicação - ELEIÇÃO OFICIAL {label} TURNO - Oficial - {round_number}º turno",
+        ),
+        ("VOTA", f"Iniciando aplicação - Oficial - {round_number}º turno"),
+        ("VOTA", "Versão da aplicação: 8.26.0.0 - Onça-pintada"),
+        *[("VOTA", m) for m in messages],
+    ]
+    return "".join(
+        f"{date} {8 + (start + i) // 3600:02d}:{(start + i) // 60 % 60:02d}:{(start + i) % 60:02d}"
+        f"\tINFO\t{device}\t{app}\t{message}\t{TOKEN}\n"
+        for i, (app, message) in enumerate(records)
+    ).encode("latin-1")
+
+
+CYCLES_2022 = [
+    "Tipo de habilitação do eleitor [biométrica]",
+    "Eleitor foi habilitado",
+    "Voto confirmado para [Presidente]",
+    "O voto do eleitor foi computado",
+    # 2022 manual flow: poll-worker fingerprint, no "habilitou o eleitor" marker
+    "Solicitação de dado pessoal do eleitor para habilitação manual",
+    "Solicita digital do mesário",
+    "Capturada a digital do mesário",
+    "Eleitor foi habilitado",
+    "O voto do eleitor foi computado",
+    "Título inválido",
+    "O eleitor identificado já votou",
+    "Eleitor foi habilitado",
+    "Eleitor foi suspenso e não confirmou nenhum voto",
+    "Procedimento de encerramento confirmado",
+    "Finalização de aplicativo",
+]
+
+
+class Year2022Tests(unittest.TestCase):
+    def test_2022_descriptors(self):
+        first, second = election_for_round(1, 2022), election_for_round(2, 2022)
+        self.assertEqual((first.pleito_code, first.election_date), ("406", "2022-10-02"))
+        self.assertEqual((second.pleito_code, second.election_date), ("407", "2022-10-30"))
+        self.assertEqual(election_for_round(2).year, 2026)
+        with self.assertRaises(ValueError):
+            election_for_round(2, 2018)
+
+    def test_7z_logs_match_the_adapter_and_keep_unreviewed_methods_unknown(self):
+        cases = {
+            "cycles": make_7z([("logd.dat", log_body_2022(CYCLES_2022))]),
+            "nested": make_7z(
+                [
+                    ("670.jez", make_7z([("logd.dat", log_body_2022(CYCLES_2022[:4]))])),
+                    ("logd.dat", log_body_2022(CYCLES_2022[4:], start=50)),
+                ]
+            ),
+            "wrong_day": make_7z([("logd.dat", log_body_2022(CYCLES_2022, date="29/10/2022"))]),
+        }
+        with tempfile.TemporaryDirectory() as d:
+            for name, body in cases.items():
+                with self.subTest(case=name):
+                    original = Path(d) / f"{name}.logjez"
+                    original.write_bytes(body)
+                    expected, counts = sp.adapter_signatures(original, Path(d) / name, 2, 2022)
+                    summary = sp.summarize_object(body, "x", 2, 2022)
+                    self.assertEqual(sp.pass_signatures(summary), expected)
+                    self.assertEqual(
+                        sum(s["manual_requests"] for s in summary.sessions),
+                        counts.get("manual_requests", 0),
+                    )
+        summary = sp.summarize_object(cases["cycles"], "x", 2, 2022)
+        (session,) = [s for s in summary.sessions if s["session_kind"] == "official_vota"]
+        self.assertTrue(session["software_supported"])
+        self.assertEqual(session["cycles_completed_biometric"], 1)
+        self.assertEqual(session["cycles_completed_unknown"], 1)  # manual is not inferred
+        self.assertEqual(session["cycles_completed_manual"], 0)
+        self.assertEqual(session["authorization_failures"], 1)
+        self.assertEqual(session["cycles_suspended_unknown"], 1)
+
+    def test_decades_long_clock_steps_are_kept_not_overflowed(self):
+        body = (
+            log_body_2022(CYCLES_2022[:4])
+            + log_body_2022(CYCLES_2022[:4], date="01/01/1933", start=10).split(b"\n", 4)[4]
+        )
+        summary = sp.summarize_object(make_7z([("logd.dat", body)]), "x", 2, 2022)
+        (session,) = [s for s in summary.sessions if s["session_kind"] == "official_vota"]
+        self.assertGreater(session["reading_backstep_max_s"], 2**31)
+        with tempfile.TemporaryDirectory() as d:
+            sp._write(Path(d) / "s.parquet", summary.sessions, sp.SESSION_SCHEMA)
+            rows = pq.read_table(Path(d) / "s.parquet").to_pylist()
+        self.assertEqual(rows[-1]["reading_backstep_max_s"], session["reading_backstep_max_s"])
+
+    def test_rules_do_not_cross_years(self):
+        log_2026 = jez(log_body(CYCLES, date="30/10/2022"))
+        summary = sp.summarize_object(log_2026, "x", 2, 2022)
+        self.assertFalse(any(s["session_kind"] == "official_vota" for s in summary.sessions))
+        log_2022 = make_7z([("logd.dat", log_body_2022(CYCLES_2022, date="25/10/2026"))])
+        summary = sp.summarize_object(log_2022, "x", 2, 2026)
+        self.assertFalse(any(s["session_kind"] == "official_vota" for s in summary.sessions))
+
+
+class BulkPassTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.bulk = Path(self.temp.name) / "bulk"
+        (self.bulk / "files").mkdir(parents=True)
+        rows = []
+        for year, turn, uf, members in (
+            (2022, 2, "AC", {"o00407-0101500020088.logjez": log_body_2022(CYCLES_2022)}),
+            (2022, 2, "AL", {"o00407-2700000010002.logjez": b"broken", "leiame.pdf": b"%PDF"}),
+            (2022, 1, "AC", {"o00406-0101500020088.logjez": log_body_2022(CYCLES_2022)}),
+        ):
+            path = f"files/bu_imgbu_logjez_rdv_vscmr_{year}_{turn}t_{uf}.zip"
+            with zipfile.ZipFile(self.bulk / path, "w") as z:
+                z.writestr(next(iter(members)).replace(".logjez", ".bu"), b"bu")
+                for name, body in members.items():
+                    z.writestr(name, make_7z([("logd.dat", body)]) if body[:2] == b"30" else body)
+            data = (self.bulk / path).read_bytes()
+            rows.append((path, hashlib.sha256(data).hexdigest(), len(data), "complete"))
+        with contextlib.closing(sqlite3.connect(self.bulk / "manifest.sqlite")) as db:
+            db.execute("CREATE TABLE files(path,sha256,bytes,status)")
+            db.executemany("INSERT INTO files VALUES(?,?,?,?)", rows)
+            db.commit()
+        self.output = Path(self.temp.name) / "pass"
+
+    def run_bulk(self, **options):
+        return sp.run_pass(
+            None, 2, self.output, bulk_root=self.bulk, year=2022, workers=1, **options
+        )
+
+    def test_bulk_pass_reads_members_in_order_with_witnesses(self):
+        result = self.run_bulk(ufs=["ac", "al"], shard_objects=1)
+        self.assertEqual((result["objects"], result["errors"]), (2, 1))
+        self.assertEqual(result["year"], 2022)
+        self.assertEqual(len(result["archives"]), 2)
+        objects = pq.read_table(self.output / "release" / "objects.parquet").to_pylist()
+        self.assertEqual(
+            [json.loads(o["witnesses_json"]) for o in objects],
+            [[["ac", "01015", "0002", "0088"]], [["al", "27000", "0001", "0002"]]],
+        )
+        with zipfile.ZipFile(self.bulk / "files/bu_imgbu_logjez_rdv_vscmr_2022_2t_AC.zip") as z:
+            body = z.read("o00407-0101500020088.logjez")
+        self.assertEqual(objects[0]["object_sha256"], hashlib.sha256(body).hexdigest())
+        sessions = pq.read_table(self.output / "release" / "sessions.parquet").to_pylist()
+        self.assertEqual(sum(s["session_kind"] == "official_vota" for s in sessions), 1)
+        exported = b"".join(p.read_bytes() for p in (self.output / "release").iterdir())
+        self.assertNotIn(TOKEN.encode(), exported)
+        again = self.run_bulk(ufs=["ac", "al"], shard_objects=1, resume=True)
+        self.assertEqual(again["files"], result["files"])
+
+    def test_bulk_mode_never_reads_2026_and_takes_no_exclusions(self):
+        with self.assertRaisesRegex(ValueError, "certified staging"):
+            sp.bulk_archives(self.bulk, 2026, 2)
+        with self.assertRaisesRegex(ValueError, "protected"):
+            self.run_bulk(exclusions_path="x.json")
+        with self.assertRaisesRegex(ValueError, "28 bulk archives"):
+            self.run_bulk()
+        with self.assertRaisesRegex(ValueError, "exclusions"):
+            sp.run_pass(Path(self.temp.name), 2, self.output, year=2022, workers=1)
 
 
 if __name__ == "__main__":

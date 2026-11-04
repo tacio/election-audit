@@ -33,6 +33,7 @@ import re
 import shutil
 import sqlite3
 import tempfile
+import threading
 import time
 import zipfile
 from collections import Counter
@@ -42,16 +43,19 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from election_audit import sevenzip
 from election_audit.elections import election_for_round
 from election_audit.national_migration import atomic, sha
-from election_audit.operational_review import RULES, classify
+from election_audit.operational_review import classify, rules_for
 
-VERSION = "session-aggregates-v1"
+VERSION = "session-aggregates-v2"  # v2: seconds columns are int64
 ADAPTER_VERSION = "real-operational-v1"
 SHARD_OBJECTS = 500
 VOCABULARY_LIMIT = 4000
 MAX_DEPTH, MAX_MEMBERS, MAX_MEMBER, MAX_EXPANDED = 4, 10000, 128 * 1024**2, 512 * 1024**2
 MAX_LINE, MAX_LINES = 65536, 2000000
+BULK_ARCHIVE = re.compile(r"files/bu_imgbu_logjez_rdv_vscmr_(\d{4})_([12])t_([A-Z]{2})\.zip")
+BULK_YEARS = (2022,)  # 2026 bulk archives hold the protected logs; 2026 reads the staging
 URL = re.compile(r"/arquivo-urna/(\d+)/dados/([a-z]{2})/(\d+)/(\d+)/(\d+)/")
 DIGITS = re.compile(r"[0-9]+")
 HEXRUN = re.compile(r"\b[0-9A-Fa-f]{12,}\b")
@@ -87,12 +91,12 @@ SESSION_SCHEMA = pa.schema(
         ("last_completion_reading", pa.string()),
         ("completions_by_reading_hour", pa.list_(pa.int32())),
         ("completion_gaps", pa.int32()),
-        ("completion_gap_min_s", pa.int32()),
+        ("completion_gap_min_s", pa.int64()),
         ("completion_gap_median_s", pa.float32()),
-        ("completion_gap_p90_s", pa.int32()),
-        ("completion_gap_max_s", pa.int32()),
+        ("completion_gap_p90_s", pa.int64()),
+        ("completion_gap_max_s", pa.int64()),
         ("reading_backsteps", pa.int32()),
-        ("reading_backstep_max_s", pa.int32()),
+        ("reading_backstep_max_s", pa.int64()),
     ]
 )
 SEGMENT_SCHEMA = pa.schema(
@@ -173,35 +177,54 @@ def iso_reading(seconds):
     return f"{date.fromordinal(day).isoformat()}T{hour:02d}:{minute:02d}:{second:02d}"
 
 
-def log_members(path):
-    """Yield (segments, member path, line iterator) for every bounded logd.dat member."""
-    totals = {"members": 0, "expanded": 0, "lines": 0}
+def log_members(path):  # path, or the object's bytes
+    """Yield (segments, body) for every bounded logd.dat member of a ZIP or 7z object."""
+    totals = {"members": 0, "expanded": 0}
+
+    def entries(handle):
+        """(index, original name, body) for each file entry; directories are skipped."""
+        if handle.read(len(sevenzip.MAGIC)) == sevenzip.MAGIC:  # 2022 logs
+            handle.seek(0)
+            data = handle.read(MAX_EXPANDED + 1)
+            if len(data) > MAX_EXPANDED:
+                raise ValueError("Expanded archive bound exceeded")
+            for index, (name, body, is_dir) in enumerate(sevenzip.read(data, limit=MAX_MEMBER)):
+                if not is_dir:
+                    yield index, name, body
+            return
+        handle.seek(0)
+        with zipfile.ZipFile(handle) as z:
+            for index, entry in enumerate(z.infolist()):
+                if entry.is_dir():
+                    continue
+                if entry.file_size > MAX_MEMBER:
+                    raise ValueError("Member bound exceeded")
+                with z.open(entry) as f:
+                    yield index, entry.orig_filename, f.read(MAX_MEMBER + 1)
 
     def archive(handle, segments):
         if len(segments) > MAX_DEPTH:
             raise ValueError("Nested archive bound exceeded")
-        with zipfile.ZipFile(handle) as z:
-            occurrences = Counter()
-            for index, entry in enumerate(z.infolist()):
-                if entry.is_dir():
-                    continue
-                totals["members"] += 1
-                if totals["members"] > MAX_MEMBERS or entry.file_size > MAX_MEMBER:
-                    raise ValueError("Member bound exceeded")
-                occurrence = occurrences[entry.orig_filename]
-                occurrences[entry.orig_filename] += 1
-                nested = (*segments, (entry.orig_filename, occurrence, index))
-                with z.open(entry) as f:
-                    body = f.read(MAX_MEMBER + 1)
-                totals["expanded"] += len(body)
-                if len(body) > MAX_MEMBER or totals["expanded"] > MAX_EXPANDED:
-                    raise ValueError("Expanded archive bound exceeded")
-                name = entry.orig_filename.replace("\\", "/").rsplit("/", 1)[-1].lower()
-                if name == "logd.dat":
-                    yield nested, body
-                elif body[:2] == b"PK" or name.endswith((".jez", ".zip")):
-                    yield from archive(io.BytesIO(body), nested)
+        occurrences = Counter()
+        for index, original, body in entries(handle):
+            totals["members"] += 1
+            if totals["members"] > MAX_MEMBERS:
+                raise ValueError("Member bound exceeded")
+            occurrence = occurrences[original]
+            occurrences[original] += 1
+            nested = (*segments, (original, occurrence, index))
+            totals["expanded"] += len(body)
+            if len(body) > MAX_MEMBER or totals["expanded"] > MAX_EXPANDED:
+                raise ValueError("Expanded archive bound exceeded")
+            name = original.replace("\\", "/").rsplit("/", 1)[-1].lower()
+            if name == "logd.dat":
+                yield nested, body
+            elif body[:2] == b"PK" or body[:6] == sevenzip.MAGIC or name.endswith((".jez", ".zip")):
+                yield from archive(io.BytesIO(body), nested)
 
+    if isinstance(path, bytes):
+        yield from archive(io.BytesIO(path), ())
+        return
     with Path(path).open("rb") as f:
         yield from archive(f, ())
 
@@ -226,10 +249,11 @@ def _gap_stats(gaps):
 class ObjectSummary:
     """Mirror of ``operational_review.review_object``'s session/cycle machine."""
 
-    def __init__(self, object_sha256, round_number):
+    def __init__(self, object_sha256, round_number, year=2026):
         self.sha = object_sha256
         self.round = round_number
-        self.election_day = date.fromisoformat(election_for_round(round_number).election_date)
+        self.rules = rules_for(year)
+        self.election_day = date.fromisoformat(election_for_round(round_number, year).election_date)
         self.election_seconds = self.election_day.toordinal() * 86400
         self.sessions, self.segments = [], []
         self.kinds, self.vocabulary = Counter(), Counter()
@@ -256,7 +280,7 @@ class ObjectSummary:
         key = (application, message)
         found = self._classes.get(key)
         if found is None:
-            found = classify(application, message)
+            found = classify(application, message, self.rules)
             if len(self._classes) < 200000:
                 self._classes[key] = found
         return found
@@ -515,9 +539,10 @@ class ObjectSummary:
         self._close_segment()
 
 
-def summarize_object(path, object_sha256, round_number):
-    summary = ObjectSummary(object_sha256, round_number)
-    for segments, body in log_members(path):
+def summarize_object(source, object_sha256, round_number, year=2026):
+    """Summarize one log object given as a path or as its bytes."""
+    summary = ObjectSummary(object_sha256, round_number, year)
+    for segments, body in log_members(source):
         summary.feed(segments, body)
     summary.finish()
     return summary
@@ -568,6 +593,83 @@ def work_list(staged_root, round_number, *, ufs=None, exclusions=frozenset(), li
     return items, len(excluded)
 
 
+def bulk_archives(bulk_root, year, round_number, ufs=None):
+    """Complete per-UF bulk archives of one round, as recorded in the bulk manifest."""
+    if year not in BULK_YEARS:
+        raise ValueError(
+            f"{year} logs are not read from bulk archives; 2026 uses the certified staging"
+        )
+    bulk_root = Path(bulk_root)
+    uri = (bulk_root / "manifest.sqlite").resolve().as_uri() + "?mode=ro&immutable=1"
+    archives = []
+    with contextlib.closing(sqlite3.connect(uri, uri=True)) as db:
+        for path, digest, size, status in db.execute(
+            "SELECT path, sha256, bytes, status FROM files ORDER BY path"
+        ):
+            match = BULK_ARCHIVE.fullmatch(path)
+            if not match or (int(match[1]), int(match[2])) != (year, round_number):
+                continue
+            uf = match[3].lower()
+            if ufs and uf not in ufs:
+                continue
+            if status != "complete" or not digest:
+                raise ValueError(f"Bulk archive is not complete: {path}")
+            if (bulk_root / path).stat().st_size != size:
+                raise ValueError(f"Bulk archive size differs from its manifest: {path}")
+            archives.append({"uf": uf, "path": path, "sha256": digest, "bytes": size})
+    if not archives:
+        raise ValueError(f"No bulk archives for {year} round {round_number}")
+    if not ufs and len(archives) != 28:
+        raise ValueError(f"Expected 28 bulk archives (27 UFs and ZZ), found {len(archives)}")
+    return archives
+
+
+def bulk_work_list(bulk_root, archives, year, round_number, *, limit=None):
+    """Log members of the bulk archives in physical (header offset) order, with witnesses."""
+    pleito = int(election_for_round(round_number, year).pleito_code)
+    member = re.compile(rf"o0*{pleito}-(\d{{5}})(\d{{4}})(\d{{4}})\.logjez")
+    items = []
+    for archive in archives:
+        with zipfile.ZipFile(Path(bulk_root) / archive["path"]) as z:
+            infos = sorted(
+                (i for i in z.infolist() if i.filename.endswith(".logjez")),
+                key=lambda i: i.header_offset,
+            )
+        for info in infos:
+            match = member.fullmatch(info.filename)
+            if not match:
+                raise ValueError(f"Unexpected log member {info.filename!r} in {archive['path']}")
+            items.append(
+                {
+                    "path": f"{archive['path']}!{info.filename}",
+                    "archive": archive["path"],
+                    "member": info.filename,
+                    "sha256": None,
+                    "witnesses": [[archive["uf"], *match.groups()]],
+                    "package": None,
+                }
+            )
+    return items[:limit] if limit is not None else items
+
+
+def bulk_bodies(bulk_root, items):
+    """Read members sequentially; zipfile checks each member's CRC at end of stream."""
+    bodies, current, handle = [], None, None
+    try:
+        for item in items:
+            if item["archive"] != current:
+                if handle is not None:
+                    handle.close()
+                handle = zipfile.ZipFile(Path(bulk_root) / item["archive"])
+                current = item["archive"]
+            with handle.open(item["member"]) as f:
+                bodies.append(f.read(MAX_EXPANDED + 1))
+    finally:
+        if handle is not None:
+            handle.close()
+    return bodies
+
+
 # --------------------------------------------------------------------------- shards
 
 
@@ -577,19 +679,24 @@ def _write(path, rows, schema):
 
 
 def run_shard(task):
-    staged_root, round_number, shard_dir, index, items = task
+    staged_root, round_number, shard_dir, index, items, bodies, year = task
     sessions, segments, objects, vocabulary = [], [], [], Counter()
-    for item in items:
+    for position, item in enumerate(items):
+        if bodies is None:
+            source, digest = Path(staged_root) / item["path"], item["sha256"]
+        else:  # bulk members arrive as bytes read in physical order by the parent
+            source = bodies[position]
+            digest = hashlib.sha256(source).hexdigest()
         row = {
-            "object_sha256": item["sha256"],
+            "object_sha256": digest,
             "path": item["path"],
             "witnesses_json": json.dumps(item["witnesses"], separators=(",", ":")),
             "package_status": item["package"],
         }
         try:
-            summary = summarize_object(
-                Path(staged_root) / item["path"], item["sha256"], round_number
-            )
+            if bodies is not None and len(source) > MAX_EXPANDED:
+                raise ValueError("Object bound exceeded")
+            summary = summarize_object(source, digest, round_number, year)
         except Exception as exc:  # recorded per object; the pass continues
             row.update(status="error", error=f"{type(exc).__name__}: {exc}"[:500])
             objects.append(row)
@@ -631,39 +738,70 @@ def _init_worker():
         os.environ[name] = "1"
 
 
+def _rules_sha(year):
+    return hashlib.sha256(json.dumps(rules_for(year), sort_keys=True).encode()).hexdigest()
+
+
 def run_pass(
     staged_root,
     round_number,
     output,
     *,
-    exclusions_path,
+    exclusions_path=None,
     workers=4,
     ufs=None,
     limit=None,
     resume=False,
     shard_objects=SHARD_OBJECTS,
+    bulk_root=None,
+    year=2026,
 ):
-    staged_root = Path(staged_root).expanduser().absolute()
+    """Sharded pass over a certified 2026 staging, or over the 2022 bulk archives."""
     output = Path(output).expanduser().absolute()
     if workers < 1 or workers > max(1, (os.cpu_count() or 2) // 2):
         raise ValueError("Workers must stay within half the CPUs")
-    staging_certificate = json.loads((staged_root / "staging-certificate.json").read_bytes())
-    if staging_certificate.get("round") != round_number:
-        raise ValueError("Staged root belongs to another round")
-    exclusions, exclusions_sha = load_exclusions(exclusions_path)
-    binding = {
-        "version": VERSION,
-        "adapter_version": ADAPTER_VERSION,
-        "rules_sha256": hashlib.sha256(json.dumps(RULES, sort_keys=True).encode()).hexdigest(),
-        "round": round_number,
-        "staged_root": str(staged_root),
-        "staging_certificate_sha256": sha(staged_root / "staging-certificate.json"),
-        "manifest_sha256": staging_certificate["manifest_sha256"],
-        "exclusions_sha256": exclusions_sha,
-        "ufs": sorted(ufs) if ufs else None,
-        "limit": limit,
-        "shard_objects": shard_objects,
-    }
+    if (staged_root is None) == (bulk_root is None):
+        raise ValueError("Give exactly one of a staged root or a bulk root")
+    if bulk_root is None:
+        if year != 2026 or exclusions_path is None:
+            raise ValueError("A staged 2026 pass requires the protection exclusions")
+        staged_root = Path(staged_root).expanduser().absolute()
+        staging_certificate = json.loads((staged_root / "staging-certificate.json").read_bytes())
+        if staging_certificate.get("round") != round_number:
+            raise ValueError("Staged root belongs to another round")
+        exclusions, exclusions_sha = load_exclusions(exclusions_path)
+        binding = {
+            "version": VERSION,
+            "adapter_version": ADAPTER_VERSION,
+            "rules_sha256": _rules_sha(year),
+            "round": round_number,
+            "staged_root": str(staged_root),
+            "staging_certificate_sha256": sha(staged_root / "staging-certificate.json"),
+            "manifest_sha256": staging_certificate["manifest_sha256"],
+            "exclusions_sha256": exclusions_sha,
+            "ufs": sorted(ufs) if ufs else None,
+            "limit": limit,
+            "shard_objects": shard_objects,
+        }
+    else:
+        if exclusions_path is not None:
+            raise ValueError("Bulk passes read 2022 logs, which have no protected sections")
+        bulk_root = Path(bulk_root).expanduser().absolute()
+        archives = bulk_archives(bulk_root, year, round_number, set(ufs) if ufs else None)
+        binding = {
+            "version": VERSION,
+            "adapter_version": ADAPTER_VERSION,
+            "rules_sha256": _rules_sha(year),
+            "rules_version": rules_for(year)["version"],
+            "year": year,
+            "round": round_number,
+            "bulk_root": str(bulk_root),
+            "archives": {a["path"]: {"sha256": a["sha256"], "bytes": a["bytes"]} for a in archives},
+            "exclusions": "none: 2022 is the negative control and has no protected sections",
+            "ufs": sorted(ufs) if ufs else None,
+            "limit": limit,
+            "shard_objects": shard_objects,
+        }
     if output.exists() and not resume:
         raise FileExistsError(f"Output must be new (or pass --resume): {output}")
     if resume:
@@ -674,16 +812,32 @@ def run_pass(
     atomic(output / "binding.json", binding)
     shard_dir = output / "shards"
     shard_dir.mkdir(exist_ok=True)
-    items, excluded = work_list(
-        staged_root, round_number, ufs=set(ufs) if ufs else None, exclusions=exclusions, limit=limit
-    )
+    if bulk_root is None:
+        items, excluded = work_list(
+            staged_root,
+            round_number,
+            ufs=set(ufs) if ufs else None,
+            exclusions=exclusions,
+            limit=limit,
+        )
+    else:
+        items, excluded = bulk_work_list(bulk_root, archives, year, round_number, limit=limit), 0
     shards = [items[i : i + shard_objects] for i in range(0, len(items), shard_objects)]
     done = {int(p.name) for p in shard_dir.iterdir() if p.name.isdigit()}
-    tasks = [
-        (str(staged_root), round_number, str(shard_dir), i, shard)
-        for i, shard in enumerate(shards)
-        if i not in done
-    ]
+    todo = [i for i in range(len(shards)) if i not in done]
+    # Bulk members are read by this process only, in physical order, and at most
+    # workers + 2 shards of bytes are in flight at once.
+    gate = threading.BoundedSemaphore(workers + 2)
+
+    def tasks():
+        for i in todo:
+            if bulk_root is None:
+                yield (str(staged_root), round_number, str(shard_dir), i, shards[i], None, year)
+            else:
+                gate.acquire()
+                bodies = bulk_bodies(bulk_root, shards[i])
+                yield (None, round_number, str(shard_dir), i, shards[i], bodies, year)
+
     started = time.monotonic()
     status = output / "status.json"
     completed_objects = sum(len(shards[i]) for i in done if i < len(shards))
@@ -711,7 +865,9 @@ def run_pass(
     with multiprocessing.get_context("spawn").Pool(
         workers, initializer=_init_worker, maxtasksperchild=50
     ) as pool:
-        for _, count, failed in pool.imap_unordered(run_shard, tasks):
+        for _, count, failed in pool.imap_unordered(run_shard, tasks()):
+            if bulk_root is not None:
+                gate.release()
             completed_objects += count
             session_done += count
             errors += failed
@@ -796,7 +952,7 @@ def merge(output, shards, binding, excluded):
 # --------------------------------------------------------------------------- equivalence
 
 
-def adapter_signatures(original, scratch, round_number):
+def adapter_signatures(original, scratch, round_number, year=2026):
     """Run the Phase 13 event-level adapter on one object and reduce it to signatures."""
     from election_audit.archive_parsing import inspect_artifact, parse_object
     from election_audit.national import _compact_jsonl, _write_json
@@ -823,7 +979,9 @@ def adapter_signatures(original, scratch, round_number):
             "files": specs,
         },
     )
-    result = review_object(structural, original, scratch / "review", round_number=round_number)
+    result = review_object(
+        structural, original, scratch / "review", round_number=round_number, year=year
+    )
 
     def rows(name):
         table = pq.read_table(result / f"{name}.parquet").column(0).to_pylist()
@@ -883,28 +1041,62 @@ def pass_signatures(summary):
     return signatures
 
 
-def equivalence(staged_root, round_number, output, *, exclusions_path, ufs, sample, seed=21):
+def equivalence(
+    staged_root,
+    round_number,
+    output,
+    *,
+    exclusions_path=None,
+    ufs,
+    sample,
+    seed=21,
+    bulk_root=None,
+    year=2026,
+):
     """Compare the streaming pass with the event-level adapter on sampled objects."""
-    staged_root = Path(staged_root).expanduser().absolute()
     output = Path(output).expanduser().absolute()
     if output.exists():
         raise FileExistsError(f"Output must be new: {output}")
-    exclusions, exclusions_sha = load_exclusions(exclusions_path)
-    items, _ = work_list(staged_root, round_number, ufs=set(ufs), exclusions=exclusions)
+    if (staged_root is None) == (bulk_root is None):
+        raise ValueError("Give exactly one of a staged root or a bulk root")
+    if bulk_root is None:
+        if year != 2026 or exclusions_path is None:
+            raise ValueError("A staged 2026 comparison requires the protection exclusions")
+        staged_root = Path(staged_root).expanduser().absolute()
+        exclusions, exclusions_sha = load_exclusions(exclusions_path)
+        items, _ = work_list(staged_root, round_number, ufs=set(ufs), exclusions=exclusions)
+        source = {"staging_certificate_sha256": sha(staged_root / "staging-certificate.json")}
+    else:
+        if exclusions_path is not None:
+            raise ValueError("Bulk passes read 2022 logs, which have no protected sections")
+        bulk_root = Path(bulk_root).expanduser().absolute()
+        archives = bulk_archives(bulk_root, year, round_number, set(ufs))
+        items, exclusions_sha = bulk_work_list(bulk_root, archives, year, round_number), None
+        source = {
+            "year": year,
+            "rules_version": rules_for(year)["version"],
+            "archives": {a["path"]: a["sha256"] for a in archives},
+        }
     chosen = sorted(
         random.Random(seed).sample(items, min(sample, len(items))), key=lambda i: i["path"]
     )
     output.mkdir(parents=True)
     results = []
     for item in chosen:
-        original = staged_root / item["path"]
-        record = {"object_sha256": item["sha256"], "witnesses": item["witnesses"]}
         with tempfile.TemporaryDirectory(dir=output) as scratch:
+            if bulk_root is None:
+                original, digest = staged_root / item["path"], item["sha256"]
+            else:
+                body = bulk_bodies(bulk_root, [item])[0]
+                digest = hashlib.sha256(body).hexdigest()
+                original = Path(scratch) / "object.logjez"
+                original.write_bytes(body)
+            record = {"object_sha256": digest, "witnesses": item["witnesses"]}
             started = time.monotonic()
-            expected, adapter_counts = adapter_signatures(original, scratch, round_number)
+            expected, adapter_counts = adapter_signatures(original, scratch, round_number, year)
             adapter_seconds = time.monotonic() - started
-        started = time.monotonic()
-        summary = summarize_object(original, item["sha256"], round_number)
+            started = time.monotonic()
+            summary = summarize_object(original, digest, round_number, year)
         pass_seconds = time.monotonic() - started
         observed = pass_signatures(summary)
         orphan_pass = sum(s["orphan_completions"] for s in summary.sessions) + (
@@ -937,7 +1129,7 @@ def equivalence(staged_root, round_number, output, *, exclusions_path, ufs, samp
         "ufs": sorted(ufs),
         "seed": seed,
         "exclusions_sha256": exclusions_sha,
-        "staging_certificate_sha256": sha(staged_root / "staging-certificate.json"),
+        **source,
         "objects": len(results),
         "equal_objects": sum(r["equal"] for r in results),
         "completed_cycles": sum(r["completed"] for r in results),
@@ -958,10 +1150,13 @@ def semantic_pass_main(argv=None):
     run = commands.add_parser("run", help="Run the sharded pass over a staged round.")
     check = commands.add_parser("equivalence", help="Compare with the event-level adapter.")
     for sub in (run, check):
-        sub.add_argument("--staged-root", required=True, help="Certified staged round root.")
+        root = sub.add_mutually_exclusive_group(required=True)
+        root.add_argument("--staged-root", help="Certified staged 2026 round root.")
+        root.add_argument("--bulk-root", help="Verified bulk archive root (2022 only).")
+        sub.add_argument("--year", type=int, choices=(2026, 2022), default=2026)
         sub.add_argument("--round", type=int, choices=(1, 2), required=True)
         sub.add_argument("--output", required=True, help="New output directory.")
-        sub.add_argument("--exclusions", required=True, help="Protected/stress exclusions JSON.")
+        sub.add_argument("--exclusions", help="Protected/stress exclusions JSON (2026 only).")
         sub.add_argument("--uf", action="append", help="Restrict to these UFs (lowercase).")
     run.add_argument("--workers", type=int, default=4, help="Worker processes.")
     run.add_argument("--limit", type=int, help="Process only the first N objects.")
@@ -979,6 +1174,8 @@ def semantic_pass_main(argv=None):
             ufs=args.uf,
             limit=args.limit,
             resume=args.resume,
+            bulk_root=args.bulk_root,
+            year=args.year,
         )
         print(json.dumps({k: result[k] for k in ("objects", "errors", "sessions", "segments")}))
     else:
@@ -992,6 +1189,8 @@ def semantic_pass_main(argv=None):
             ufs=args.uf,
             sample=args.sample,
             seed=args.seed,
+            bulk_root=args.bulk_root,
+            year=args.year,
         )
         print(json.dumps({k: result[k] for k in ("objects", "equal_objects", "completed_cycles")}))
     return 0

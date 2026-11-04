@@ -23,12 +23,52 @@ from zoneinfo import ZoneInfo
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from election_audit import sevenzip
 from election_audit.elections import election_for_round
 from election_audit.national import _read_json, _verify_files, _write_json
 from election_audit.source_inventory import canonical, digest, hash_file
 
 VERSION = "real-operational-v1"
 RULES = json.loads(files("election_audit").joinpath("resources/real-log-rules.json").read_text())
+RULES_2022 = json.loads(
+    files("election_audit").joinpath("resources/real-log-rules-2022.json").read_text()
+)
+RULES_BY_YEAR = {2026: RULES, 2022: RULES_2022}
+# The 2026 rules predate per-year templates; their markers stay here so the reviewed
+# 2026 rules file, and every binding that hashes it, is unchanged.
+TEMPLATES_2026 = {
+    "official_round": {
+        "1": "Iniciando aplicação - ELEIÇÃO OFICIAL PRIMEIRO TURNO - 1º turno",
+        "2": "Iniciando aplicação - ELEIÇÃO OFICIAL SEGUNDO TURNO - 2º turno",
+    },
+    "session_start": {"1": "Iniciando aplicação - 1º turno", "2": "Iniciando aplicação - 2º turno"},
+    "supported_software": "Versão da aplicação: 10.23.0.0 - Praia da Barra do Cahy",
+    "operator_authorized": r"Mesário [0-9]{1,32} habilitou o eleitor",
+}
+CONTEST = re.compile(
+    r"Voto confirmado para \[(?:Presidente|Governador|Senador|Deputado Federal"
+    r"|Deputado Estadual|Deputado Distrital|Vereador|Prefeito)\]"
+)
+
+
+def rules_for(year):
+    if year not in RULES_BY_YEAR:
+        raise ValueError(f"No reviewed log rules for {year!r}")
+    return RULES_BY_YEAR[year]
+
+
+def _markers(rules):
+    templates = rules.get("templates", TEMPLATES_2026)
+    operator = templates["operator_authorized"]
+    return (
+        {message: int(turn) for turn, message in templates["official_round"].items()},
+        {message: int(turn) for turn, message in templates["session_start"].items()},
+        templates["supported_software"],
+        re.compile(operator) if operator else None,
+    )
+
+
+_MARKERS = {}
 
 
 class Rows:
@@ -54,28 +94,28 @@ class Rows:
         self.writer.close()
 
 
-def classify(application, message):
+def classify(application, message, rules=RULES):
     """Full matches only; variable fields are never retained in returned semantics."""
+    markers = _MARKERS.get(rules["version"])
+    if markers is None:
+        markers = _MARKERS[rules["version"]] = _markers(rules)
+    official, starts, software, operator = markers
     if application == "GAP":
-        for turn, label in ((1, "PRIMEIRO"), (2, "SEGUNDO")):
-            if message == f"Iniciando aplicação - ELEIÇÃO OFICIAL {label} TURNO - {turn}º turno":
-                return "official_round", turn
+        if message in official:
+            return "official_round", official[message]
         if message.startswith("Iniciando aplicação"):
             return "context_reset", None
     if application != "VOTA":
         return "other_application", None
-    if message in RULES["exact"]:
-        return RULES["exact"][message], None
-    if message in ("Iniciando aplicação - 1º turno", "Iniciando aplicação - 2º turno"):
-        return "session_start", int(message[-8])
-    if message == "Versão da aplicação: 10.23.0.0 - Praia da Barra do Cahy":
+    if message in rules["exact"]:
+        return rules["exact"][message], None
+    if message in starts:
+        return "session_start", starts[message]
+    if message == software:
         return "supported_software", None
-    if re.fullmatch(r"Mesário [0-9]{1,32} habilitou o eleitor", message):
+    if operator is not None and operator.fullmatch(message):
         return "operator_authorized", None
-    if re.fullmatch(
-        r"Voto confirmado para \[(?:Presidente|Governador|Senador|Deputado Federal|Deputado Estadual|Deputado Distrital|Vereador|Prefeito)\]",
-        message,
-    ):
+    if CONTEST.fullmatch(message):
         return "contest_confirmation", None
     return "unknown", None
 
@@ -84,69 +124,93 @@ def raw_events(path):
     """Read only validated log members; repeat original locators including occurrences."""
     total, members, sequence = 0, 0, 0
 
+    def entries(handle):
+        """(index, original name, chunk iterator); 2022 logs are 7z, 2026 logs ZIP."""
+        if handle.read(len(sevenzip.MAGIC)) == sevenzip.MAGIC:
+            handle.seek(0)
+            data = handle.read(512 * 1024**2 + 1)
+            if len(data) > 512 * 1024**2:
+                raise ValueError("Expanded archive bound exceeded")
+            for index, (name, body, is_dir) in enumerate(sevenzip.read(data, limit=128 * 1024**2)):
+                if not is_dir:
+                    yield index, name, len(body), iter((body,))
+            return
+        handle.seek(0)
+        with zipfile.ZipFile(handle) as z:
+            for index, entry in enumerate(z.infolist()):
+                if entry.is_dir():
+                    continue
+                with z.open(entry) as f:
+                    yield (
+                        index,
+                        entry.orig_filename,
+                        entry.file_size,
+                        iter(lambda: f.read(65536), b""),
+                    )
+
     def archive(handle, segments=()):
         nonlocal total, members, sequence
         if len(segments) > 4:
             raise ValueError("Nested archive bound exceeded")
-        with zipfile.ZipFile(handle) as z:
-            occurrences = Counter()
-            for index, entry in enumerate(z.infolist()):
-                if entry.is_dir():
-                    continue
-                members += 1
-                if members > 10000 or entry.file_size > 128 * 1024**2:
-                    raise ValueError("Member bound exceeded")
-                occurrence = occurrences[entry.orig_filename]
-                occurrences[entry.orig_filename] += 1
-                nested = [
-                    *segments,
-                    {
-                        "member_name": entry.orig_filename,
-                        "occurrence": occurrence,
-                        "member_index": index,
-                    },
-                ]
-                with tempfile.TemporaryFile() as content:
-                    with z.open(entry) as f:
-                        while body := f.read(65536):
-                            total += len(body)
-                            if total > 512 * 1024**2:
-                                raise ValueError("Expanded archive bound exceeded")
-                            content.write(body)
-                    content.seek(0)
-                    magic = content.read(4)
-                    content.seek(0)
-                    name = entry.orig_filename.replace("\\", "/").rsplit("/", 1)[-1].lower()
-                    if name == "logd.dat":
-                        for number, line in enumerate(content, 1):
-                            sequence += 1
-                            if len(line) > 65536 or sequence > 2000000:
-                                raise ValueError("Line bound exceeded")
-                            fields = line.decode("latin-1").rstrip("\r\n").split("\t")
-                            if len(fields) != 6:
-                                continue
-                            timestamp, _level, device, application, message, _token = fields
-                            try:
-                                datetime.strptime(timestamp, "%d/%m/%Y %H:%M:%S")
-                            except ValueError:
-                                continue
-                            locator = {
-                                "archive_segments": nested,
-                                "line_start": number,
-                                "line_end": number,
-                                "byte_start": None,
-                                "byte_end": None,
-                            }
-                            yield (
-                                locator,
-                                hashlib.sha256(line).hexdigest(),
-                                timestamp,
-                                device,
-                                application,
-                                message,
-                            )
-                    elif magic.startswith(b"PK") or name.endswith((".jez", ".zip")):
-                        yield from archive(content, nested)
+        occurrences = Counter()
+        for index, original, size, chunks in entries(handle):
+            members += 1
+            if members > 10000 or size > 128 * 1024**2:
+                raise ValueError("Member bound exceeded")
+            occurrence = occurrences[original]
+            occurrences[original] += 1
+            nested = [
+                *segments,
+                {
+                    "member_name": original,
+                    "occurrence": occurrence,
+                    "member_index": index,
+                },
+            ]
+            with tempfile.TemporaryFile() as content:
+                for body in chunks:
+                    total += len(body)
+                    if total > 512 * 1024**2:
+                        raise ValueError("Expanded archive bound exceeded")
+                    content.write(body)
+                content.seek(0)
+                magic = content.read(4)
+                content.seek(0)
+                name = original.replace("\\", "/").rsplit("/", 1)[-1].lower()
+                if name == "logd.dat":
+                    for number, line in enumerate(content, 1):
+                        sequence += 1
+                        if len(line) > 65536 or sequence > 2000000:
+                            raise ValueError("Line bound exceeded")
+                        fields = line.decode("latin-1").rstrip("\r\n").split("\t")
+                        if len(fields) != 6:
+                            continue
+                        timestamp, _level, device, application, message, _token = fields
+                        try:
+                            datetime.strptime(timestamp, "%d/%m/%Y %H:%M:%S")
+                        except ValueError:
+                            continue
+                        locator = {
+                            "archive_segments": nested,
+                            "line_start": number,
+                            "line_end": number,
+                            "byte_start": None,
+                            "byte_end": None,
+                        }
+                        yield (
+                            locator,
+                            hashlib.sha256(line).hexdigest(),
+                            timestamp,
+                            device,
+                            application,
+                            message,
+                        )
+                elif (
+                    magic.startswith(b"PK")
+                    or magic == sevenzip.MAGIC[:4]
+                    or name.endswith((".jez", ".zip"))
+                ):
+                    yield from archive(content, nested)
 
     with Path(path).open("rb") as f:
         yield from archive(f)
@@ -167,16 +231,19 @@ def _clock(clock, reading, event_id):
     return first
 
 
-def review_object(structural, original, output, *, round_number=2, clock=None, witnesses=()):
+def review_object(
+    structural, original, output, *, round_number=2, clock=None, witnesses=(), year=2026
+):
     """Bounded disk join against structural hashes and deterministic real semantics."""
     structural, original, output = Path(structural), Path(original), Path(output)
     document = _read_json(structural / "artifact.json")
     _verify_files(structural, document)
     if hash_file(original) != (document["object_sha256"], document["source_bytes"]):
         raise ValueError("Original source hash/size mismatch")
-    e = election_for_round(round_number)
+    e = election_for_round(round_number, year)
+    rules = rules_for(year)
     key = digest(
-        [VERSION, document["object_sha256"], round_number, digest(RULES), clock, list(witnesses)]
+        [VERSION, document["object_sha256"], round_number, digest(rules), clock, list(witnesses)]
     )
     target = output / key
     if target.exists():
@@ -325,7 +392,7 @@ def review_object(structural, original, output, *, round_number=2, clock=None, w
                 fingerprint, stream_count = hashlib.sha256(), 0
             fingerprint.update(bytes.fromhex(line_hash))
             stream_count += 1
-            kind, value = classify(app, message)
+            kind, value = classify(app, message, rules)
             reading = datetime.strptime(timestamp, "%d/%m/%Y %H:%M:%S")
             normalized = _clock(clock, reading, row["event_id"])
             if kind in ("official_round", "context_reset"):
@@ -360,8 +427,8 @@ def review_object(structural, original, output, *, round_number=2, clock=None, w
             safe = {
                 **row,
                 "real_kind": kind,
-                "rules_version": RULES["version"],
-                "rules_sha256": digest(RULES),
+                "rules_version": rules["version"],
+                "rules_sha256": digest(rules),
                 "session_id": session["session_id"] if session else None,
                 "selection_state": "official_anchored" if active else "unresolved_or_other_context",
                 "normalized_at": normalized.isoformat() if normalized else None,
@@ -452,8 +519,8 @@ def review_object(structural, original, output, *, round_number=2, clock=None, w
             "version": VERSION,
             "round": round_number,
             "object_sha256": document["object_sha256"],
-            "rules_sha256": digest(RULES),
-            "source_guide": RULES["source_url"],
+            "rules_sha256": digest(rules),
+            "source_guide": rules["source_url"],
             "counts": dict(counts),
             "files": specs,
             "copy_candidates": duplicate_count,

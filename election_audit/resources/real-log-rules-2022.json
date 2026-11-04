@@ -1,0 +1,39 @@
+{
+  "version": "tse-real-log-rules-2022-v1",
+  "year": 2022,
+  "derived_from": "tse-real-log-rules-v1",
+  "source_url": "https://www.tse.jus.br/eleicoes/eleicoes-2026-content/arquivos/log-do-ecossistema",
+  "supported_software": "8.26.0.0",
+  "review": "2026 exact semantics applied only where the 2022 message text is identical; version-specific session, round and software markers read from 2022 logs (AC, both rounds, 4 November 2026); messages without an identical 2026 rule remain unknown",
+  "templates": {
+    "official_round": {
+      "1": "Iniciando aplicação - ELEIÇÃO OFICIAL PRIMEIRO TURNO - Oficial - 1º turno",
+      "2": "Iniciando aplicação - ELEIÇÃO OFICIAL SEGUNDO TURNO - Oficial - 2º turno"
+    },
+    "session_start": {
+      "1": "Iniciando aplicação - Oficial - 1º turno",
+      "2": "Iniciando aplicação - Oficial - 2º turno"
+    },
+    "supported_software": "Versão da aplicação: 8.26.0.0 - Onça-pintada",
+    "operator_authorized": null
+  },
+  "exact": {
+    "Eleitor foi habilitado": "authorization",
+    "O voto do eleitor foi computado": "completion",
+    "Solicitação de dado pessoal do eleitor para habilitação manual": "manual_request",
+    "Tipo de habilitação do eleitor [biométrica]": "method_biometric",
+    "Eleitor foi suspenso e não confirmou nenhum voto": "suspension_full",
+    "Eleitor votou parcialmente e em seguida foi suspenso": "suspension_partial",
+    "Procedimento de encerramento confirmado": "session_closing",
+    "Finalização de aplicativo": "application_exit",
+    "O eleitor identificado já votou": "authorization_failed",
+    "Eleitor voltou a digitar enquanto estava sendo suspenso": "resumption"
+  },
+  "not_mapped": {
+    "Mesário # habilitou o eleitor": "2026 operator-authorization marker; absent in 2022, so manual cycles keep method unknown",
+    "Identificador do eleitor digitado inválido": "2026 authorization failure; absent in 2022",
+    "Título inválido": "plausible 2022 counterpart of an invalid identifier; no reviewed source",
+    "Capturada a digital do mesário": "poll-worker fingerprint after a manual request; no reviewed source that it authorizes the voter",
+    "O eleitor não possui biometria": "voter without biometrics; no reviewed source"
+  }
+}

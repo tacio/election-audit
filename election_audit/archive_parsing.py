@@ -25,6 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+from election_audit import sevenzip
 from election_audit.snapshots import _fsync_directory, inspect_snapshot, snapshot_tables
 from election_audit.source_inventory import canonical, digest, hash_file, identity, safe_source
 
@@ -192,6 +193,12 @@ class _Parser:
         if len(segments) > self.config.max_depth:
             self.issue("archive_depth_limit", segments, limit=self.config.max_depth)
             return
+        stream.seek(0)
+        magic = stream.read(len(sevenzip.MAGIC))
+        stream.seek(0)
+        if magic == sevenzip.MAGIC:
+            self.archive_7z(stream, segments)
+            return
         if not self._directory_guard(stream, segments):
             return
         try:
@@ -270,6 +277,52 @@ class _Parser:
                             self.issue("member_integrity_error", nested)
         except zipfile.BadZipFile, RuntimeError, NotImplementedError, EOFError, ValueError:
             self.issue("invalid_archive", segments)
+
+    def archive_7z(self, stream, segments):
+        """2022 logs are 7z archives; the same bounds and issue codes apply."""
+        stream.seek(0, 2)
+        if stream.tell() > self.config.max_archive_bytes:
+            self.issue("archive_size_limit", segments, limit=self.config.max_archive_bytes)
+            return
+        stream.seek(0)
+        try:
+            entries = sevenzip.read(stream.read(), limit=self.config.max_member_bytes)
+        except sevenzip.SevenZipError:
+            self.issue("invalid_archive", segments)
+            return
+        occurrences = Counter()
+        for index, (original_name, content, _is_dir) in enumerate(entries):
+            self.counts["members"] += 1
+            occurrence = occurrences[original_name]
+            occurrences[original_name] += 1
+            nested = [
+                *segments,
+                {"member_name": original_name, "occurrence": occurrence, "member_index": index},
+            ]
+            if self.counts["members"] > self.config.max_members:
+                self.issue("member_count_limit", nested, limit=self.config.max_members)
+                break
+            if len(content) > self.config.max_member_bytes:
+                self.issue("member_size_limit", nested, limit=self.config.max_member_bytes)
+                continue
+            if len(content) + self.counts["expanded_bytes"] > self.config.max_total_bytes:
+                self.issue("expanded_size_limit", nested, limit=self.config.max_total_bytes)
+                continue
+            self.counts["expanded_bytes"] += len(content)
+            self.counts["verified_members"] += 1
+            name = original_name.replace("\\", "/").rsplit("/", 1)[-1].lower()
+            with self.member_buffer() as body:
+                body.write(content)
+                body.seek(0)
+                if name == "logd.dat":
+                    self.log_members += 1
+                    self.lines(body, nested)
+                elif (
+                    content[:2] == b"PK"
+                    or content[:6] == sevenzip.MAGIC
+                    or name.endswith((".jez", ".zip"))
+                ):
+                    self.archive(body, nested)
 
     def lines(self, body, segments):
         line_number = 0

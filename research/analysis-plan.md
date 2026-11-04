@@ -1,6 +1,6 @@
 # Statistical audit of the 2026 presidential election: study protocol
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 2 · Language: en
+Document-ID: EA-ANALYSIS-PLAN · Revision: 3 · Language: en
 
 [Português](analysis-plan.pt-BR.md) · [Completion plan](completion-plan.md) · [Related work](related-work.md)
 
@@ -72,7 +72,7 @@ confirmatory family.
 | --- | --- | --- | --- |
 | Altered or substituted results after the urn (transmission, totalization, publication) | BU signature; binary BU vs BWEB vs hierarchical totals; printed BU copies | I1, I2, I4, I8 | Nothing within the electronic chain if the signing keys themselves were compromised; printed copies are the out-of-band check |
 | Software that alters votes inside the urn, with BU, RDV and log all consistent | No log trace; aggregate result patterns only | TSE election-day integrity tests (external evidence, section 4); C1, C2, C4, C6 | A small, spatially uniform switch that mimics ordinary swing; its size is bounded by the minimum detectable manipulation |
-| Ballot stuffing or impersonation by poll workers | Manual (non-biometric) authorizations, cycles outside normal hours, bursts of fast cycles; turnout and share spikes | I5; C2, C3, C5 | Stuffing spread thinly over many sections at normal times and with biometric authorizations |
+| Ballot stuffing or impersonation by poll workers | Non-biometric authorizations, cycles outside normal hours, bursts of fast cycles; turnout and share spikes | I5; C2, C3, C5 | Stuffing spread thinly over many sections at normal times and with biometric authorizations |
 | Suppression or obstruction of voters | Turnout drop from round 1 to round 2 relative to peers; long gaps, suspensions, late opening, urn replacement | C1 (turnout), C4, C5 | Causes outside the polling place; legitimate causes (transport, weather) produce the same signal |
 | Tampered, copied or fabricated logs | Block hashes; the round-1 segment inside each runoff log vs the round-1 log; clock discontinuities | I6, I7 | A complete, consistently re-signed artifact chain |
 | Errors in publication or in this pipeline | Any reconciliation failure | I1–I9 | — |
@@ -152,6 +152,12 @@ only out-of-band evidence, and they are reported with that caveat.
   before selecting a session.
 - Count completed voter cycles, not messages. A request for manual data can be
   cancelled; it is not a completed manual vote. Unresolved cycles stay unknown.
+- Split authorization as biometric versus non-biometric. A biometric match is the
+  only path where the urn checks the voter against an enrolled fingerprint; manual,
+  no-biometrics and undetermined methods all rest on the poll worker and are
+  pooled. The biometric marker is identical in 2026 and 2022, so the split is
+  measured the same way in both years; the 2022 logs have no explicit manual
+  marker.
 - Timestamps are naive device-clock readings. Keep the original reading, the
   assigned offset, adjustments, the conversion rule and its confidence. Do not
   infer a timezone from an early or late first vote. Unresolved clocks block
@@ -180,7 +186,8 @@ crosswalk, or marked incomparable. Outcomes:
   zero; every test runs in both directions (A and B), with A and B fixed from
   official candidacy identifiers;
 - blank and null shares, with their own denominators;
-- operational measures: manual-authorization share of completed cycles, share of
+- operational measures: non-biometric share of completed cycles (expected level
+  from biometric enrolment and electorate profile), share of
   cycles after the official closing time, and cycle cadence (completed cycles per
   active minute).
 
@@ -225,7 +232,7 @@ null drawn from the fitted model with whole-location resampling.
 | C2 | Turnout × share joint distribution compared with the model-implied null, in the spirit of [Klimek et al. 2012](https://doi.org/10.1073/pnas.1210722109) | Stuffing that raises turnout and one candidate together | Strongly mobilized homogeneous communities |
 | C3 | Excess of integer percentages relative to a size-aware null ([Kobak et al. 2016](https://doi.org/10.1214/16-AOAS904); [Rozenas 2017](https://doi.org/10.1017/pan.2016.9)) | Fabricated or rounded results | Small sections; tested against the exact discrete null |
 | C4 | Scan statistic over polling places and municipalities on residuals ([Kulldorff 1997](https://doi.org/10.1080/03610929708831995)) | Geographically concentrated manipulation | Local political events; reviewed with source evidence |
-| C5 | Association between operational excess (manual share, late cycles, cadence) and share residual, both directions | Stuffing or impersonation linked to one candidate | Low biometric enrolment, accessibility, queues |
+| C5 | Association between operational excess (non-biometric share, late cycles, cadence) and share residual, both directions | Stuffing or impersonation linked to one candidate | Low biometric enrolment, accessibility, queues |
 | C6 | Swing residual by device model and software version, within location | Device-specific software manipulation | Composition of places using older devices (the 2022 Instituto Voto Legal error; section 7.6) |
 
 Multiplicity is controlled across this family with Benjamini–Yekutieli at 5% FDR

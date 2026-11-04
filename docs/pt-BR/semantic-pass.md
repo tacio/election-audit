@@ -1,6 +1,6 @@
 # Passada semântica em fluxo (Fase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 2 · Language: pt-BR
+Document-ID: EA-SEMANTIC-PASS · Revision: 3 · Language: pt-BR
 
 [English](../en/semantic-pass.md) · [Índice de implementação](implementation-index.md)
 
@@ -19,8 +19,15 @@ seguintes precisam.
   qualquer testemunha numa seção excluída nunca são abertos, em nenhum turno.
 - `resources/real-log-rules.json` (software 10.23.0.0). Outras versões de software
   nunca viram sessões oficiais.
+- Para 2022, os arquivos em massa verificados e `resources/real-log-rules-2022.json`
+  ([logs de 2022](#logs-de-2022)).
 
 ## Saídas
+
+A versão `session-aggregates-v2` guarda em inteiros de 64 bits os segundos dos
+intervalos entre conclusões e dos recuos do relógio: o relógio de uma urna de 2022
+recuou cerca de 89 anos, o que estourou as colunas de 32 bits da v1. As versões
+nacionais de 2026 são v1 e não têm valor além do limite de 32 bits.
 
 `<output>/release/` contém quatro tabelas Parquet e um `manifest.json` com o
 vínculo (hashes das regras, do certificado da cópia, do manifesto e das exclusões)
@@ -140,10 +147,69 @@ protegido e os 60 foram atribuídos pela identidade impressa:
 Os totais de votos das seções SA vêm do `busa.dat`, presente nos arquivos em massa;
 a Fase 20 precisa lê-lo junto com o `bu.dat`.
 
+## Logs de 2022
+
+2022 é o controle negativo (seção 7.6 do plano de análise). Seus logs vêm dos
+arquivos em massa verificados (`bulk-download`, 28 por turno), não de uma cópia
+certificada, e são arquivos 7z em vez de ZIP. `election_audit/sevenzip.py` os lê só
+com a biblioteca padrão: cabeçalhos simples ou codificados em LZMA, codificadores
+únicos LZMA, LZMA2 ou cópia, todo CRC declarado conferido e todo o resto recusado.
+Ele coincidiu byte a byte com a ferramenta `7z` em 300 logs do AC amostrados. O
+parser estrutural, o adaptador por evento e a passada abrem 7z em qualquer nível
+de aninhamento.
+
+Com `--bulk-root`, só o processo pai lê os membros de log de cada arquivo, na
+ordem do deslocamento do cabeçalho (ordem física), e entrega os bytes aos
+trabalhadores, com no máximo `workers + 2` lotes em andamento. Os hashes dos
+objetos são calculados a partir dos bytes do membro e as testemunhas vêm do nome do
+membro (`o00406-MMMMMZZZZSSSS.logjez`). O modo em massa recusa 2026, cujos
+arquivos contêm os logs protegidos, e não recebe exclusões.
+
+`resources/real-log-rules-2022.json` (software 8.26.0.0,
+`tse-real-log-rules-2022-v1`) mantém a máquina de estados de 2026 e aplica uma
+regra de 2026 só quando o texto da mensagem de 2022 é idêntico. Os marcadores de
+sessão, turno e software mudam em 2022 e foram lidos dos próprios logs:
+
+| Marcador | 2026 | 2022 |
+| --- | --- | --- |
+| Turno oficial (GAP) | `ELEIÇÃO OFICIAL SEGUNDO TURNO - 2º turno` | `ELEIÇÃO OFICIAL SEGUNDO TURNO - Oficial - 2º turno` |
+| Início de sessão (VOTA) | `Iniciando aplicação - 2º turno` | `Iniciando aplicação - Oficial - 2º turno` |
+| Software | `10.23.0.0 - Praia da Barra do Cahy` | `8.26.0.0 - Onça-pintada` |
+| Habilitação pelo operador | `Mesário # habilitou o eleitor` | ausente |
+
+Não foi encontrado um catálogo oficial de mensagens de 2022, então mensagens de
+2022 sem regra idêntica em 2026 ficam desconhecidas e estão listadas no arquivo de
+regras. Em particular, uma habilitação manual em 2022 mostra a digital do mesário
+(`Capturada a digital do mesário`) em vez do marcador de operador de 2026, então
+os ciclos manuais de 2022 contam com método `unknown`. `Título inválido` e
+`O eleitor não possui biometria` também não são mapeados. A análise compara o
+método biométrico com todos os outros (plano de análise rev. 3), e o marcador
+biométrico é idêntico nos dois anos, então isso não limita 2022.
+
+Em 4 de novembro de 2026 a passada coincidiu com o adaptador em 200 de 200 objetos
+de 2022 do AC amostrados por turno (43707 e 40220 ciclos concluídos); a passada
+levou 10.4 s e 16.4 s contra 203.2 s e 319.6 s do adaptador.
+
+```sh
+just semantic-pass equivalence \
+  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2022-arqurnatot \
+  --year 2022 --round 2 \
+  --output ~/data/election-audit-stage/phase21/equivalence-2022-r2-ac-200 \
+  --uf ac --sample 200 --seed 2103
+just semantic-pass run \
+  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2022-arqurnatot \
+  --year 2022 --round 2 \
+  --output ~/data/election-audit-stage/phase21/national-2022-r2-v2-20261104 \
+  --workers 6
+```
+
+Os resultados nacionais de 2022 estão pendentes: as duas execuções estavam em andamento quando esta revisão foi escrita.
+
 ## Limites
 
-- Os logs de 2022 usam outra versão de software e precisam de regras de 2022
-  revisadas antes de produzir sessões oficiais.
+- Habilitações manuais de 2022 não são separadas das outras não biométricas (não há
+  contrapartida revisada do marcador de operador de 2026). As análises usam
+  biométrico contra não biométrico nos dois anos.
 - Seções SA têm medidas de apuração SA, não medidas de sessão da urna: a votação
   ocorreu em cédulas ou numa urna cujo log não é publicado no pacote SA.
 - As impressões digitais comparam segmentos de contexto inteiros; um segmento do
