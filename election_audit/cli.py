@@ -43,6 +43,8 @@ def main(argv=None):
         "bulk-download": ("election_audit.bulk_acquisition", "bulk_download_main"),
         "semantic-pass": ("election_audit.semantic_pass", "semantic_pass_main"),
         "sa-logs": ("election_audit.sa_logs", "sa_logs_main"),
+        "results-hierarchy": ("election_audit.results_hierarchy", "results_hierarchy_main"),
+        "integrity-docs": ("election_audit.integrity_documents", "integrity_documents_main"),
     }
     if args and args[0] in extension_commands:
         module, function = extension_commands[args[0]]

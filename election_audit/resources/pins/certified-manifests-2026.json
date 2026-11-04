@@ -1,0 +1,31 @@
+{
+  "version": "certified-manifests-v1",
+  "pinned_on": "2026-11-04",
+  "note": "Analysis inputs. Read these manifest copies by digest, never a live or pre-split manifest. Both copies of each manifest were re-hashed on 2026-11-04 and match.",
+  "rounds": {
+    "1": {
+      "manifest_sha256": "5989aab1df0708fdef0945a23723cab4a9c71a1a959ab2e3b39903320fad089a",
+      "manifest_bytes": 1869316096,
+      "certificate_sha256": "fa081055f625a39501001cd71f5d318ded3d42d27c9928703c227df16ea274b5",
+      "staging_certificate_sha256": "4b57a3846bb38085410ac02e6ca5f6a377009dccd68af41e4b0c0b5124155ed2",
+      "objects": 998412,
+      "object_bytes": 53722200971,
+      "copies": [
+        "output volume: 2026/migration-2026-11-01/manifest-r1.sqlite",
+        "SSD staging: ~/data/election-audit-stage/2026/turno-1/manifest.sqlite"
+      ]
+    },
+    "2": {
+      "manifest_sha256": "1feb269a0547704930c0203a1a1d564a7ddad08b093bcdcfae68cdbb30288c28",
+      "manifest_bytes": 2532749312,
+      "certificate_sha256": "149acb72b5830840ded6c378fb200f3536dcb2714132d1306ef0e4a1d1c043ac",
+      "staging_certificate_sha256": "298f182c870ee90ced0c1129bfacbb8bece22107bcf410375aaa44d08f303d4e",
+      "objects": 998413,
+      "object_bytes": 90643145031,
+      "copies": [
+        "output volume: 2026/migration-2026-11-01/manifest-r2.sqlite",
+        "SSD staging: ~/data/election-audit-stage/2026/turno-2/manifest.sqlite"
+      ]
+    }
+  }
+}

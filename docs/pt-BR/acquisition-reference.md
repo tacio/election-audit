@@ -1,6 +1,6 @@
 # Logs da eleição presidencial de 2026 do TSE
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 9 · Language: pt-BR
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 10 · Language: pt-BR
 
 [English](../en/acquisition-reference.md)
 
@@ -33,6 +33,10 @@ continua apontando para seu manifesto no SSD. Para análise, use as cópias dos
 manifestos certificadas por hash feitas na migração, e não os arquivos vivos no SSD; a
 raiz copiada do segundo turno também contém um `manifest.sqlite` obsoleto de antes da
 separação, que não deve ser lido.
+Os hashes certificados estão fixados em
+`election_audit/resources/pins/certified-manifests-2026.json`; as duas cópias de
+cada manifesto (volume de saída e cópia no SSD) e os dois certificados foram
+conferidos contra esses hashes em 2026-11-04.
 
 ## Inspecionar logs salvos
 
@@ -238,6 +242,57 @@ retotalizações podem ocorrer por meses. Trate um relatório baixado como retra
 um momento (o manifesto guarda ETag e Last-Modified), leia o horário de resultado
 impresso em cada PDF e compare retratos pelo CRC dos membros do ZIP, não pelo hash
 do arquivo.
+
+### Resultados hierárquicos (EA20)
+
+`results-hierarchy fetch` lê a configuração oficial de municípios
+(`config/mun-e<election>-cm.json`) e baixa todos os arquivos de resultado unificado
+da eleição presidencial (`-u.json`) que ela implica: Brasil, as 27 UFs e ZZ, e os
+5757 municípios, além dos arquivos de andamento do Brasil e das UFs (`-ab.json`),
+5815 arquivos por turno. Cada corpo precisa ser oficial (`f` = `o`) e indicar a
+eleição, o turno e a abrangência esperados (arquivos municipais dizem `tpabr` =
+`mu`); os corpos são guardados endereçados por conteúdo e somente leitura, com
+ETag, Last-Modified e o carimbo de geração do próprio arquivo (`dg`, `hg`, `idg`).
+`--resume` continua uma coleta interrompida sob o mesmo vínculo.
+
+```sh
+just results-hierarchy fetch --round 1 --output ~/data/election-audit-stage/results-hierarchy/ea20-r1-20261104
+just results-hierarchy fetch --round 2 --output ~/data/election-audit-stage/results-hierarchy/ea20-r2-20261104
+```
+
+Os retratos de 2026-11-04 têm 5815 arquivos por turno, todo arquivo unificado final
+(`tf` = `s`). O segundo turno foi gerado na noite da eleição (2026-10-25). O
+primeiro foi gerado em 2026-10-05, exceto todo o ZZ (suas 186 cidades e o total do
+ZZ), regerado em 2026-10-24; a Fase 20 precisa comparar esses arquivos com os
+resultados SA do ZZ. Como os relatórios de totalização, esses arquivos mudam após
+retotalizações, então uma coleta é um retrato datado.
+
+### Documentos do teste de integridade (sites dos TREs)
+
+O TSE não publica os resultados do Teste de Integridade do dia da eleição como
+dados abertos. Cada TRE publica suas atas, listas de urnas sorteadas e editais no
+próprio formato, e `tse.jus.br` e os sites dos TREs recusam requisições
+automatizadas (HTTP 403), por isso os documentos são coletados num navegador. Para
+cada documento a página baixa os bytes e grava um arquivo de registros por tribunal
+(`ea-integrity-manifest-<court>.json`) com URL, status HTTP, tipo de mídia, tamanho,
+SHA-256 e Last-Modified. `integrity-docs ingest` então associa cada registro servido
+a um arquivo salvo pelo SHA-256 (navegadores renomeiam downloads) e o arquiva numa
+nova raiz endereçada por conteúdo e somente leitura; um registro servido sem seus
+bytes fica `missing`.
+
+```sh
+just integrity-docs ingest --downloads ~/Downloads \
+  --output ~/data/election-audit-stage/inputs/integrity-tests-2026-sample-20261104
+```
+
+A amostra de 2026-11-04 cobre dez tribunais (SP, AC, AL, DF, ES, PR, MG, RJ, BA,
+RS): 125 documentos arquivados, todos iguais ao hash do navegador, e um link quebrado
+registrado como não servido. O que cada tribunal publica varia: SP, DF, ES, MG, RJ e
+BA publicam atas dos dois tipos de teste; AC, AL, PR e RS publicam só as listas de
+urnas sorteadas (como páginas HTML, relatórios ou notícias). Os outros 17
+tribunais não foram coletados. O TCU, que acompanhou os testes nas 27 UFs, deve
+enviar ao TSE um relatório consolidado em até 30 dias após o segundo turno; essa é
+a fonte nacional esperada.
 
 ## Saídas
 

@@ -1,6 +1,6 @@
 # TSE 2026 presidential election logs
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 9 · Language: en
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 10 · Language: en
 
 [Português](../pt-BR/acquisition-reference.md)
 
@@ -33,6 +33,10 @@ manifest rewrite: each copied root's `manifest-location.json` still points at it
 SSD manifest. For analysis, use the hash-certified manifest copies made during the
 migration rather than the live SSD files; the copied round-2 root also contains a
 stale pre-split `manifest.sqlite` that must not be read.
+The certified digests are pinned in
+`election_audit/resources/pins/certified-manifests-2026.json`; both copies of each
+manifest (output volume and SSD staging) and both certificates were re-hashed
+against those pins on 2026-11-04.
 
 ## Inspecting saved logs
 
@@ -240,6 +244,57 @@ retotalization. Every report says "sujeito a modificações", and retotalization
 can follow for months. Treat a fetched report as a point-in-time snapshot (the
 manifest keeps its ETag and Last-Modified), read the result time printed in each
 PDF, and compare snapshots by ZIP member CRC rather than by archive hash.
+
+### Hierarchical results (EA20)
+
+`results-hierarchy fetch` reads the official municipality configuration
+(`config/mun-e<election>-cm.json`) and fetches every presidential unified result file
+(`-u.json`) it implies: Brazil, the 27 UFs and ZZ, and all 5757 municipalities,
+plus the Brazil and UF progress files (`-ab.json`), 5815 files per round. Each
+body must be official (`f` = `o`) and name the expected election, round and scope
+(municipal files say `tpabr` = `mu`); bodies are stored content-addressed and
+read-only with their ETag, Last-Modified and the file's own generation stamp
+(`dg`, `hg`, `idg`). `--resume` continues an interrupted fetch under the same
+binding.
+
+```sh
+just results-hierarchy fetch --round 1 --output ~/data/election-audit-stage/results-hierarchy/ea20-r1-20261104
+just results-hierarchy fetch --round 2 --output ~/data/election-audit-stage/results-hierarchy/ea20-r2-20261104
+```
+
+The 2026-11-04 snapshots hold 5815 files per round, every unified file final
+(`tf` = `s`). Round 2 was generated on election night (2026-10-25). Round 1 was
+generated on 2026-10-05, except all of ZZ (its 186 cities and the ZZ total),
+regenerated on 2026-10-24; Phase 20 must compare those files with the ZZ SA
+results. Like the totalization reports, these files change after retotalizations,
+so a fetch is a dated snapshot.
+
+### Integrity test documents (TRE sites)
+
+TSE does not publish the election-day integrity test (Teste de Integridade)
+results as open data. Each TRE posts its own minutes, urn-selection lists and
+notices in its own layout, and `tse.jus.br` and the TRE sites refuse scripted
+requests (HTTP 403), so the documents are collected in a browser. For each
+document the page fetches the bytes and writes a per-court record file
+(`ea-integrity-manifest-<court>.json`) with URL, HTTP status, media type, size,
+SHA-256 and Last-Modified. `integrity-docs ingest` then matches each served record
+to a saved file by SHA-256 (browsers rename downloads) and files it in a new
+content-addressed, read-only root; a served record without its bytes stays
+`missing`.
+
+```sh
+just integrity-docs ingest --downloads ~/Downloads \
+  --output ~/data/election-audit-stage/inputs/integrity-tests-2026-sample-20261104
+```
+
+The 2026-11-04 sample covers ten courts (SP, AC, AL, DF, ES, PR, MG, RJ, BA, RS):
+125 documents filed, every one matching its browser hash, and one dead link
+recorded as not served. What courts publish differs: SP, DF, ES, MG, RJ and BA post
+test minutes for both test types; AC, AL, PR and RS post only the urn-selection
+lists (as HTML pages, reports or news posts). The other 17 courts were not
+collected. The TCU, which observed the tests in all 27 UFs, is due to send TSE a
+consolidated report within 30 days of the second round; that is the expected
+national source.
 
 ## Outputs
 

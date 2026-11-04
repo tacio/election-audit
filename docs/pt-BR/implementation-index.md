@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 26 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 27 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -83,7 +83,7 @@ reverifica a apenas 56–63 MB/s. O
 [plano de conclusão](../../research/completion-plan.pt-BR.md#regras-de-recursos-e-es)
 define as regras de E/S para a próxima passada.
 
-**Fase 19 (entradas nacionais): em andamento.** `bulk-download` baixou, com
+**Fase 19 (entradas nacionais): concluída; documentos do teste de integridade amostrados.** `bulk-download` baixou, com
 SHA-256/SHA-512 e o JSON do catálogo do TSE, o BWEB de 2026 e de 2022 (112
 arquivos por ano, todos os 56 por ano coincidindo com o `.sha512` publicado).
 Os 12 conjuntos
@@ -99,6 +99,17 @@ Os arquivos em massa de BU/RDV/log (56 por ano; 2026: 219.2 GB, 2022: 168.5 GB)
 estão completos em `bulk/` no volume de saída, e `bulk-download verify` recalculou
 os hashes dos 112 contra seus manifestos em 2026-11-04 (o TSE não publica `.sha512`
 para eles).
+`results-hierarchy` baixou a hierarquia EA20 da eleição presidencial nos dois turnos
+(BR, 27 UFs e ZZ, 5757 municípios e os arquivos de andamento: 5815 arquivos por
+turno, todos finais); o ZZ do primeiro turno foi regerado em 2026-10-24. Os hashes
+dos manifestos certificados estão fixados em
+`election_audit/resources/pins/certified-manifests-2026.json` e as duas cópias foram
+conferidas contra eles. Os documentos do teste de integridade não são dados abertos
+e os sites dos TREs recusam requisições automatizadas, então um navegador coletou
+uma amostra de dez tribunais (SP, AC, AL, DF, ES, PR, MG, RJ, BA, RS):
+`integrity-docs` arquivou 125 documentos, todos iguais ao hash do navegador
+([referência de aquisição](acquisition-reference.md#documentos-do-teste-de-integridade-sites-dos-tres)).
+Veja o [handoff da Fase 19](handoffs/task-19.md).
 
 **Fase 21 (passada semântica): execuções nacionais de 2026 concluídas; 2022
 pendente.** `semantic-pass` coincidiu com o adaptador por evento em 400 de 400
@@ -138,14 +149,15 @@ Não existe resultado eleitoral nacional, margem nacional, modelo nacional ajust
 nem rótulo de fraude.
 
 **Verificações.** A verificação offline completa `just check` passa (lock, formato,
-lint, contratos, documentos, comandos documentados e todos os 339 testes).
+lint, contratos, documentos, comandos documentados e todos os 348 testes).
 
 ## Próximo passo
 
-Concluir a Fase 19 (resultados hierárquicos EA20, relatórios do teste de
-integridade do dia da eleição, manifestos certificados fixados) e a Fase 21 de 2022
-(revisão das regras, equivalência, execução nacional) e então as verificações de
-integridade da Fase 20 sobre BU, RDV, assinaturas e correspondências baixados. O
+Fase 21 de 2022 (revisão das regras, equivalência, execução nacional) e então as
+verificações de integridade da Fase 20 sobre BU baixados (incluindo `busa.dat` do
+SA), RDV, assinaturas, correspondências e a hierarquia EA20. Arquivar o relatório
+consolidado do TCU sobre o teste de integridade quando for publicado (previsto até
+30 dias após o segundo turno). O
 [protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 2) define as
 afirmações, o mapa de ameaças e observáveis, as verificações de integridade I1–I9, os
 testes confirmatórios C1–C6, o estudo de poder e a política de dados; o
@@ -219,7 +231,9 @@ com verificações aritméticas reais do AC (177 testes).
 | 16 | Ajuste de desenvolvimento de comparecimento no AC | Família completa de alvos/variantes, simulações com reajuste, avaliação final | [16](handoffs/task-16.md) |
 | 17 | Pacotes de casos de desenvolvimento do AC | Casos nacionais, corroboração, limites de impacto, sensibilidade do pipeline completo | [17](handoffs/task-17.md) |
 | 18 | Notebooks sobre a exportação do AC | QA no navegador, conjuntos de dados nacionais | [18](handoffs/task-18.md) |
-| 19–26 | Não iniciadas; definidas no [plano de conclusão](../../research/completion-plan.pt-BR.md#fases-revisadas) | Todas | — |
+| 19 | Concluída: BWEB, arquivos de BU/RDV/log, perfil do eleitorado, correspondências, GEDAI, hierarquia EA20, manifestos fixados, dois turnos e 2022 | Documentos do teste de integridade dos 17 tribunais fora da amostra; relatório consolidado do TCU | [19](handoffs/task-19.md) |
+| 21 | Execuções nacionais de 2026 concluídas; o registro concilia todas as seções; logs SA atribuídos | Revisão das regras de 2022, equivalência e execução nacional | — |
+| 20, 22–26 | Não iniciadas; definidas no [plano de conclusão](../../research/completion-plan.pt-BR.md#fases-revisadas) | Todas | — |
 
 ## Onde estão os resultados
 
@@ -237,6 +251,8 @@ absolutos ficam no volume de saída da máquina de referência
 | Arquivos em massa de BU/RDV/log da Fase 19, 2026 e 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` no volume de saída |
 | Relatórios de equivalência, passada de desenvolvimento do AC e passadas nacionais da Fase 21 | `~/data/election-audit-stage/phase21/` |
 | Logs SA (apuração de contingência) por turno e seu resumo por seção | `~/data/election-audit-stage/sa-logs/` |
+| Resultados hierárquicos EA20 da eleição presidencial, dois turnos | `~/data/election-audit-stage/results-hierarchy/` |
+| Documentos do teste de integridade, amostra de dez tribunais, com arquivos de registros do navegador; os downloads originais do navegador | `~/data/election-audit-stage/inputs/integrity-tests-2026-sample-20261104/`; `~/data/election-audit-stage/integrity-downloads-20261104/` |
 | Manifestos originais da coleta (vivos) | `.local-state/` |
 | Metadados da coleta no HDD antigo (cobertura, marcadores, manifesto obsoleto anterior à divisão) e o store por evento inicial da Fase 11 do AC, verificados por hash; os objetos brutos do HDD antigo duplicavam as cópias certificadas e foram liberados para exclusão em 3 de novembro de 2026 | `archive/old-hdd-2026-11-03/` no volume de saída |
 | Logs de execução e registros de lançamento da coleta | `data/phase10/` |
@@ -254,9 +270,9 @@ absolutos ficam no volume de saída da máquina de referência
 | Área | Módulos e guias |
 | --- | --- |
 | Ambiente | `pyproject.toml`, `uv.lock`, `.python-version`; `uv sync --locked` |
-| CLI | `election_audit/cli.py`. Legados: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensões: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export stage-sources bulk-download semantic-pass sa-logs` |
+| CLI | `election_audit/cli.py`. Legados: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensões: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export stage-sources bulk-download semantic-pass sa-logs results-hierarchy integrity-docs` |
 | Receitas | `justfile`; uma receita por comando da CLI, mais `setup doctor fmt lint test contracts-check docs-check docs-command-check check` |
-| Coleta | `scripts/download_tse_logs.py` (`--round 1` ou `--round 2`), `election_audit/elections.py`; cópia para SSD `source_staging` (`stage-sources`); arquivos de dados abertos `bulk_acquisition` (`bulk-download`); [referência de coleta](acquisition-reference.md) |
+| Coleta | `scripts/download_tse_logs.py` (`--round 1` ou `--round 2`), `election_audit/elections.py`; cópia para SSD `source_staging` (`stage-sources`); arquivos de dados abertos `bulk_acquisition` (`bulk-download`); hierarquia EA20 `results_hierarchy` (`results-hierarchy`); documentos do teste de integridade dos TREs `integrity_documents` (`integrity-docs`); hashes fixados dos manifestos certificados `resources/pins/`; [referência de coleta](acquisition-reference.md) |
 | Snapshot/origem/cobertura | `source_inventory`, `coverage`, `snapshots`; [snapshots](snapshots.md) |
 | Parse estrutural | `archive_parsing` (`jez-structural-v1`); [parse de arquivos](archive-parsing.md) |
 | Reconstrução operacional | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Fase 13), `semantic_pass` (`session-aggregates-v1`, Fase 21), `sa_logs` (`sa-log-summary-v1`); [reconstrução](reconstruction.md), [passada semântica](semantic-pass.md) |

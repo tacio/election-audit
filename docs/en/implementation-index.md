@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 26 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 27 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -79,7 +79,7 @@ directory is eCryptfs, so one reader re-hashes at only 56–63 MB/s. The
 [completion plan](../../research/completion-plan.md#resource-and-io-rules) sets
 the I/O rules for the next pass.
 
-**Phase 19 (national inputs): in progress.** `bulk-download` fetched, with
+**Phase 19 (national inputs): complete; integrity test documents sampled.** `bulk-download` fetched, with
 SHA-256/SHA-512 and the TSE catalog JSON, the 2026 and 2022 BWEB (112 archives
 each year, all 56 per year with a published `.sha512` match). All 12 small
 input datasets (BWEB and results for 2026 and 2022, voter profile and polling places,
@@ -93,6 +93,16 @@ after retotalizations; see the
 The bulk BU/RDV/log archives (56 per year; 2026: 219.2 GB, 2022: 168.5 GB) are
 complete in `bulk/` on the output volume, and `bulk-download verify` re-hashed all
 112 against their manifests on 2026-11-04 (TSE publishes no `.sha512` for them).
+`results-hierarchy` fetched the presidential EA20 hierarchy for both rounds (BR,
+27 UFs and ZZ, 5757 municipalities and the progress files: 5815 files per round,
+all final); round-1 ZZ was regenerated on 2026-10-24. The certified manifest
+digests are pinned in `election_audit/resources/pins/certified-manifests-2026.json`
+and both copies re-hashed against them. Integrity test documents are not open
+data and the TRE sites refuse scripted requests, so a browser collected a sample
+of ten courts (SP, AC, AL, DF, ES, PR, MG, RJ, BA, RS): `integrity-docs` filed 125
+documents, every one matching its browser hash
+([acquisition reference](acquisition-reference.md#integrity-test-documents-tre-sites)).
+See the [Phase 19 handoff](handoffs/task-19.md).
 
 **Phase 21 (semantic pass): national 2026 runs complete; 2022 pending.**
 `semantic-pass` matched the event-level adapter on 400 of 400 sampled AC objects
@@ -128,14 +138,14 @@ No national electoral result, national margin, fitted national model or fraud
 label exists.
 
 **Checks.** The full offline gate `just check` passes (lock, format, lint,
-contracts, docs, documented commands and all 339 tests).
+contracts, docs, documented commands and all 348 tests).
 
 ## Next step
 
-Finish Phase 19 (hierarchical EA20 results, election-day integrity test reports,
-pinned certified manifests) and Phase 21 for 2022 (rules review, equivalence,
-national run), then Phase 20 integrity checks on the downloaded BU, RDV,
-signatures and correspondences. The
+Phase 21 for 2022 (rules review, equivalence, national run), then Phase 20
+integrity checks on the downloaded BU (including SA `busa.dat`), RDV, signatures,
+correspondences and the EA20 hierarchy. File the TCU consolidated integrity test
+report when it is published (due within 30 days of the second round). The
 [study protocol](../../research/analysis-plan.md) (Revision 2) defines the claims,
 the threat-to-observable map, the integrity checks I1–I9, the confirmatory tests
 C1–C6, the power study and the data policy; the
@@ -208,7 +218,9 @@ checks (177 tests).
 | 16 | AC turnout development fit | Full target/variant family, refit simulations, final evaluation | [16](handoffs/task-16.md) |
 | 17 | AC development case packets | National cases, corroboration, impact bounds, full-pipeline sensitivity | [17](handoffs/task-17.md) |
 | 18 | Notebooks over AC export | Browser QA, national datasets | [18](handoffs/task-18.md) |
-| 19–26 | Not started; defined in the [completion plan](../../research/completion-plan.md#revised-phases) | All | — |
+| 19 | Complete: BWEB, BU/RDV/log archives, voter profile, correspondences, GEDAI, EA20 hierarchy, pinned manifests, both rounds and 2022 | Integrity test documents for the 17 courts outside the sample; TCU consolidated report | [19](handoffs/task-19.md) |
+| 21 | 2026 national runs complete; ledger reconciles every section; SA logs attributed | 2022 rules review, equivalence and national run | — |
+| 20, 22–26 | Not started; defined in the [completion plan](../../research/completion-plan.md#revised-phases) | All | — |
 
 ## Where results are
 
@@ -226,6 +238,8 @@ paths are on the reference machine's output volume
 | Phase 19 bulk BU/RDV/log archives, 2026 and 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` on the output volume |
 | Phase 21 equivalence reports, AC development pass, national passes | `~/data/election-audit-stage/phase21/` |
 | SA (contingency counting) logs per round and their section summary | `~/data/election-audit-stage/sa-logs/` |
+| EA20 hierarchical presidential results, both rounds | `~/data/election-audit-stage/results-hierarchy/` |
+| Integrity test documents, ten-court sample, with browser record files; the original browser downloads | `~/data/election-audit-stage/inputs/integrity-tests-2026-sample-20261104/`; `~/data/election-audit-stage/integrity-downloads-20261104/` |
 | Original acquisition manifests (live) | `.local-state/` |
 | Old-HDD acquisition metadata (coverage, markers, stale pre-split manifest) and the early Phase 11 AC event-level store, hash-verified; the old-HDD raw objects duplicated the certified copies and were released for deletion on 3 November 2026 | `archive/old-hdd-2026-11-03/` on the output volume |
 | Acquisition run logs and launch records | `data/phase10/` |
@@ -243,9 +257,9 @@ paths are on the reference machine's output volume
 | Area | Modules and guides |
 | --- | --- |
 | Runtime | `pyproject.toml`, `uv.lock`, `.python-version`; `uv sync --locked` |
-| CLI | `election_audit/cli.py`. Legacy: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensions: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export stage-sources bulk-download semantic-pass sa-logs` |
+| CLI | `election_audit/cli.py`. Legacy: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensions: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export stage-sources bulk-download semantic-pass sa-logs results-hierarchy integrity-docs` |
 | Recipes | `justfile`; one recipe per CLI command plus `setup doctor fmt lint test contracts-check docs-check docs-command-check check` |
-| Acquisition | `scripts/download_tse_logs.py` (`--round 1` or `--round 2`), `election_audit/elections.py`; SSD staging `source_staging` (`stage-sources`); open-data archives `bulk_acquisition` (`bulk-download`); [acquisition reference](acquisition-reference.md) |
+| Acquisition | `scripts/download_tse_logs.py` (`--round 1` or `--round 2`), `election_audit/elections.py`; SSD staging `source_staging` (`stage-sources`); open-data archives `bulk_acquisition` (`bulk-download`); EA20 hierarchy `results_hierarchy` (`results-hierarchy`); TRE integrity test documents `integrity_documents` (`integrity-docs`); certified manifest pins `resources/pins/`; [acquisition reference](acquisition-reference.md) |
 | Snapshot/source/coverage | `source_inventory`, `coverage`, `snapshots`; [snapshots](snapshots.md) |
 | Structural parse | `archive_parsing` (`jez-structural-v1`); [archive parsing](archive-parsing.md) |
 | Operational reconstruction | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Phase 13), `semantic_pass` (`session-aggregates-v1`, Phase 21), `sa_logs` (`sa-log-summary-v1`); [reconstruction](reconstruction.md), [semantic pass](semantic-pass.md) |

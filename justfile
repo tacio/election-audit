@@ -136,6 +136,14 @@ semantic-pass *args:
 sa-logs *args:
     rtk proxy uv run --locked election-audit sa-logs "$@"
 
+# Fetch the official hierarchical presidential results (EA20) of a round.
+results-hierarchy *args:
+    rtk proxy uv run --locked election-audit results-hierarchy "$@"
+
+# File browser-collected TRE integrity test documents by SHA-256.
+integrity-docs *args:
+    rtk proxy uv run --locked election-audit integrity-docs "$@"
+
 # Benchmark read orders or stage certified raw objects onto a new verified root.
 stage-sources *args:
     rtk proxy uv run --locked election-audit stage-sources "$@"
