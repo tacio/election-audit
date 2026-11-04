@@ -1,6 +1,6 @@
 # TSE 2026 presidential election logs
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 7 · Language: en
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 8 · Language: en
 
 [Português](../pt-BR/acquisition-reference.md)
 
@@ -223,10 +223,11 @@ just bulk-download verify --output /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca7316
 
 #### Totalization reports are a moving target
 
-The `resultados-2026` dataset (catalog update frequency "Diária") includes 28
-`Relatorio_Resultado_Totalizacao_2026_<UF>.zip` PDF packages. TSE re-zips all of
+The `resultados-2026` dataset (catalog update frequency "Diária") includes 29
+`Relatorio_Resultado_Totalizacao_2026_<UF>.zip` PDF packages (27 UFs, BR, ZZ). TSE re-zips all of
 them every few hours (seen on 2026-11-03 at 11:30, 19:30 and 22:30 GMT) with the
-same byte sizes; on that date no PDF inside was newer than 2026-10-25. The PDFs
+same byte sizes; on that date no PDF inside was newer than 2026-10-25, and the
+2026-11-04 08:30 GMT re-zip of all 29 kept every member CRC and size unchanged. The PDFs
 themselves do change after court decisions: 18 first-round PDFs were regenerated
 between 2026-10-07 and 2026-10-24, including RJ ("Resultado em 10/10/2026") after
 the governor retotalization and MS ("Resultado em 21/10/2026") after the deputy

@@ -1,6 +1,6 @@
 # Logs da eleição presidencial de 2026 do TSE
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 7 · Language: pt-BR
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 8 · Language: pt-BR
 
 [English](../en/acquisition-reference.md)
 
@@ -221,10 +221,11 @@ just bulk-download verify --output /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca7316
 #### Relatórios de totalização mudam com o tempo
 
 O conjunto `resultados-2026` (frequência de atualização "Diária" no catálogo) inclui
-28 pacotes PDF `Relatorio_Resultado_Totalizacao_2026_<UF>.zip`. O TSE recompacta
+29 pacotes PDF `Relatorio_Resultado_Totalizacao_2026_<UF>.zip` (27 UFs, BR, ZZ). O TSE recompacta
 todos a cada poucas horas (visto em 2026-11-03 às 11:30, 19:30 e 22:30 GMT) com os
 mesmos tamanhos em bytes; nessa data nenhum PDF interno era mais novo que
-2026-10-25. Os PDFs em si mudam após decisões judiciais: 18 PDFs do primeiro turno
+2026-10-25, e a recompactação dos 29 em 2026-11-04 às 08:30 GMT manteve CRC e
+tamanho de todos os membros. Os PDFs em si mudam após decisões judiciais: 18 PDFs do primeiro turno
 foram regerados entre 2026-10-07 e 2026-10-24, entre eles RJ ("Resultado em
 10/10/2026") após a retotalização para governador e MS ("Resultado em 21/10/2026")
 após a retotalização para deputados. Todo relatório diz "sujeito a modificações", e
