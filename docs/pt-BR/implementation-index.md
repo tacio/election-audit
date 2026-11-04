@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 24 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 25 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -86,11 +86,17 @@ define as regras de E/S para a próxima passada.
 **Fase 19 (entradas nacionais): em andamento.** `bulk-download` baixou, com
 SHA-256/SHA-512 e o JSON do catálogo do TSE, o BWEB de 2026 e de 2022 (112
 arquivos por ano, todos os 56 por ano coincidindo com o `.sha512` publicado).
-Resultados por seção, perfil do eleitorado e locais de votação, correspondências de
-mídias e logs GEDAI de 2026 estão sendo baixados para
-`~/data/election-audit-stage/inputs/`; os arquivos em massa de BU/RDV/log (2026:
-219.2 GB, 2022: 168.5 GB) para `bulk/` no volume de saída. Veja `status.json` em
-cada raiz.
+Os 12 conjuntos
+de entradas pequenas (BWEB e resultados de 2026 e 2022, perfil do eleitorado e
+locais de votação, correspondências de mídias dos dois turnos de 2026 e 2022, logs
+GEDAI de 2026 dos dois turnos) estão completos em `~/data/election-audit-stage/inputs/`,
+com todo `.sha512` publicado coincidindo. O CDN pode servir cópias antigas em cache
+para HEAD ou GET, então `bulk-download` revalida com um parâmetro descartável e
+continua exigindo ETag e tamanho coincidentes. Os relatórios de totalização são
+recompactados a cada poucas horas e mudam após retotalizações; veja a
+[referência de aquisição](acquisition-reference.md#relatórios-de-totalização-mudam-com-o-tempo).
+Os arquivos em massa de BU/RDV/log (2026: 219.2 GB, 2022: 168.5 GB) ainda estão
+sendo baixados para `bulk/` no volume de saída. Veja `status.json` em cada raiz.
 
 **Fase 21 (passada semântica): execuções nacionais de 2026 em andamento.**
 `semantic-pass` coincidiu com o adaptador por evento em 400 de 400 objetos do AC
@@ -124,7 +130,7 @@ Não existe resultado eleitoral nacional, margem nacional, modelo nacional ajust
 nem rótulo de fraude.
 
 **Verificações.** A verificação offline completa `just check` passa (lock, formato,
-lint, contratos, documentos, comandos documentados e todos os 330 testes).
+lint, contratos, documentos, comandos documentados e todos os 333 testes).
 
 ## Próximo passo
 

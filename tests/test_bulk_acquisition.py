@@ -32,6 +32,9 @@ class Server:
         self.files = {"x_1t_AC.zip": archive("ac"), "x_1t_AL.zip": archive("al")}
         self.etags = {name: '"v1"' for name in self.files}
         self.cut = None  # (name, bytes) to truncate a GET once
+        self.stale = set()  # names whose unqueried HEAD omits Content-Length
+        self.stale_head = set()  # names whose unqueried HEAD reports an older ETag
+        self.stale_get = {}  # name -> older body served on unqueried GETs
         self.requests = []
         outer = self
 
@@ -40,14 +43,19 @@ class Server:
                 pass
 
             def _file(self):
-                return self.path.rsplit("/", 1)[-1]
+                return self.path.split("?", 1)[0].rsplit("/", 1)[-1]
 
             def do_HEAD(self):
                 name = self._file()
+                busted = "?" in self.path
                 self.send_response(200)
-                if not name.endswith(".sha512"):
+                stale = name in outer.stale and not busted
+                if not name.endswith(".sha512") and not stale:
                     self.send_header("Content-Length", str(len(outer.files[name])))
-                self.send_header("ETag", outer.etags[name])
+                etag = outer.etags[name]
+                if not busted and name in outer.stale_head:
+                    etag = '"old"'  # an earlier version cached for HEAD only
+                self.send_header("ETag", etag)
                 self.send_header("Accept-Ranges", "bytes")
                 self.end_headers()
 
@@ -83,7 +91,12 @@ class Server:
                     self.send_response(200)
                 payload = body[start:]
                 self.send_header("Content-Length", str(len(payload)))
-                self.send_header("ETag", outer.etags[name])
+                stale = outer.stale_get.get(name)
+                if stale and "?" not in self.path:
+                    payload = stale  # an older cached copy of the same size
+                    self.send_header("ETag", '"old"')
+                else:
+                    self.send_header("ETag", outer.etags[name])
                 self.end_headers()
                 if outer.cut and outer.cut[0] == name:
                     payload = payload[: outer.cut[1]]
@@ -225,6 +238,33 @@ class BulkAcquisitionTests(unittest.TestCase):
         self.server.etags["x_1t_AC.zip.sha512"] = '"s1"'
         with self.assertRaisesRegex(ValueError, "more bytes"):
             self.run_acquire()
+
+    def test_stale_cdn_copy_without_length_is_revalidated_once(self):
+        self.server.stale.add("x_1t_AL.zip")
+        result = self.run_acquire()
+        self.assertEqual(result["complete_files"], 2)
+        body = self.server.files["x_1t_AL.zip"]
+        self.assertIn(
+            ("x_1t_AL.zip", "complete", hashlib.sha256(body).hexdigest()),
+            [row[:3] for row in self.rows()],
+        )
+
+    def test_stale_cdn_head_from_an_earlier_version_is_bypassed(self):
+        self.server.stale_head.add("x_1t_AL.zip")
+        self.run_acquire()
+        uri = (self.output / "manifest.sqlite").as_uri() + "?mode=ro"
+        with contextlib.closing(sqlite3.connect(uri, uri=True)) as db:
+            etag = db.execute("SELECT etag FROM files WHERE name='x_1t_AL.zip'").fetchone()
+        self.assertEqual(etag, ('"v1"',))
+
+    def test_stale_cdn_copy_on_get_is_refetched_from_the_current_version(self):
+        old = archive("zz")
+        self.server.stale_get["x_1t_AC.zip"] = old
+        self.run_acquire()
+        body = self.server.files["x_1t_AC.zip"]
+        stored = (self.output / "files" / "x_1t_AC.zip").read_bytes()
+        self.assertEqual(stored, body)
+        self.assertNotEqual(stored, old)
 
     def test_tampered_archive_fails_verification(self):
         self.run_acquire()

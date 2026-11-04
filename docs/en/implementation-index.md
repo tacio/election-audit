@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 24 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 25 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -81,11 +81,17 @@ the I/O rules for the next pass.
 
 **Phase 19 (national inputs): in progress.** `bulk-download` fetched, with
 SHA-256/SHA-512 and the TSE catalog JSON, the 2026 and 2022 BWEB (112 archives
-each year, all 56 per year with a published `.sha512` match). Results by section,
-voter profile and polling places, media correspondences and 2026 GEDAI logs are
-downloading to `~/data/election-audit-stage/inputs/`; the bulk BU/RDV/log archives
-(2026: 219.2 GB, 2022: 168.5 GB) to `bulk/` on the output volume. Check
-`status.json` in each root.
+each year, all 56 per year with a published `.sha512` match). All 12 small
+input datasets (BWEB and results for 2026 and 2022, voter profile and polling places,
+media correspondences for both rounds of 2026 and 2022, 2026 GEDAI logs for both
+rounds) are complete in `~/data/election-audit-stage/inputs/`, every published
+`.sha512` matching. The CDN can serve stale cached HEAD or GET copies, so
+`bulk-download` revalidates with a throwaway query and still requires matching
+ETag and length. Totalization reports are re-zipped every few hours and change
+after retotalizations; see the
+[acquisition reference](acquisition-reference.md#totalization-reports-are-a-moving-target).
+The bulk BU/RDV/log archives (2026: 219.2 GB, 2022: 168.5 GB) are still
+downloading to `bulk/` on the output volume. Check `status.json` in each root.
 
 **Phase 21 (semantic pass): national 2026 runs in progress.** `semantic-pass`
 matched the event-level adapter on 400 of 400 sampled AC objects (84469 completed
@@ -116,7 +122,7 @@ No national electoral result, national margin, fitted national model or fraud
 label exists.
 
 **Checks.** The full offline gate `just check` passes (lock, format, lint,
-contracts, docs, documented commands and all 330 tests).
+contracts, docs, documented commands and all 333 tests).
 
 ## Next step
 

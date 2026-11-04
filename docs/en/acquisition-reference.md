@@ -1,6 +1,6 @@
 # TSE 2026 presidential election logs
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 6 · Language: en
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 7 · Language: en
 
 [Português](../pt-BR/acquisition-reference.md)
 
@@ -205,7 +205,11 @@ catalog JSON, downloads each selected resource once into a new root (only from
 the ETag and length are unchanged, records SHA-256 and SHA-512, checks the ZIP
 central directory and makes files read-only. When the TSE publishes a sibling
 `.sha512`, it is fetched and the archive must match it; the bulk log archives have
-none. `bulk-download verify` re-hashes a finished root. Large archives go to the
+none. The CDN can cache HEAD and GET separately, with copies from an earlier
+republication or without a length, so the metadata request carries a throwaway
+`revalidate` query that reaches the current version; a GET whose ETag differs is
+retried once the same way and must then match ETag and length.
+`bulk-download verify` re-hashes a finished root. Large archives go to the
 ext4 data drive and small inputs to the SSD.
 
 ```sh
@@ -216,6 +220,20 @@ just bulk-download fetch --dataset resultados-2026-boletim-de-urna \
   --output ~/data/election-audit-stage/inputs/resultados-2026-boletim-de-urna --reserve-gib 100
 just bulk-download verify --output /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot
 ```
+
+#### Totalization reports are a moving target
+
+The `resultados-2026` dataset (catalog update frequency "Diária") includes 28
+`Relatorio_Resultado_Totalizacao_2026_<UF>.zip` PDF packages. TSE re-zips all of
+them every few hours (seen on 2026-11-03 at 11:30, 19:30 and 22:30 GMT) with the
+same byte sizes; on that date no PDF inside was newer than 2026-10-25. The PDFs
+themselves do change after court decisions: 18 first-round PDFs were regenerated
+between 2026-10-07 and 2026-10-24, including RJ ("Resultado em 10/10/2026") after
+the governor retotalization and MS ("Resultado em 21/10/2026") after the deputy
+retotalization. Every report says "sujeito a modificações", and retotalizations
+can follow for months. Treat a fetched report as a point-in-time snapshot (the
+manifest keeps its ETag and Last-Modified), read the result time printed in each
+PDF, and compare snapshots by ZIP member CRC rather than by archive hash.
 
 ## Outputs
 

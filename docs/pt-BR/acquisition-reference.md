@@ -1,6 +1,6 @@
 # Logs da eleição presidencial de 2026 do TSE
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 6 · Language: pt-BR
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 7 · Language: pt-BR
 
 [English](../en/acquisition-reference.md)
 
@@ -201,7 +201,11 @@ selecionado uma vez numa nova raiz (só de `https://cdn.tse.jus.br/estatistica/s
 retoma com intervalos HTTP só enquanto ETag e tamanho não mudam, registra SHA-256 e
 SHA-512, confere o diretório central do ZIP e deixa os arquivos somente leitura.
 Quando o TSE publica um `.sha512` irmão, ele é baixado e o arquivo precisa
-coincidir; os arquivos em massa de logs não têm. `bulk-download verify` recalcula
+coincidir; os arquivos em massa de logs não têm. O CDN pode guardar em cache HEAD e
+GET separadamente, com cópias de uma republicação anterior ou sem tamanho; por isso
+a consulta de metadados leva um parâmetro descartável `revalidate` que alcança a
+versão atual, e um GET com ETag diferente é repetido uma vez do mesmo modo e precisa
+então coincidir em ETag e tamanho. `bulk-download verify` recalcula
 os hashes de uma raiz concluída. Arquivos grandes vão para o disco de dados ext4 e
 entradas pequenas para o SSD.
 
@@ -213,6 +217,21 @@ just bulk-download fetch --dataset resultados-2026-boletim-de-urna \
   --output ~/data/election-audit-stage/inputs/resultados-2026-boletim-de-urna --reserve-gib 100
 just bulk-download verify --output /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot
 ```
+
+#### Relatórios de totalização mudam com o tempo
+
+O conjunto `resultados-2026` (frequência de atualização "Diária" no catálogo) inclui
+28 pacotes PDF `Relatorio_Resultado_Totalizacao_2026_<UF>.zip`. O TSE recompacta
+todos a cada poucas horas (visto em 2026-11-03 às 11:30, 19:30 e 22:30 GMT) com os
+mesmos tamanhos em bytes; nessa data nenhum PDF interno era mais novo que
+2026-10-25. Os PDFs em si mudam após decisões judiciais: 18 PDFs do primeiro turno
+foram regerados entre 2026-10-07 e 2026-10-24, entre eles RJ ("Resultado em
+10/10/2026") após a retotalização para governador e MS ("Resultado em 21/10/2026")
+após a retotalização para deputados. Todo relatório diz "sujeito a modificações", e
+retotalizações podem ocorrer por meses. Trate um relatório baixado como retrato de
+um momento (o manifesto guarda ETag e Last-Modified), leia o horário de resultado
+impresso em cada PDF e compare retratos pelo CRC dos membros do ZIP, não pelo hash
+do arquivo.
 
 ## Saídas
 

@@ -106,6 +106,19 @@ def select_resources(resources, include, allowed_prefixes=ALLOWED_PREFIXES):
 
 
 def head(url):
+    # CDN edges cache HEAD and GET separately and can hold copies stored without
+    # Content-Length or from an earlier republication. A throwaway query reaches the
+    # current version; downloads must then match its ETag and length.
+    return _head(_revalidate(url))
+
+
+def _revalidate(url):
+    """Return ``url`` with a throwaway query that bypasses a stale CDN cache entry."""
+    separator = "&" if urlsplit(url).query else "?"
+    return f"{url}{separator}revalidate={time.time_ns()}"
+
+
+def _head(url):
     with _request(url, method="HEAD") as response:
         return {
             "bytes": (
@@ -150,7 +163,12 @@ def download_one(url, target, expected, *, reserve, progress=None):
     headers = {}
     if offset:
         headers = {"Range": f"bytes={offset}-", "If-Range": expected["etag"]}
-    with _request(url, headers=headers, timeout=120) as response:
+    response = _request(url, headers=headers, timeout=120)
+    if response.headers.get("ETag") and response.headers.get("ETag") != expected["etag"]:
+        # An edge can serve an older cached copy on GET while HEAD reached the origin.
+        response.close()
+        response = _request(_revalidate(url), headers=headers, timeout=120)
+    with response:
         if offset and response.status != 206:
             # The object changed (If-Range failed) or ranges were refused: restart.
             digest, long_digest, offset = hashlib.sha256(), hashlib.sha512(), 0
