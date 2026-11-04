@@ -1,6 +1,6 @@
 # Logs da eleição presidencial de 2026 do TSE
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 8 · Language: pt-BR
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 9 · Language: pt-BR
 
 [English](../en/acquisition-reference.md)
 
@@ -190,6 +190,11 @@ just stage-sources copy \
   --destination ~/data/election-audit-stage/2026/turno-2 \
   --order physical --floor-gib 100
 ```
+
+O coletor por seção segue só logs da urna. Seções apuradas pelo sistema de
+contingência SA publicam `logsa.jez` no lugar; `sa-logs fetch` obtém esses arquivos
+a partir dos arquivos auxiliares da cópia certificada (veja o
+[guia da passada semântica](semantic-pass.md#logs-de-apuração-de-contingência-sa)).
 
 ### Arquivos de dados abertos em massa
 

@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 25 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 26 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -95,16 +95,24 @@ para HEAD ou GET, então `bulk-download` revalida com um parâmetro descartável
 continua exigindo ETag e tamanho coincidentes. Os relatórios de totalização são
 recompactados a cada poucas horas e mudam após retotalizações; veja a
 [referência de aquisição](acquisition-reference.md#relatórios-de-totalização-mudam-com-o-tempo).
-Os arquivos em massa de BU/RDV/log (2026: 219.2 GB, 2022: 168.5 GB) ainda estão
-sendo baixados para `bulk/` no volume de saída. Veja `status.json` em cada raiz.
+Os arquivos em massa de BU/RDV/log (56 por ano; 2026: 219.2 GB, 2022: 168.5 GB)
+estão completos em `bulk/` no volume de saída, e `bulk-download verify` recalculou
+os hashes dos 112 contra seus manifestos em 2026-11-04 (o TSE não publica `.sha512`
+para eles).
 
-**Fase 21 (passada semântica): execuções nacionais de 2026 em andamento.**
-`semantic-pass` coincidiu com o adaptador por evento em 400 de 400 objetos do AC
-amostrados (84469 ciclos concluídos) e rodou em todos os 1674 objetos não
-protegidos do segundo turno do AC em cerca de 60 s, sem erros. As execuções
-nacionais dos dois turnos (6 workers, a partir da cópia no SSD) gravam em
-`~/data/election-audit-stage/phase21/`. Os logs de 2022 precisam antes de regras de
-2022 revisadas. Veja o [guia da passada semântica](semantic-pass.md).
+**Fase 21 (passada semântica): execuções nacionais de 2026 concluídas; 2022
+pendente.** `semantic-pass` coincidiu com o adaptador por evento em 400 de 400
+objetos do AC amostrados (84469 ciclos concluídos). As execuções nacionais
+processaram 498580 objetos do primeiro turno e 498581 do segundo, sem erros
+(1704924 e 3393756 sessões), em
+`~/data/election-audit-stage/phase21/national-r{1,2}-20261103/`. O registro da
+população reconcilia cada uma das 499207 seções por turno: 31 e 29 seções foram
+apuradas pelo Sistema de Apuração (SA) de contingência e não têm log da urna, uma
+seção de SP do segundo turno foi publicada sem log e 596 são excluídas. `sa-logs`
+baixou os 60 logs SA (idênticos byte a byte aos arquivos em massa) e atribuiu cada
+um à sua seção ([logs SA](semantic-pass.md#logs-de-apuração-de-contingência-sa)). Os logs de
+2022 precisam antes de regras de 2022 revisadas. Veja o
+[guia da passada semântica](semantic-pass.md#execuções-nacionais).
 
 **Fases 12–18: encerradas como pilotos de desenvolvimento do Acre (AC).** A revisão
 metodológica de 3 de novembro substituiu suas definições; o trabalho revisado são as
@@ -130,12 +138,13 @@ Não existe resultado eleitoral nacional, margem nacional, modelo nacional ajust
 nem rótulo de fraude.
 
 **Verificações.** A verificação offline completa `just check` passa (lock, formato,
-lint, contratos, documentos, comandos documentados e todos os 333 testes).
+lint, contratos, documentos, comandos documentados e todos os 339 testes).
 
 ## Próximo passo
 
-Concluir a Fase 19 (downloads em andamento) e a Fase 21 (execuções nacionais em
-andamento; revisão das regras de 2022 pendente) e então as verificações de
+Concluir a Fase 19 (resultados hierárquicos EA20, relatórios do teste de
+integridade do dia da eleição, manifestos certificados fixados) e a Fase 21 de 2022
+(revisão das regras, equivalência, execução nacional) e então as verificações de
 integridade da Fase 20 sobre BU, RDV, assinaturas e correspondências baixados. O
 [protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 2) define as
 afirmações, o mapa de ameaças e observáveis, as verificações de integridade I1–I9, os
@@ -227,6 +236,7 @@ absolutos ficam no volume de saída da máquina de referência
 | Entradas pequenas da Fase 19 (BWEB, resultados, perfil do eleitorado, correspondências, GEDAI), cada uma com catálogo, manifesto e estado | `~/data/election-audit-stage/inputs/<dataset>/` |
 | Arquivos em massa de BU/RDV/log da Fase 19, 2026 e 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` no volume de saída |
 | Relatórios de equivalência, passada de desenvolvimento do AC e passadas nacionais da Fase 21 | `~/data/election-audit-stage/phase21/` |
+| Logs SA (apuração de contingência) por turno e seu resumo por seção | `~/data/election-audit-stage/sa-logs/` |
 | Manifestos originais da coleta (vivos) | `.local-state/` |
 | Metadados da coleta no HDD antigo (cobertura, marcadores, manifesto obsoleto anterior à divisão) e o store por evento inicial da Fase 11 do AC, verificados por hash; os objetos brutos do HDD antigo duplicavam as cópias certificadas e foram liberados para exclusão em 3 de novembro de 2026 | `archive/old-hdd-2026-11-03/` no volume de saída |
 | Logs de execução e registros de lançamento da coleta | `data/phase10/` |
@@ -244,12 +254,12 @@ absolutos ficam no volume de saída da máquina de referência
 | Área | Módulos e guias |
 | --- | --- |
 | Ambiente | `pyproject.toml`, `uv.lock`, `.python-version`; `uv sync --locked` |
-| CLI | `election_audit/cli.py`. Legados: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensões: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export stage-sources bulk-download semantic-pass` |
+| CLI | `election_audit/cli.py`. Legados: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensões: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export stage-sources bulk-download semantic-pass sa-logs` |
 | Receitas | `justfile`; uma receita por comando da CLI, mais `setup doctor fmt lint test contracts-check docs-check docs-command-check check` |
 | Coleta | `scripts/download_tse_logs.py` (`--round 1` ou `--round 2`), `election_audit/elections.py`; cópia para SSD `source_staging` (`stage-sources`); arquivos de dados abertos `bulk_acquisition` (`bulk-download`); [referência de coleta](acquisition-reference.md) |
 | Snapshot/origem/cobertura | `source_inventory`, `coverage`, `snapshots`; [snapshots](snapshots.md) |
 | Parse estrutural | `archive_parsing` (`jez-structural-v1`); [parse de arquivos](archive-parsing.md) |
-| Reconstrução operacional | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Fase 13), `semantic_pass` (`session-aggregates-v1`, Fase 21); [reconstrução](reconstruction.md), [passada semântica](semantic-pass.md) |
+| Reconstrução operacional | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Fase 13), `semantic_pass` (`session-aggregates-v1`, Fase 21), `sa_logs` (`sa-log-summary-v1`); [reconstrução](reconstruction.md), [passada semântica](semantic-pass.md) |
 | Releases operacionais | `publication`, `operational_marts`, `release_tools`; [publicação](publication.md) |
 | Processamento estrutural nacional | Caminho de resumos: `national_parallel`, `national_summary`, `national_summary_release`, `national_summary_tools`, `national_summary_tuning`, `national_resources`; [processamento orientado a features](feature-oriented-processing.md). Caminho em nível de evento: `national_benchmark`, `national_tuning`, `national_workload`, `national`, `national_storage`, `national_relocation`, `national_migration`, `national_overnight`; [processamento nacional](national-processing.md) |
 | Importação e verificação eleitoral | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` e `electoral_verification` (Fase 12); [resultados eleitorais](electoral-results.md). `electoral_references` é um protótipo sem integração na CLI e sem testes para conjuntos de referência oficiais |

@@ -132,6 +132,10 @@ bulk-download *args:
 semantic-pass *args:
     rtk proxy uv run --locked election-audit semantic-pass "$@"
 
+# Fetch and summarize contingency-counting (SA) logs listed by certified stagings.
+sa-logs *args:
+    rtk proxy uv run --locked election-audit sa-logs "$@"
+
 # Benchmark read orders or stage certified raw objects onto a new verified root.
 stage-sources *args:
     rtk proxy uv run --locked election-audit stage-sources "$@"

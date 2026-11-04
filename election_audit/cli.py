@@ -42,6 +42,7 @@ def main(argv=None):
         "stage-sources": ("election_audit.source_staging", "stage_sources_main"),
         "bulk-download": ("election_audit.bulk_acquisition", "bulk_download_main"),
         "semantic-pass": ("election_audit.semantic_pass", "semantic_pass_main"),
+        "sa-logs": ("election_audit.sa_logs", "sa_logs_main"),
     }
     if args and args[0] in extension_commands:
         module, function = extension_commands[args[0]]

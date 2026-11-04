@@ -1,6 +1,6 @@
 # TSE 2026 presidential election logs
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 8 · Language: en
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 9 · Language: en
 
 [Português](../pt-BR/acquisition-reference.md)
 
@@ -194,6 +194,11 @@ just stage-sources copy \
   --destination ~/data/election-audit-stage/2026/turno-2 \
   --order physical --floor-gib 100
 ```
+
+The per-section collector follows urn logs only. Sections counted with the SA
+contingency system publish `logsa.jez` instead; `sa-logs fetch` acquires those
+from the certified staging's auxiliary files (see the
+[semantic pass guide](semantic-pass.md#contingency-counting-sa-logs)).
 
 ### Bulk open-data archives
 
