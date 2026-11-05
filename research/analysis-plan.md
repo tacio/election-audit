@@ -1,6 +1,6 @@
 # Statistical audit of the 2026 presidential election: study protocol
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 3 · Language: en
+Document-ID: EA-ANALYSIS-PLAN · Revision: 4 · Language: en
 
 [Português](analysis-plan.pt-BR.md) · [Completion plan](completion-plan.md) · [Related work](related-work.md)
 
@@ -59,8 +59,21 @@ writing it. As of this revision:
 - **Inspection registries:** every location listed in
   `data/phase15/inspection.sqlite`, `data/national/phase11-protection-2026-10-31/`
   and the Phase 11 tranche registries is development data.
-- **Not seen:** any national electoral result at section level, any national
-  operational measure, the 596 protected/stress runoff logs, and any 2022 data.
+- **National semantic pass (Phase 21):** per-session aggregates of every eligible log
+  of both 2026 rounds and of both 2022 rounds, computed by code. Seen: object,
+  session and segment counts, the population ledgers, the AC equivalence samples and
+  individual clock-fault sessions of 2022 (four restarts at 01/01/2009, one at
+  23/08/1933). No session measure was joined to results, ranked or summarized by area.
+- **Integrity checks (Phase 20):** I1–I9 compare artifacts section by section. Seen:
+  match and mismatch counts per check, and the values of rows that disagree. AC and
+  ZZ outputs were inspected while the checks were built, and I5 compared AC completed
+  cycles with BU attendance. Values of agreeing rows stay in the check outputs
+  (`restricted/` and per-contest digests) and are neither reported nor queried before
+  the freeze. The logs of the 596 protected/stress sections are hashed with SHA-512
+  for I1 and never parsed.
+- **Not seen:** section-level electoral results or operational measures outside AC,
+  beyond the counts and disagreeing rows above; the contents of the 596
+  protected/stress runoff logs.
 
 ## 3. Threat model: from mechanism to observable
 

@@ -1,6 +1,6 @@
 # Plano de conclusão da auditoria de 2026
 
-Document-ID: EA-COMPLETION-PLAN · Revision: 11 · Language: pt-BR
+Document-ID: EA-COMPLETION-PLAN · Revision: 12 · Language: pt-BR
 
 [English](completion-plan.md) · [Protocolo do estudo](analysis-plan.pt-BR.md)
 
@@ -37,6 +37,7 @@ operacional precisa, portanto, da passada semântica da Fase 21.
 | --- | --- | --- |
 | 19 | **Entradas nacionais.** Coletar e congelar, com checksums e manifestos imutáveis: BWEB das 27 UFs e ZZ, os dois turnos; BUs binários, RDVs e assinaturas dos pacotes totalizados; resultados hierárquicos (EA20); perfil do eleitorado por seção e locais de votação; BWEB, BUs, logs e perfil do eleitorado presidenciais de 2022, os dois turnos; relatórios do teste de integridade do TSE no dia da eleição. Fixar as cópias certificadas dos manifestos como entradas da análise e documentar os arquivos de manifesto obsoletos. | `official_bu`, `electoral_imports`, coletor |
 | 20 | **Verificações de integridade de nível 1 (I1–I9)** em nível nacional, os dois turnos: relatórios determinísticos com tabelas completas de discrepâncias, hashes de origem e livro de população. Reunir cópias impressas independentes do BU para I8. | `binary_bu`, `electoral_verification` (piloto AC) |
+| 20b | **Conclusão da integridade,** condição para o congelamento da Fase 23: verificar as assinaturas Ed521 das urnas UE2020/UE2022 (descobrir a construção exata do TSE, a partir de vetores de teste publicados, material de verificação do TSE ou uma implementação revisada; conferir a implementação contra vetores antes de qualquer execução nacional); obter as autoridades certificadoras das urnas do TSE (`AC URNA`, `AC UE2020`, `AC UE2022` e suas raízes) e verificar toda cadeia de certificados, ECDSA inclusive; reexecutar o I1 nacionalmente. Também: releitura por prefixo, bloco a bloco, para o I6 (o último bloco aberto, os 99 logs que diferem e os 3645 com blocos a mais); uma fonte para as dez eleições municipais realizadas com o segundo turno (I2); cópias impressas de BU para o I8, ou uma decisão registrada de que nenhuma pode ser obtida. Se algum item não puder ser concluído, o protocolo congelado na Fase 23 declara quais afirmações perdem o apoio do I1 (ou do I6, do I8). | `integrity_checks` |
 | 21 | **Passada semântica nacional dos logs,** os dois turnos e 2022: uma passada em fluxo por turno aplica as regras de mensagem revisadas e grava agregados por sessão (ciclos por tipo de habilitação, suspensões, leituras de abertura/encerramento, contagens por hora, cadência, eventos de relógio), comparações de blocos do primeiro turno (I6) e um vocabulário de modelos de mensagem. Testada por equivalência contra o adaptador por evento do AC antes da execução nacional. | `national_summary`, `operational_review`, `real-log-rules.json` |
 | 22 | **Tabela de features por seção v2:** unidades harmonizadas entre turnos com tabela de correspondência explícita, covariáveis do perfil do eleitorado, chaves de local de votação, modelo de urna e software, medidas operacionais, livro de disponibilidade. | `features` (piloto AC) |
 | 23 | **Modelagem de desenvolvimento, estudo de poder e congelamento do protocolo.** Só em dados de desenvolvimento: modelo beta-binomial de variação, contrastes dentro do local, ajuste cruzado, o comparador de floresta quantílica, os testes C1–C6 e seus nulos simulados; corrigir os defeitos conhecidos do modelo da primeira versão (piso de escala fixo `1e-6`, pontuações zero empatadas, seleção de folhas inconsistente com a calibração por local reservado, comparação otimista floresta vs referência). Rodar o estudo de injeção e divulgar a manipulação mínima detectável. Sortear e registrar o hash da reserva lacrada. Congelar e pré-registrar publicamente (OSF e tag git assinada). | `research_models`, `research_protocol`, `research_evaluation` |
@@ -63,8 +64,9 @@ passada completa deve, portanto:
   que está sendo lido;
 - gravar arquivos grandes de leitura sequencial (zips em massa do TSE) no disco de
   dados ext4, não no SSD nem no disco NTFS compartilhado;
-- ficar dentro de metade da CPU, 4 GiB de RAM agregada e uma thread de biblioteca por
-  processo, com pisos explícitos de espaço livre no SSD e no HDD (a cópia usou
+- ficar dentro de metade da CPU, 6 GiB de RAM agregada (elevado de 4 GiB em
+  5 de novembro de 2026, ainda pequeno o bastante para máquinas modestas) e uma
+  thread de biblioteca por processo, com pisos explícitos de espaço livre no SSD e no HDD (a cópia usou
   100 GiB no SSD).
 
 ## Política de dados

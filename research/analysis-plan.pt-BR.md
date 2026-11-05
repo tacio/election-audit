@@ -1,6 +1,6 @@
 # Auditoria estatística da eleição presidencial de 2026: protocolo do estudo
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 3 · Language: pt-BR
+Document-ID: EA-ANALYSIS-PLAN · Revision: 4 · Language: pt-BR
 
 [English](analysis-plan.md) · [Plano de conclusão](completion-plan.pt-BR.md) · [Trabalhos relacionados](related-work.pt-BR.md)
 
@@ -63,9 +63,23 @@ escrevê-lo. Nesta revisão:
 - **Registros de inspeção:** todo local listado em
   `data/phase15/inspection.sqlite`, `data/national/phase11-protection-2026-10-31/`
   e nos registros de lotes da Fase 11 é dado de desenvolvimento.
-- **Não visto:** qualquer resultado eleitoral nacional por seção, qualquer medida
-  operacional nacional, os 596 logs protegidos/de estresse do segundo turno e
-  qualquer dado de 2022.
+- **Passada semântica nacional (Fase 21):** agregados por sessão de todo log elegível
+  dos dois turnos de 2026 e dos dois turnos de 2022, calculados por código. Visto:
+  contagens de objetos, sessões e segmentos, os registros da população, as amostras
+  de equivalência do AC e sessões individuais com falha de relógio de 2022 (quatro
+  reinícios em 01/01/2009, um em 23/08/1933). Nenhuma medida de sessão foi ligada a
+  resultados, ordenada ou resumida por área.
+- **Verificações de integridade (Fase 20):** I1–I9 comparam artefatos seção a seção.
+  Visto: contagens de concordância e discordância por verificação e os valores das
+  linhas que discordam. As saídas do AC e do ZZ foram inspecionadas durante a
+  construção das verificações, e o I5 comparou os ciclos concluídos do AC com o
+  comparecimento do BU. Os valores das linhas que concordam ficam nas saídas das
+  verificações (`restricted/` e resumos por disputa) e não são relatados nem
+  consultados antes do congelamento. Os logs das 596 seções protegidas/de estresse
+  passam por SHA-512 para o I1 e nunca são interpretados.
+- **Não visto:** resultados eleitorais ou medidas operacionais por seção fora do AC,
+  além das contagens e das linhas discordantes acima; o conteúdo dos 596 logs
+  protegidos/de estresse do segundo turno.
 
 ## 3. Modelo de ameaças: do mecanismo ao observável
 

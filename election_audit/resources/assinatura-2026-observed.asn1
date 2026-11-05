@@ -1,0 +1,78 @@
+-- Layout of the 2026 urn signature files (-vota.vsc, -sa.vsc) as observed in the
+-- TSE bulk archives on 5 November 2026. Field names follow the mirrored
+-- assinatura.asn1 (ModuloAssinaturaResultado); the order of the top-level fields,
+-- the context tags [0] and [1] and the trailing equipment sequence differ from that
+-- mirror and are read from real files. "desconhecido" is an observed enumerated
+-- value with no reviewed meaning.
+AssinaturaObservada2026 DEFINITIONS IMPLICIT TAGS ::= BEGIN
+
+EntidadeAssinaturaResultado ::= SEQUENCE {
+    assinaturaSW    EntidadeAssinatura,
+    assinaturaHW    EntidadeAssinatura,
+    equipamento     Equipamento
+}
+
+Equipamento ::= SEQUENCE {
+    modeloEquipamento   ModeloEquipamento,
+    desconhecido        ENUMERATED { v1 (1), v2 (2), v3 (3), v4 (4), v5 (5), v6 (6), v7 (7), v8 (8) }
+}
+
+ModeloEquipamento ::= ENUMERATED {
+    tpm12   (1),
+    tpm20   (2),
+    ue2009  (9),
+    ue2010  (10),
+    ue2011  (11),
+    ue2013  (13),
+    ue2015  (15),
+    ue2020  (20),
+    ue2022  (22),
+    ue2024  (24)
+}
+
+EntidadeAssinatura ::= SEQUENCE {
+    dataHoraCriacao         GeneralString,
+    versao                  INTEGER,
+    autoAssinado            AutoAssinaturaDigital,
+    conteudoAutoAssinado    OCTET STRING,
+    conjuntoChave           [0] GeneralString OPTIONAL,
+    certificadoDigital      [1] OCTET STRING OPTIONAL
+}
+
+AutoAssinaturaDigital ::= SEQUENCE {
+    usuario             DescritorChave,
+    algoritmoHash       AlgoritmoHashInfo,
+    algoritmoAssinatura AlgoritmoAssinaturaInfo,
+    assinatura          AssinaturaDigital
+}
+
+AlgoritmoHashInfo ::= SEQUENCE {
+    algoritmo   ENUMERATED { sha1 (1), sha256 (2), sha384 (3), sha512 (4) }
+}
+
+AlgoritmoAssinaturaInfo ::= SEQUENCE {
+    algoritmo   ENUMERATED { rsa (1), ecdsa (2), cepesc (3), eddsa (4) },
+    bits        INTEGER
+}
+
+DescritorChave ::= SEQUENCE {
+    nomeUsuario GeneralString,
+    serial      INTEGER
+}
+
+AssinaturaDigital ::= SEQUENCE {
+    tamanho     INTEGER,
+    hash        OCTET STRING,
+    assinatura  OCTET STRING
+}
+
+Assinatura ::= SEQUENCE {
+    arquivosAssinados SEQUENCE OF AssinaturaArquivo
+}
+
+AssinaturaArquivo ::= SEQUENCE {
+    nomeArquivo GeneralString,
+    assinatura  AssinaturaDigital
+}
+
+END

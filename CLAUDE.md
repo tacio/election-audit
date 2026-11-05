@@ -45,7 +45,7 @@ Optional extras are imported lazily: `dashboard` (marimo/altair), `research` (sc
 7. Analysis (`analysis*`, `features`, `research_*`, `investigations`): descriptive features, frozen partitions and append-only ledgers. A protected final-evaluation population is withheld.
 8. Reproduction (`reproduction`): synthetic `demo`, relocatable `review-bundle`, `reproduce` and `backfill`.
 
-`national*.py` holds the resource-bounded national structural processing: parallel workers, tuning, storage relocation and fused summaries (`source-operational-summary-v1`, `grouped-source-summary-shards-v3`). Read `docs/en/feature-oriented-processing.md` and `docs/en/national-processing.md` before touching it. Parallelism is capped at half the CPU and 4 GiB of aggregate RAM, with one library thread per process.
+`national*.py` holds the resource-bounded national structural processing: parallel workers, tuning, storage relocation and fused summaries (`source-operational-summary-v1`, `grouped-source-summary-shards-v3`). Read `docs/en/feature-oriented-processing.md` and `docs/en/national-processing.md` before touching it. Parallelism is capped at half the CPU and 6 GiB of aggregate RAM (raised from 4 GiB on 5 November 2026; Phase 11 configurations keep their recorded 4 GiB), with one library thread per process.
 
 **Contracts.** `election_audit/resources/contracts/schema.json` defines the dimensional tables and `features.json` the feature registry. `election_audit/contracts.py` validates both structurally. Pinned TSE layouts and ASN.1 specs (BWEB layout, BU/RDV/signature) live alongside them in `election_audit/resources/`.
 

@@ -1,0 +1,45 @@
+{
+  "archive": "files/bu_imgbu_logjez_rdv_vscmr_2026_2t_AC.zip",
+  "archive_sha256": "7e58076367c9a0d8002b7918fe33183a2aee8aaf562d32555cf62ce10d188dc5",
+  "extracted": "2026-11-05",
+  "members": {
+    "o03221ac0101500020088-bu.dat": {
+      "bytes": 1374,
+      "included": true,
+      "sha256": "e41aaf20c15e3a10d5532ee6afd4418e20b60aad9efc0c7d8617dc58239bf1ce",
+      "sha512": "b981e6a1b12e607b1091a8364dc30ead1c073cffeb7ba8ed71dc95fa95a4c7a86526ced9955c4f96c02d9554efd290d36c9b6ea252b0548210dac1c542d2527c"
+    },
+    "o03221ac0101500020088-imgbu.dat": {
+      "bytes": 6832,
+      "included": true,
+      "sha256": "a3d567037049f6c86641e54d0bab86505467dabe08864ffc7db8a6fc8b315240",
+      "sha512": "4266aa42dc5994a43b8a742b1a4ee01c08e8b0b5e597cd26453662245a58e7161f6b0aeecc717860a2933d43b53e81fc08abb2a927b3106c6623aba5cdf48931"
+    },
+    "o03221ac0101500020088-log.jez": {
+      "bytes": 48802,
+      "included": false,
+      "sha256": "b547645a83332b5c070d3701588b18f9e541a8ab1f6a25b8fa2ed2b8c32676bc",
+      "sha512": "3cf676684267cefb7d95d19b443fe061120fefa2e7054c03c6e5c8a76507528c9e5bc4669603ffed39c6fad58eac8eb5373c28218c20d91095d70d4145b3f27f"
+    },
+    "o03221ac0101500020088-rdv.dat": {
+      "bytes": 2761,
+      "included": true,
+      "sha256": "a4f0cfb75f16296feee562f24908ec10e3f1db2c700ffea0d02fa30c19c593fe",
+      "sha512": "f1d800df39f34b45f579281f827d6db701c8b5a4e0d77915b98fc57c487f81c9ad506d449a82550650050f135b32476529093c5d5f75b952d2d23cd7544f49f7"
+    },
+    "o03221ac0101500020088-vota.vsc": {
+      "bytes": 62605,
+      "included": true,
+      "sha256": "f42b7bdcf81ab9adda845fdf9c159ff9ddf044d2ce443974a627599d7ed9c164",
+      "sha512": "ea94f1be5b233fad128ee7630883036b3d88554675cd7b562d8f071e0c402bf67514ab715a7adea08bec34f43c9561e29a984e5b5b0d118355e5efc241536055"
+    }
+  },
+  "note": "the log is not included; tests use its published SHA-512 from this file",
+  "section": [
+    "ac",
+    "01015",
+    "0002",
+    "0088"
+  ],
+  "source": "TSE open-data bulk archive (bu_imgbu_logjez_rdv_vscmr), 2026 round 2, AC development data"
+}

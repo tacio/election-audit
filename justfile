@@ -144,6 +144,10 @@ results-hierarchy *args:
 integrity-docs *args:
     rtk proxy uv run --locked election-audit integrity-docs "$@"
 
+# Phase 20 Tier 1 integrity checks over the bulk BU/RDV/signature archives.
+integrity-check *args:
+    rtk proxy uv run --locked election-audit integrity-check "$@"
+
 # Benchmark read orders or stage certified raw objects onto a new verified root.
 stage-sources *args:
     rtk proxy uv run --locked election-audit stage-sources "$@"

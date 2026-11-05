@@ -594,11 +594,16 @@ def work_list(staged_root, round_number, *, ufs=None, exclusions=frozenset(), li
 
 
 def bulk_archives(bulk_root, year, round_number, ufs=None):
-    """Complete per-UF bulk archives of one round, as recorded in the bulk manifest."""
+    """Complete per-UF bulk archives of one round whose logs this pass may parse."""
     if year not in BULK_YEARS:
         raise ValueError(
             f"{year} logs are not read from bulk archives; 2026 uses the certified staging"
         )
+    return verified_bulk_archives(bulk_root, year, round_number, ufs)
+
+
+def verified_bulk_archives(bulk_root, year, round_number, ufs=None):
+    """Complete per-UF bulk archives of one round, as recorded in the bulk manifest."""
     bulk_root = Path(bulk_root)
     uri = (bulk_root / "manifest.sqlite").resolve().as_uri() + "?mode=ro&immutable=1"
     archives = []

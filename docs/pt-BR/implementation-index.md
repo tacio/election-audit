@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 28 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 29 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -9,7 +9,7 @@ de fato foi executado, onde estão os resultados e qual é o próximo passo. Os 
 em `docs/pt-BR/` descrevem o comportamento de cada ferramenta. Os handoffs em
 `docs/pt-BR/handoffs/` são registros datados do que cada tarefa fez na época;
 leia-os para detalhes, não para saber o estado. Os planos ficam em `research/`.
-O estado abaixo é de **4 de novembro de 2026**.
+O estado abaixo é de **5 de novembro de 2026**.
 
 ## Estado atual
 
@@ -134,6 +134,21 @@ a habilitação biométrica com todas as outras (plano de análise rev. 3). Veja
 [guia da passada semântica](semantic-pass.md#logs-de-2022) e o
 [handoff da Fase 21](handoffs/task-21.md).
 
+**Fase 20 (verificações de integridade de nível 1): concluída para 2026, nos dois
+turnos.** `integrity-check` executou I1–I9 sobre as 499207 seções de cada turno em
+`~/data/election-audit-stage/phase20/national-r{1,2}-*-20261105/`. Todo arquivo
+publicado de BU, RDV e imagem coincide com as duas listas de hashes assinadas; as
+assinaturas ECDSA das urnas UE2013/UE2015 foram verificadas em 99985 e 99957 seções
+sem falha, enquanto as 399222 e 399250 seções Ed521 (UE2020/UE2022) não são
+verificadas. Toda cadeia de hash do BU está íntegra; toda disputa presente no BU e
+no BWEB é igual; toda medida de voto do EA20 é igual às somas do BWEB nos 5786 nós;
+e toda urna efetivada nas correspondências é igual ao seu BU. A recontagem do RDV só
+difere em duas seções SA de MG (20 eleitores cada, primeiro turno). Em aberto: 85 e
+36 diferenças de comparecimento no I5, 99 logs do segundo turno com um bloco do
+primeiro turno que difere (I6), regras do I7 violadas em 2138 e 1815 seções, Ed521 e
+I8. Ver o [guia das verificações de integridade](integrity-checks.md#resultados-nacionais)
+e o [handoff da Fase 20](handoffs/task-20.md).
+
 **Fases 12–18: encerradas como pilotos de desenvolvimento do Acre (AC).** A revisão
 metodológica de 3 de novembro substituiu suas definições; o trabalho revisado são as
 Fases 19–26. Suas ferramentas existem, foram exercitadas com dados reais do AC e são
@@ -158,18 +173,21 @@ Não existe resultado eleitoral nacional, margem nacional, modelo nacional ajust
 nem rótulo de fraude.
 
 **Verificações.** A verificação offline completa `just check` passa (lock, formato,
-lint, contratos, documentos, comandos documentados e todos os 359 testes).
+lint, contratos, documentos, comandos documentados e todos os 371 testes).
 
 ## Próximo passo
 
-As verificações de integridade da Fase 20 sobre BU baixados (incluindo `busa.dat` do
-SA), RDV, assinaturas, correspondências e a hierarquia EA20. Arquivar o relatório
+Fase 22: agrupar sessões de várias execuções e aplicar as regras de relógio, a partir
+das tabelas de discrepâncias do I5 e do I6 da Fase 20. A Fase 20b (verificação Ed521
+e das cadeias de certificados, releitura por prefixo do I6, fontes ausentes do I2 e
+do I8) não bloqueia a Fase 22, mas precisa ser concluída, ou ter suas lacunas
+escritas no protocolo, antes do congelamento da Fase 23. Arquivar o relatório
 consolidado do TCU sobre o teste de integridade quando for publicado (previsto até
 30 dias após o segundo turno). O
-[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 3) define as
+[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 4) define as
 afirmações, o mapa de ameaças e observáveis, as verificações de integridade I1–I9, os
 testes confirmatórios C1–C6, o estudo de poder e a política de dados; o
-[plano de conclusão](../../research/completion-plan.pt-BR.md) (Revisão 11) define as
+[plano de conclusão](../../research/completion-plan.pt-BR.md) (Revisão 12) define as
 Fases 19–26. O protocolo é um rascunho até ser congelado e pré-registrado
 publicamente na Fase 23.
 
@@ -178,8 +196,8 @@ publicamente na Fase 23.
 Leia o `CLAUDE.md` do repositório, este índice, o handoff atribuído e só os
 contratos relevantes. Execute uma fase por vez. Após cada tarefa numerada, escreva
 um handoff em pares a partir do [modelo](task-handoff-template.md) e atualize este
-índice nos dois idiomas. Mantenha o processamento dentro de metade da CPU, 4 GiB de
-RAM agregada e uma thread de biblioteca por processo.
+índice nos dois idiomas. Mantenha o processamento dentro de metade da CPU, 6 GiB de
+RAM agregada (4 GiB até 5 de novembro de 2026) e uma thread de biblioteca por processo.
 
 As 596 observações protegidas/de estresse do segundo turno ficam excluídas antes de
 qualquer acesso semântico ou a cache. Os históricos de inspeção em
@@ -240,8 +258,10 @@ com verificações aritméticas reais do AC (177 testes).
 | 17 | Pacotes de casos de desenvolvimento do AC | Casos nacionais, corroboração, limites de impacto, sensibilidade do pipeline completo | [17](handoffs/task-17.md) |
 | 18 | Notebooks sobre a exportação do AC | QA no navegador, conjuntos de dados nacionais | [18](handoffs/task-18.md) |
 | 19 | Concluída: BWEB, arquivos de BU/RDV/log, perfil do eleitorado, correspondências, GEDAI, hierarquia EA20, manifestos fixados, dois turnos e 2022 | Documentos do teste de integridade dos 17 tribunais fora da amostra; relatório consolidado do TCU | [19](handoffs/task-19.md) |
+| 20 | Concluída: I1–I9 para 2026, nos dois turnos, todas as seções; ECDSA verificada, BWEB, EA20 e correspondências concordam | Assinaturas Ed521, cadeias de certificados, releitura por prefixo do I6, diferenças em aberto do I5/I6, I8, 2022 | [20](handoffs/task-20.md) |
 | 21 | Concluída: 2026 nos dois turnos (v1, reproduzida pela v2 no AC) e 2022 nos dois turnos (v2); os registros conciliam todas as seções; logs SA atribuídos | Agrupar sessões com várias execuções e regras de relógio passam para a Fase 22 | [21](handoffs/task-21.md) |
-| 20, 22–26 | Não iniciadas; definidas no [plano de conclusão](../../research/completion-plan.pt-BR.md#fases-revisadas) | Todas | — |
+| 20b | Não iniciada: Ed521 e cadeias de certificados, nova execução do I1, releitura por prefixo do I6, fonte das eleições municipais para o I2, I8; condição para o congelamento da Fase 23 | Todas | — |
+| 22–26 | Não iniciadas; definidas no [plano de conclusão](../../research/completion-plan.pt-BR.md#fases-revisadas) | Todas | — |
 
 ## Onde estão os resultados
 
@@ -257,6 +277,7 @@ absolutos ficam no volume de saída da máquina de referência
 | Benchmarks de ordem de leitura | `~/data/election-audit-stage/benchmarks/` |
 | Entradas pequenas da Fase 19 (BWEB, resultados, perfil do eleitorado, correspondências, GEDAI), cada uma com catálogo, manifesto e estado | `~/data/election-audit-stage/inputs/<dataset>/` |
 | Arquivos em massa de BU/RDV/log da Fase 19, 2026 e 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` no volume de saída |
+| Versões do `integrity-check` da Fase 20 (seções, BWEB, hierarquia, correspondências, logs), execuções de desenvolvimento do AC/ZZ | `~/data/election-audit-stage/phase20/` |
 | Relatórios de equivalência, passada de desenvolvimento do AC, reprodução v2 do AC e passadas nacionais (2026 e 2022) da Fase 21 | `~/data/election-audit-stage/phase21/` |
 | Logs SA (apuração de contingência) por turno e seu resumo por seção | `~/data/election-audit-stage/sa-logs/` |
 | Resultados hierárquicos EA20 da eleição presidencial, dois turnos | `~/data/election-audit-stage/results-hierarchy/` |
@@ -278,7 +299,7 @@ absolutos ficam no volume de saída da máquina de referência
 | Área | Módulos e guias |
 | --- | --- |
 | Ambiente | `pyproject.toml`, `uv.lock`, `.python-version`; `uv sync --locked` |
-| CLI | `election_audit/cli.py`. Legados: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensões: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export stage-sources bulk-download semantic-pass sa-logs results-hierarchy integrity-docs` |
+| CLI | `election_audit/cli.py`. Legados: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensões: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export stage-sources bulk-download semantic-pass sa-logs results-hierarchy integrity-docs integrity-check` |
 | Receitas | `justfile`; uma receita por comando da CLI, mais `setup doctor fmt lint test contracts-check docs-check docs-command-check check` |
 | Coleta | `scripts/download_tse_logs.py` (`--round 1` ou `--round 2`), `election_audit/elections.py`; cópia para SSD `source_staging` (`stage-sources`); arquivos de dados abertos `bulk_acquisition` (`bulk-download`); hierarquia EA20 `results_hierarchy` (`results-hierarchy`); documentos do teste de integridade dos TREs `integrity_documents` (`integrity-docs`); hashes fixados dos manifestos certificados `resources/pins/`; [referência de coleta](acquisition-reference.md) |
 | Snapshot/origem/cobertura | `source_inventory`, `coverage`, `snapshots`; [snapshots](snapshots.md) |
@@ -286,6 +307,7 @@ absolutos ficam no volume de saída da máquina de referência
 | Reconstrução operacional | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Fase 13), `semantic_pass` (`session-aggregates-v2`, Fase 21; regras `real-log-rules.json` e `real-log-rules-2022.json`), `sa_logs` (`sa-log-summary-v1`); [reconstrução](reconstruction.md), [passada semântica](semantic-pass.md) |
 | Releases operacionais | `publication`, `operational_marts`, `release_tools`; [publicação](publication.md) |
 | Processamento estrutural nacional | Caminho de resumos: `national_parallel`, `national_summary`, `national_summary_release`, `national_summary_tools`, `national_summary_tuning`, `national_resources`; [processamento orientado a features](feature-oriented-processing.md). Caminho em nível de evento: `national_benchmark`, `national_tuning`, `national_workload`, `national`, `national_storage`, `national_relocation`, `national_migration`, `national_overnight`; [processamento nacional](national-processing.md) |
+| Verificações de integridade | `integrity_checks` (`integrity-sections-v1`, `integrity-logs-v1`; formato de assinatura `resources/assinatura-2026-observed.asn1`); [verificações de integridade](integrity-checks.md) |
 | Importação e verificação eleitoral | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` e `electoral_verification` (Fase 12); [resultados eleitorais](electoral-results.md). `electoral_references` é um protótipo sem integração na CLI e sem testes para conjuntos de referência oficiais |
 | Fundação analítica | `analysis`, `analysis_partitions`, `analysis_ledgers`, `analysis_reports`; [análise](analysis.md) |
 | Caminho de pesquisa | `features` (Fase 14), `research_protocol` e `research_evaluation` (Fase 15), `research_models` (Fase 16), `investigations` (Fase 17); veja seus handoffs |
