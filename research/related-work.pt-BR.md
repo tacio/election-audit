@@ -1,6 +1,6 @@
 # Trabalhos relacionados
 
-Document-ID: EA-RELATED-WORK · Revision: 3 · Language: pt-BR
+Document-ID: EA-RELATED-WORK · Revision: 4 · Language: pt-BR
 
 [English](related-work.md) · [Protocolo de pesquisa](analysis-plan.pt-BR.md) · [README](../README.pt-BR.md)
 
@@ -75,16 +75,34 @@ cadeia de produção parcialmente compartilhada.
 
 ## Artefatos binários e seções com votação zero
 
-[DataUrnas-BR](https://github.com/alissonlinneker/DataUrnas-BR) descreve a
-decodificação de BUs binários, logs e assinaturas, totalização paralela,
-reconciliação por UF e publicação em Parquet. É a comparação de engenharia mais
-próxima entre os projetos revisados. Compartilhamos a necessidade de reconstruir
-histórico operacional e preservar casos excepcionais, mas nossas evidências
-implementadas atualmente cobrem processamento estrutural/de logs e importação
-CSV verificada do AC. Decodificação de BU binário, certificação criptográfica e
-vínculo com o resultado final continuam sendo lacunas. Parsers externos são
-candidatos à reutilização validada; não dispensam a conferência de esquemas,
-pressupostos de confiança e comportamento em arquivos excepcionais.
+[DataUrnas-BR](https://github.com/alissonlinneker/DataUrnas-BR) decodifica BUs
+binários, RDVs, logs e arquivos de assinatura de todas as seções de 2026, nos dois
+turnos, e de 2022. Confere os hashes dos arquivos e as assinaturas das urnas,
+inclusive Ed521, e verifica os certificados das urnas até as ACs intermediárias.
+Também confere as assinaturas JWS do TSE nos totais divulgados, a zerésima, as
+cargas das urnas contra os logs de preparação do GEDAI, os nomes dos programas
+contra as listas oficiais de hashes, a ordem de chegada dos BUs e os QR Codes de
+BUs impressos (38 de 38 no 1º turno). Publica um veredicto sobre 27 verificações.
+É a comparação de engenharia mais próxima entre os projetos revisados (revisado em
+5 de novembro de 2026 pelo README e pela documentação; seus números não foram
+reproduzidos aqui).
+
+Os desenhos diferem na forma de fazer afirmações. O DataUrnas-BR executa e relata
+verificações à medida que as constrói, usa testes de Benford e um índice composto
+de confiança e emite um veredicto. Este projeto congela um protocolo
+pré-registrado antes de qualquer teste confirmatório, reserva uma amostra lacrada,
+controla uma família confirmatória fixa, relata a manipulação mínima detectável ao
+lado de todo resultado nulo e não emite veredicto
+([protocolo do estudo](analysis-plan.pt-BR.md)). Suas medidas de log vêm de regras
+revisadas sobre todos os logs, com históricos copiados removidos pela linhagem dos
+blocos e o desconhecido separado do zero. Dois resultados precisam ser
+conciliados: no 1º turno, o DataUrnas-BR não relata divergência na recontagem do
+RDV, enquanto nosso I3 encontrou dez disputas diferentes em duas seções de
+contingência (SA); e sua amostra de logs de 2.997 seções encontrou votos no log
+iguais ao comparecimento, enquanto nosso I5 nacional lista 85 e 36 diferenças. Sua
+implementação de Ed521 e seus três certificados de AC, idênticos byte a byte aos
+embutidos no pacote de formatos de 2026 do TSE, são referências independentes para
+as nossas (Fase 20b do [plano de conclusão](completion-plan.pt-BR.md)).
 
 A [análise de votação zero de Wesley Cota](https://g.wcota.me/eleicoes2026/)
 vincula resultados por seção ao contexto histórico e aos artefatos individuais
@@ -165,7 +183,7 @@ comprovadamente exclusiva nem um detector superior.
 | ETL eleitoral com esquema explícito | Turicas | Adaptador oficial AC BWEB fixado; contratos de importação normalizada. |
 | Versões de publicação e denominadores | INEMA | Entradas congeladas e derivadas imutáveis; populações derivadas parciais. |
 | Reconciliação hierárquica | Multiverso Digital; AnaliseEleicoes | Aritmética das linhas publicadas e totais da UF do AC conferem; reconciliação nacional BR/UF/municipal/ZZ pendente. |
-| Integração de BU binário/log/assinatura | DataUrnas-BR | Fluxo de logs e resumos estruturais nacionais do segundo turno concluídos; conteúdo do BU binário do AC verificado contra o BWEB; assinaturas e RDV pendentes. |
+| Integração de BU binário/log/assinatura | DataUrnas-BR | I1–I9 nacionais para 2026 (Fase 20); Ed521, cadeias de certificados, JWS, zerésima, GEDAI e listas de hashes na Fase 20b; diferenças de I3/I5 com o DataUrnas-BR a conciliar. |
 | Escolhas omitidas com zero votos | Cota | Desconhecidos explícitos; normalização esparsa para completa com evidências pendente. |
 | Triagem estatística condicional | Klimek et al.; Kobak et al.; Rozenas; Mebane; Meinshausen; Bates et al. | Rascunho do protocolo do estudo com mapa de ameaças, família confirmatória e estudo de poder; um ajuste de desenvolvimento de comparecimento no AC; sem modelo nacional ou inferência validada de fraude. |
 

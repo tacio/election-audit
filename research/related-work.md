@@ -1,6 +1,6 @@
 # Related work
 
-Document-ID: EA-RELATED-WORK · Revision: 3 · Language: en
+Document-ID: EA-RELATED-WORK · Revision: 4 · Language: en
 
 [Português](related-work.pt-BR.md) · [Research protocol](analysis-plan.md) · [README](../README.md)
 
@@ -70,15 +70,31 @@ separate TSE products checks consistency within a partly shared production chain
 
 ## Binary artifacts and zero-vote sections
 
-[DataUrnas-BR](https://github.com/alissonlinneker/DataUrnas-BR) describes decoding
-binary BUs, logs and signature artifacts, parallel totalization, UF-level result
-reconciliation, and Parquet publication. It is the closest engineering comparison
-among the projects reviewed. We share the need to reconstruct operational history
-and preserve exceptional cases, but our implemented evidence currently covers
-structural/log processing and a verified AC CSV import. Binary-BU decoding,
-cryptographic certification and final-result linkage remain gaps in our pipeline.
-External parsers are candidates for validated reuse, rather than substitutes for
-checking their schemas, trust assumptions and behavior on exceptional files.
+[DataUrnas-BR](https://github.com/alissonlinneker/DataUrnas-BR) decodes binary
+BUs, RDVs, logs and signature files for every 2026 section of both rounds and for
+2022. It verifies file hashes and urn signatures, Ed521 included, and checks the
+urn certificates up to the intermediate CAs. It also verifies TSE's JWS signatures
+on the published totals, the zerésima, urn loads against the GEDAI preparation
+logs, program names against the official hash lists, BU arrival order and
+printed-BU QR codes (38 of 38 in round 1). It publishes a verdict over 27 checks.
+It is the closest engineering comparison among the projects reviewed (reviewed on
+5 November 2026 from its README and documentation; its numbers were not reproduced
+here).
+
+The designs differ in how claims are made. DataUrnas-BR runs and reports checks as
+they are built, uses Benford tests and a composite confidence index, and issues a
+verdict. This project freezes a pre-registered protocol before any confirmatory
+test, withholds a sealed holdout, controls a fixed confirmatory family, reports the
+minimum detectable manipulation beside every null result and issues no verdict
+([study protocol](analysis-plan.md)). Its log measures come from reviewed rules
+over every log, with copied histories removed by block lineage and unknown kept
+apart from zero. Two results are to be reconciled: for round 1, DataUrnas-BR
+reports no RDV recount divergence where our I3 found ten differing contests in two
+contingency (SA) sections, and its 2,997-section log sample found log votes equal
+to attendance where our national I5 lists 85 and 36 differences. Its Ed521
+implementation and its three CA certificates, which match byte for byte those
+embedded in TSE's 2026 format package, are independent references for our own
+(Phase 20b of the [completion plan](completion-plan.md)).
 
 [Wesley Cota's zero-vote analysis](https://g.wcota.me/eleicoes2026/) links section
 results to historical context and individual TSE urn artifacts. Its method states
@@ -155,7 +171,7 @@ to the reviewed work, not a demonstrated unique feature or superior detector.
 | Schema-aware electoral ETL | Turicas | Pinned official AC BWEB adapter; normalized import contracts. |
 | Publication versions and denominators | INEMA | Frozen inputs and immutable derivatives; partial derived populations. |
 | Hierarchical result reconciliation | Multiverso Digital; AnaliseEleicoes | AC published-row arithmetic and UF totals match; national BR/UF/municipal/ZZ reconciliation pending. |
-| Binary BU/log/signature integration | DataUrnas-BR | Log pipeline and national runoff structural summaries done; AC binary BU content verified against BWEB; signatures and RDV pending. |
+| Binary BU/log/signature integration | DataUrnas-BR | I1–I9 national for 2026 (Phase 20); Ed521, certificate chains, JWS, zerésima, GEDAI and hash lists in Phase 20b; I3/I5 differences with DataUrnas-BR to reconcile. |
 | Omitted zero-vote choices | Cota | Explicit unknowns; evidence-backed sparse-to-complete normalization pending. |
 | Conditional statistical screening | Klimek et al.; Kobak et al.; Rozenas; Mebane; Meinshausen; Bates et al. | Draft study protocol with a threat map, confirmatory family and power study; one AC development turnout fit; no national model or validated fraud inference. |
 
