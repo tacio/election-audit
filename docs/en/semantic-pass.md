@@ -1,6 +1,6 @@
 # Streaming semantic pass (Phase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 3 · Language: en
+Document-ID: EA-SEMANTIC-PASS · Revision: 4 · Language: en
 
 [Português](../pt-BR/semantic-pass.md) · [Implementation index](implementation-index.md)
 
@@ -26,7 +26,11 @@ machine it mirrors exactly, and keeps only what later phases need.
 Version `session-aggregates-v2` stores the completion-gap and clock-backstep
 seconds as 64-bit integers: a 2022 urn clock stepped back about 89 years, which
 overflowed the 32-bit columns of v1. The 2026 national releases are v1 and hold no
-value beyond the 32-bit range.
+value beyond the 32-bit range. Rerunning them with the current code gives v2 with
+the same values: on 4 November 2026 a v2 run of AC 2026 (1674 objects per round)
+equalled the AC rows of both v1 national releases in every object, session and
+segment row once the four seconds columns were cast to `int64`. Read the 2026
+releases with that cast.
 
 `<output>/release/` holds four Parquet tables and a `manifest.json` with the
 binding (rules, staging certificate, manifest and exclusions hashes) and file
@@ -197,7 +201,40 @@ just semantic-pass run \
   --workers 6
 ```
 
-National 2022 results are pending: both runs were in progress when this revision was written.
+National 2022 runs, 4 November 2026, 6 workers, reading the bulk archives from
+the output volume:
+
+| Round | Objects | Sessions | Segments | Wall time | Peak RSS |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 471859 | 1805887 | 5242171 | 6441 s | 1.06 GB |
+| 2 | 471983 | 3570943 | 9845999 | 14202 s + 112 s (resumed once) | 1.16 GB |
+
+Round 2 first finished with one error: SP 71072/0002/0310 nests a 32-byte empty 7z
+archive (`…-01.jez`, signature header only), which the reader refused as truncated
+although `7z` accepts it. The reader now returns no entries for exactly that case,
+shard 00844 was moved out of the output and the pass resumed under the same
+binding; the object matched the adapter. The fix changes only objects that
+previously failed, and round 1 had none.
+
+Population ledger, from the archive member names (`o0040N-MMMMMZZZZSSSS.ext`):
+
+| Round | Sections | Urn log | SA counting | BU only (`bu`, `vscmr`) | BU and RDV, no log | Processed |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 472024 | 471859 | 109 | 54 | 2 | 471859 |
+| 2 | 472027 | 471983 | 39 | 0 | 5 | 471983 |
+
+Every section with a log was processed once and no section has two logs. SA
+sections hold `busa`, `imgbusa`, `logsajez`, `rdv` and `vscsa`; 99 of the round-1
+and 33 of the round-2 SA sections are abroad (ZZ). All 54 BU-only sections are ZZ
+round 1. The sections with BU and RDV but no log are MG 51390/0244/0091 and RN
+16918/0054/0090 in round 1, and PA 04650/0006/0059, 0060, 0072, 0109 and 0111 in
+round 2. No 2022 BWEB was cross-checked.
+
+The logs record clock faults as they happened: four round-1 sessions restart at
+01/01/2009 (one, BA 39799/0106/0049, mid-vote on election day), and PE
+25097/0091/0032 restarts during preparation at 23/08/1933 before an operator sets
+the date with the ADH application. The bytes pass every CRC and the archive
+SHA-256; these are urn clock events for Phase 22, not corruption.
 
 ## Limits
 

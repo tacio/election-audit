@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 27 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 28 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -9,7 +9,7 @@ de fato foi executado, onde estão os resultados e qual é o próximo passo. Os 
 em `docs/pt-BR/` descrevem o comportamento de cada ferramenta. Os handoffs em
 `docs/pt-BR/handoffs/` são registros datados do que cada tarefa fez na época;
 leia-os para detalhes, não para saber o estado. Os planos ficam em `research/`.
-O estado abaixo é de **3 de novembro de 2026**.
+O estado abaixo é de **4 de novembro de 2026**.
 
 ## Estado atual
 
@@ -111,8 +111,7 @@ uma amostra de dez tribunais (SP, AC, AL, DF, ES, PR, MG, RJ, BA, RS):
 ([referência de aquisição](acquisition-reference.md#documentos-do-teste-de-integridade-sites-dos-tres)).
 Veja o [handoff da Fase 19](handoffs/task-19.md).
 
-**Fase 21 (passada semântica): execuções nacionais de 2026 concluídas; 2022
-pendente.** `semantic-pass` coincidiu com o adaptador por evento em 400 de 400
+**Fase 21 (passada semântica): concluída nos dois turnos de 2026 e em 2022.** `semantic-pass` coincidiu com o adaptador por evento em 400 de 400
 objetos do AC amostrados (84469 ciclos concluídos). As execuções nacionais
 processaram 498580 objetos do primeiro turno e 498581 do segundo, sem erros
 (1704924 e 3393756 sessões), em
@@ -121,9 +120,19 @@ população reconcilia cada uma das 499207 seções por turno: 31 e 29 seções 
 apuradas pelo Sistema de Apuração (SA) de contingência e não têm log da urna, uma
 seção de SP do segundo turno foi publicada sem log e 596 são excluídas. `sa-logs`
 baixou os 60 logs SA (idênticos byte a byte aos arquivos em massa) e atribuiu cada
-um à sua seção ([logs SA](semantic-pass.md#logs-de-apuração-de-contingência-sa)). Os logs de
-2022 precisam antes de regras de 2022 revisadas. Veja o
-[guia da passada semântica](semantic-pass.md#execuções-nacionais).
+um à sua seção ([logs SA](semantic-pass.md#logs-de-apuração-de-contingência-sa)). As versões de
+2026 são `session-aggregates-v1`; o código atual grava v2 (colunas de segundos de 64
+bits) e reproduziu exatamente as linhas do AC dos dois turnos. Para 2022 (o controle
+negativo), um leitor 7z só com a biblioteca padrão e regras de 2022 revisadas
+(`tse-real-log-rules-2022-v1`) alimentam um modo em massa sobre os arquivos de 2022
+que recusa 2026. Ele coincidiu com o adaptador em 200 de 200 objetos do AC por
+turno e então processou 471859 e 471983 objetos sem erros (1805887 e 3570943
+sessões) em
+`~/data/election-audit-stage/phase21/national-2022-r{1,2}-v2-20261104/`. O registro
+de 2022 contabiliza cada seção dos arquivos (472024 e 472027). As análises comparam
+a habilitação biométrica com todas as outras (plano de análise rev. 3). Veja o
+[guia da passada semântica](semantic-pass.md#logs-de-2022) e o
+[handoff da Fase 21](handoffs/task-21.md).
 
 **Fases 12–18: encerradas como pilotos de desenvolvimento do Acre (AC).** A revisão
 metodológica de 3 de novembro substituiu suas definições; o trabalho revisado são as
@@ -149,16 +158,15 @@ Não existe resultado eleitoral nacional, margem nacional, modelo nacional ajust
 nem rótulo de fraude.
 
 **Verificações.** A verificação offline completa `just check` passa (lock, formato,
-lint, contratos, documentos, comandos documentados e todos os 348 testes).
+lint, contratos, documentos, comandos documentados e todos os 359 testes).
 
 ## Próximo passo
 
-Fase 21 de 2022 (revisão das regras, equivalência, execução nacional) e então as
-verificações de integridade da Fase 20 sobre BU baixados (incluindo `busa.dat` do
+As verificações de integridade da Fase 20 sobre BU baixados (incluindo `busa.dat` do
 SA), RDV, assinaturas, correspondências e a hierarquia EA20. Arquivar o relatório
 consolidado do TCU sobre o teste de integridade quando for publicado (previsto até
 30 dias após o segundo turno). O
-[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 2) define as
+[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 3) define as
 afirmações, o mapa de ameaças e observáveis, as verificações de integridade I1–I9, os
 testes confirmatórios C1–C6, o estudo de poder e a política de dados; o
 [plano de conclusão](../../research/completion-plan.pt-BR.md) (Revisão 11) define as
@@ -223,7 +231,7 @@ com verificações aritméticas reais do AC (177 testes).
 | Fase | Estado | Pendências | Handoff |
 | --- | --- | --- | --- |
 | 10 | Concluída: dois turnos coletados, copiados e verificados por SHA-256 | Seções com lacuna continuam explícitas; BWEB, cadastros e fontes de RDV/assinatura de outras UFs são importações separadas | [10](handoffs/task-10.md) |
-| 11 | Concluída no escopo elegível do segundo turno (498581 objetos, 0 falhas) | Passada semântica dos dois turnos e de 2022 (Fase 21); logs protegidos lidos só depois do congelamento da Fase 23 | [11](handoffs/task-11.md) |
+| 11 | Concluída no escopo elegível do segundo turno (498581 objetos, 0 falhas) | Logs protegidos lidos só depois do congelamento da Fase 23 | [11](handoffs/task-11.md) |
 | 12 | Só AC: 2270 seções com conteúdo verificado, totais da UF batem | Outras UFs, dois turnos, assinaturas, RDV, hierarquia BR/UF/municipal/ZZ | [12](handoffs/task-12.md) |
 | 13 | Amostra do AC: um log por turno | Sessões, relógios, históricos copiados e conciliação de comparecimento nacionais | [13](handoffs/task-13.md) |
 | 14 | Só AC: 54480 linhas de features | Features nacionais, identidade entre turnos, resultados do primeiro turno | [14](handoffs/task-14.md) |
@@ -232,7 +240,7 @@ com verificações aritméticas reais do AC (177 testes).
 | 17 | Pacotes de casos de desenvolvimento do AC | Casos nacionais, corroboração, limites de impacto, sensibilidade do pipeline completo | [17](handoffs/task-17.md) |
 | 18 | Notebooks sobre a exportação do AC | QA no navegador, conjuntos de dados nacionais | [18](handoffs/task-18.md) |
 | 19 | Concluída: BWEB, arquivos de BU/RDV/log, perfil do eleitorado, correspondências, GEDAI, hierarquia EA20, manifestos fixados, dois turnos e 2022 | Documentos do teste de integridade dos 17 tribunais fora da amostra; relatório consolidado do TCU | [19](handoffs/task-19.md) |
-| 21 | Execuções nacionais de 2026 concluídas; o registro concilia todas as seções; logs SA atribuídos | Revisão das regras de 2022, equivalência e execução nacional | — |
+| 21 | Concluída: 2026 nos dois turnos (v1, reproduzida pela v2 no AC) e 2022 nos dois turnos (v2); os registros conciliam todas as seções; logs SA atribuídos | Agrupar sessões com várias execuções e regras de relógio passam para a Fase 22 | [21](handoffs/task-21.md) |
 | 20, 22–26 | Não iniciadas; definidas no [plano de conclusão](../../research/completion-plan.pt-BR.md#fases-revisadas) | Todas | — |
 
 ## Onde estão os resultados
@@ -249,7 +257,7 @@ absolutos ficam no volume de saída da máquina de referência
 | Benchmarks de ordem de leitura | `~/data/election-audit-stage/benchmarks/` |
 | Entradas pequenas da Fase 19 (BWEB, resultados, perfil do eleitorado, correspondências, GEDAI), cada uma com catálogo, manifesto e estado | `~/data/election-audit-stage/inputs/<dataset>/` |
 | Arquivos em massa de BU/RDV/log da Fase 19, 2026 e 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` no volume de saída |
-| Relatórios de equivalência, passada de desenvolvimento do AC e passadas nacionais da Fase 21 | `~/data/election-audit-stage/phase21/` |
+| Relatórios de equivalência, passada de desenvolvimento do AC, reprodução v2 do AC e passadas nacionais (2026 e 2022) da Fase 21 | `~/data/election-audit-stage/phase21/` |
 | Logs SA (apuração de contingência) por turno e seu resumo por seção | `~/data/election-audit-stage/sa-logs/` |
 | Resultados hierárquicos EA20 da eleição presidencial, dois turnos | `~/data/election-audit-stage/results-hierarchy/` |
 | Documentos do teste de integridade, amostra de dez tribunais, com arquivos de registros do navegador; os downloads originais do navegador | `~/data/election-audit-stage/inputs/integrity-tests-2026-sample-20261104/`; `~/data/election-audit-stage/integrity-downloads-20261104/` |
@@ -274,8 +282,8 @@ absolutos ficam no volume de saída da máquina de referência
 | Receitas | `justfile`; uma receita por comando da CLI, mais `setup doctor fmt lint test contracts-check docs-check docs-command-check check` |
 | Coleta | `scripts/download_tse_logs.py` (`--round 1` ou `--round 2`), `election_audit/elections.py`; cópia para SSD `source_staging` (`stage-sources`); arquivos de dados abertos `bulk_acquisition` (`bulk-download`); hierarquia EA20 `results_hierarchy` (`results-hierarchy`); documentos do teste de integridade dos TREs `integrity_documents` (`integrity-docs`); hashes fixados dos manifestos certificados `resources/pins/`; [referência de coleta](acquisition-reference.md) |
 | Snapshot/origem/cobertura | `source_inventory`, `coverage`, `snapshots`; [snapshots](snapshots.md) |
-| Parse estrutural | `archive_parsing` (`jez-structural-v1`); [parse de arquivos](archive-parsing.md) |
-| Reconstrução operacional | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Fase 13), `semantic_pass` (`session-aggregates-v1`, Fase 21), `sa_logs` (`sa-log-summary-v1`); [reconstrução](reconstruction.md), [passada semântica](semantic-pass.md) |
+| Parse estrutural | `archive_parsing` (`jez-structural-v1`), `sevenzip` (logs 7z de 2022); [parse de arquivos](archive-parsing.md) |
+| Reconstrução operacional | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Fase 13), `semantic_pass` (`session-aggregates-v2`, Fase 21; regras `real-log-rules.json` e `real-log-rules-2022.json`), `sa_logs` (`sa-log-summary-v1`); [reconstrução](reconstruction.md), [passada semântica](semantic-pass.md) |
 | Releases operacionais | `publication`, `operational_marts`, `release_tools`; [publicação](publication.md) |
 | Processamento estrutural nacional | Caminho de resumos: `national_parallel`, `national_summary`, `national_summary_release`, `national_summary_tools`, `national_summary_tuning`, `national_resources`; [processamento orientado a features](feature-oriented-processing.md). Caminho em nível de evento: `national_benchmark`, `national_tuning`, `national_workload`, `national`, `national_storage`, `national_relocation`, `national_migration`, `national_overnight`; [processamento nacional](national-processing.md) |
 | Importação e verificação eleitoral | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` e `electoral_verification` (Fase 12); [resultados eleitorais](electoral-results.md). `electoral_references` é um protótipo sem integração na CLI e sem testes para conjuntos de referência oficiais |

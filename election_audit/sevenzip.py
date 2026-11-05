@@ -259,6 +259,11 @@ def read(data, *, limit=128 * 1024**2):
     if zlib.crc32(data[12:32]) != struct.unpack("<I", data[8:12])[0]:
         raise SevenZipError("Start header CRC mismatch")
     offset, size, crc = struct.unpack("<QQI", data[12:32])
+    if size == 0:
+        # An empty archive (7-Zip writes no header at all): a 32-byte signature header only.
+        if offset or crc or len(data) != 32:
+            raise SevenZipError("Empty 7z header with trailing data")
+        return []
     start = 32 + offset
     if start + size > len(data):
         raise SevenZipError("Header beyond end of archive")

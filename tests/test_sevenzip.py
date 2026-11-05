@@ -115,6 +115,14 @@ class SevenZipTests(unittest.TestCase):
         archive = make_7z(files, method="copy", encoded_header=True)
         self.assertEqual(sevenzip.read(archive), [("logd.dat", b"x" * 1000, False)])
 
+    def test_empty_archive_has_no_entries(self):
+        # 2022 SP 71072/0002/0310 round 2 nests a 32-byte empty .jez written by 7-Zip.
+        start = struct.pack("<QQI", 0, 0, 0)
+        empty = sevenzip.MAGIC + b"\x00\x04" + struct.pack("<I", zlib.crc32(start)) + start
+        self.assertEqual(sevenzip.read(empty), [])
+        with self.assertRaises(sevenzip.SevenZipError):
+            sevenzip.read(empty + b"\x00")
+
     def test_corruption_and_unsupported_features_fail_closed(self):
         good = make_7z([("logd.dat", b"hello world " * 200)], method="copy")
         corrupt = bytearray(good)

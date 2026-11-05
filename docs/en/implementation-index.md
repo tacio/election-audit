@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 27 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 28 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -8,7 +8,7 @@ This is the single current-state entry point. It says what exists, what has
 actually run, where the results are and what comes next. Guides under `docs/en/`
 describe how each tool behaves. Handoffs under `docs/en/handoffs/` are dated
 records of what each task did at the time; read them for detail, not for status.
-Plans live in `research/`. State below is as of **3 November 2026**.
+Plans live in `research/`. State below is as of **4 November 2026**.
 
 ## Current state
 
@@ -104,7 +104,7 @@ documents, every one matching its browser hash
 ([acquisition reference](acquisition-reference.md#integrity-test-documents-tre-sites)).
 See the [Phase 19 handoff](handoffs/task-19.md).
 
-**Phase 21 (semantic pass): national 2026 runs complete; 2022 pending.**
+**Phase 21 (semantic pass): complete for both 2026 rounds and 2022.**
 `semantic-pass` matched the event-level adapter on 400 of 400 sampled AC objects
 (84469 completed cycles). The national runs processed 498580 round-1 and 498581
 round-2 objects with no errors (1704924 and 3393756 sessions) into
@@ -113,8 +113,18 @@ ledger reconciles every one of the 499207 sections per round: 31 and 29 sections
 were counted with the SA contingency system and have no urn log, one round-2 SP
 section was published without a log, and 596 are excluded. `sa-logs` fetched all
 60 SA logs (byte-identical to the bulk archives) and attributed every one to its
-section ([SA logs](semantic-pass.md#contingency-counting-sa-logs)). 2022 logs need reviewed
-2022 rules first. See the [semantic pass guide](semantic-pass.md#national-runs).
+section ([SA logs](semantic-pass.md#contingency-counting-sa-logs)). The 2026 releases are
+`session-aggregates-v1`; the current code writes v2 (64-bit seconds columns) and
+reproduced the AC rows of both rounds exactly. For 2022 (the negative control),
+a stdlib 7z reader and reviewed 2022 rules (`tse-real-log-rules-2022-v1`) feed a
+bulk mode over the 2022 archives that refuses 2026. It matched the adapter on 200
+of 200 AC objects per round, then processed 471859 and 471983 objects with no
+errors (1805887 and 3570943 sessions) into
+`~/data/election-audit-stage/phase21/national-2022-r{1,2}-v2-20261104/`. The 2022
+ledger accounts for every section in the archives (472024 and 472027). Analyses
+compare biometric with all other authorizations (analysis plan rev 3). See the
+[semantic pass guide](semantic-pass.md#2022-logs) and the
+[Phase 21 handoff](handoffs/task-21.md).
 
 **Phases 12–18: closed as Acre (AC) development pilots.** The 3 November
 methodology review replaced their definitions; the revised work is Phases 19–26.
@@ -138,15 +148,14 @@ No national electoral result, national margin, fitted national model or fraud
 label exists.
 
 **Checks.** The full offline gate `just check` passes (lock, format, lint,
-contracts, docs, documented commands and all 348 tests).
+contracts, docs, documented commands and all 359 tests).
 
 ## Next step
 
-Phase 21 for 2022 (rules review, equivalence, national run), then Phase 20
-integrity checks on the downloaded BU (including SA `busa.dat`), RDV, signatures,
+Phase 20 integrity checks on the downloaded BU (including SA `busa.dat`), RDV, signatures,
 correspondences and the EA20 hierarchy. File the TCU consolidated integrity test
 report when it is published (due within 30 days of the second round). The
-[study protocol](../../research/analysis-plan.md) (Revision 2) defines the claims,
+[study protocol](../../research/analysis-plan.md) (Revision 3) defines the claims,
 the threat-to-observable map, the integrity checks I1–I9, the confirmatory tests
 C1–C6, the power study and the data policy; the
 [completion plan](../../research/completion-plan.md) (Revision 11) defines
@@ -210,7 +219,7 @@ checks (177 tests).
 | Phase | Status | Remaining | Handoff |
 | --- | --- | --- | --- |
 | 10 | Complete: both rounds acquired, copied and SHA-256 verified | Gap sections stay explicit; BWEB, registers, RDV/signature sources for other UFs are separate imports | [10](handoffs/task-10.md) |
-| 11 | Complete for eligible runoff scope (498581 objects, 0 failures) | Semantic pass for both rounds and 2022 (Phase 21); protected logs read only after the Phase 23 freeze | [11](handoffs/task-11.md) |
+| 11 | Complete for eligible runoff scope (498581 objects, 0 failures) | Protected logs read only after the Phase 23 freeze | [11](handoffs/task-11.md) |
 | 12 | AC only: 2270 sections content-verified, UF totals match | Other UFs, both rounds, signatures, RDV, BR/UF/municipal/ZZ hierarchy | [12](handoffs/task-12.md) |
 | 13 | AC sample: one log per round | National sessions, clocks, copied histories, attendance reconciliation | [13](handoffs/task-13.md) |
 | 14 | AC only: 54480 feature rows | National features, cross-round identity, first-round results | [14](handoffs/task-14.md) |
@@ -219,7 +228,7 @@ checks (177 tests).
 | 17 | AC development case packets | National cases, corroboration, impact bounds, full-pipeline sensitivity | [17](handoffs/task-17.md) |
 | 18 | Notebooks over AC export | Browser QA, national datasets | [18](handoffs/task-18.md) |
 | 19 | Complete: BWEB, BU/RDV/log archives, voter profile, correspondences, GEDAI, EA20 hierarchy, pinned manifests, both rounds and 2022 | Integrity test documents for the 17 courts outside the sample; TCU consolidated report | [19](handoffs/task-19.md) |
-| 21 | 2026 national runs complete; ledger reconciles every section; SA logs attributed | 2022 rules review, equivalence and national run | — |
+| 21 | Complete: 2026 both rounds (v1, reproduced by v2 on AC) and 2022 both rounds (v2); ledgers reconcile every section; SA logs attributed | Grouping multi-run sessions and clock rules move to Phase 22 | [21](handoffs/task-21.md) |
 | 20, 22–26 | Not started; defined in the [completion plan](../../research/completion-plan.md#revised-phases) | All | — |
 
 ## Where results are
@@ -236,7 +245,7 @@ paths are on the reference machine's output volume
 | Read-order benchmarks | `~/data/election-audit-stage/benchmarks/` |
 | Phase 19 small inputs (BWEB, results, voter profile, correspondences, GEDAI), each with catalog, manifest and status | `~/data/election-audit-stage/inputs/<dataset>/` |
 | Phase 19 bulk BU/RDV/log archives, 2026 and 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` on the output volume |
-| Phase 21 equivalence reports, AC development pass, national passes | `~/data/election-audit-stage/phase21/` |
+| Phase 21 equivalence reports, AC development pass, AC v2 reproduction, national passes (2026 and 2022) | `~/data/election-audit-stage/phase21/` |
 | SA (contingency counting) logs per round and their section summary | `~/data/election-audit-stage/sa-logs/` |
 | EA20 hierarchical presidential results, both rounds | `~/data/election-audit-stage/results-hierarchy/` |
 | Integrity test documents, ten-court sample, with browser record files; the original browser downloads | `~/data/election-audit-stage/inputs/integrity-tests-2026-sample-20261104/`; `~/data/election-audit-stage/integrity-downloads-20261104/` |
@@ -261,8 +270,8 @@ paths are on the reference machine's output volume
 | Recipes | `justfile`; one recipe per CLI command plus `setup doctor fmt lint test contracts-check docs-check docs-command-check check` |
 | Acquisition | `scripts/download_tse_logs.py` (`--round 1` or `--round 2`), `election_audit/elections.py`; SSD staging `source_staging` (`stage-sources`); open-data archives `bulk_acquisition` (`bulk-download`); EA20 hierarchy `results_hierarchy` (`results-hierarchy`); TRE integrity test documents `integrity_documents` (`integrity-docs`); certified manifest pins `resources/pins/`; [acquisition reference](acquisition-reference.md) |
 | Snapshot/source/coverage | `source_inventory`, `coverage`, `snapshots`; [snapshots](snapshots.md) |
-| Structural parse | `archive_parsing` (`jez-structural-v1`); [archive parsing](archive-parsing.md) |
-| Operational reconstruction | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Phase 13), `semantic_pass` (`session-aggregates-v1`, Phase 21), `sa_logs` (`sa-log-summary-v1`); [reconstruction](reconstruction.md), [semantic pass](semantic-pass.md) |
+| Structural parse | `archive_parsing` (`jez-structural-v1`), `sevenzip` (2022 7z logs); [archive parsing](archive-parsing.md) |
+| Operational reconstruction | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Phase 13), `semantic_pass` (`session-aggregates-v2`, Phase 21; rules `real-log-rules.json` and `real-log-rules-2022.json`), `sa_logs` (`sa-log-summary-v1`); [reconstruction](reconstruction.md), [semantic pass](semantic-pass.md) |
 | Operational releases | `publication`, `operational_marts`, `release_tools`; [publication](publication.md) |
 | National structural processing | Summary path: `national_parallel`, `national_summary`, `national_summary_release`, `national_summary_tools`, `national_summary_tuning`, `national_resources`; [feature-oriented processing](feature-oriented-processing.md). Event-level path: `national_benchmark`, `national_tuning`, `national_workload`, `national`, `national_storage`, `national_relocation`, `national_migration`, `national_overnight`; [national processing](national-processing.md) |
 | Electoral imports and verification | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` and `electoral_verification` (Phase 12); [electoral results](electoral-results.md). `electoral_references` is an unwired, untested prototype for official reference sets |

@@ -1,6 +1,6 @@
 # Passada semântica em fluxo (Fase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 3 · Language: pt-BR
+Document-ID: EA-SEMANTIC-PASS · Revision: 4 · Language: pt-BR
 
 [English](../en/semantic-pass.md) · [Índice de implementação](implementation-index.md)
 
@@ -27,7 +27,12 @@ seguintes precisam.
 A versão `session-aggregates-v2` guarda em inteiros de 64 bits os segundos dos
 intervalos entre conclusões e dos recuos do relógio: o relógio de uma urna de 2022
 recuou cerca de 89 anos, o que estourou as colunas de 32 bits da v1. As versões
-nacionais de 2026 são v1 e não têm valor além do limite de 32 bits.
+nacionais de 2026 são v1 e não têm valor além do limite de 32 bits. Rodá-las de novo
+com o código atual gera v2 com os mesmos valores: em 4 de novembro de 2026 uma
+execução v2 do AC 2026 (1674 objetos por turno) igualou as linhas do AC das duas
+versões nacionais v1 em todas as linhas de objetos, sessões e segmentos, depois de
+converter as quatro colunas de segundos para `int64`. Leia as versões de 2026 com
+essa conversão.
 
 `<output>/release/` contém quatro tabelas Parquet e um `manifest.json` com o
 vínculo (hashes das regras, do certificado da cópia, do manifesto e das exclusões)
@@ -203,7 +208,42 @@ just semantic-pass run \
   --workers 6
 ```
 
-Os resultados nacionais de 2022 estão pendentes: as duas execuções estavam em andamento quando esta revisão foi escrita.
+Execuções nacionais de 2022, 4 de novembro de 2026, 6 workers, lendo os arquivos
+em massa no volume de saída:
+
+| Turno | Objetos | Sessões | Segmentos | Tempo de parede | RSS máximo |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 471859 | 1805887 | 5242171 | 6441 s | 1.06 GB |
+| 2 | 471983 | 3570943 | 9845999 | 14202 s + 112 s (retomado uma vez) | 1.16 GB |
+
+O segundo turno terminou primeiro com um erro: SP 71072/0002/0310 aninha um arquivo
+7z vazio de 32 bytes (`…-01.jez`, só o cabeçalho de assinatura), que o leitor
+recusou como truncado embora o `7z` o aceite. O leitor agora não devolve entradas
+exatamente nesse caso, o shard 00844 foi retirado da saída e a passada retomada sob
+o mesmo vínculo; o objeto coincidiu com o adaptador. A correção só muda objetos que
+antes falhavam, e o primeiro turno não teve nenhum.
+
+Registro da população, a partir dos nomes dos membros dos arquivos
+(`o0040N-MMMMMZZZZSSSS.ext`):
+
+| Turno | Seções | Log da urna | Apuração SA | Só BU (`bu`, `vscmr`) | BU e RDV, sem log | Processadas |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 472024 | 471859 | 109 | 54 | 2 | 471859 |
+| 2 | 472027 | 471983 | 39 | 0 | 5 | 471983 |
+
+Cada seção com log foi processada uma vez e nenhuma seção tem dois logs. Seções SA
+guardam `busa`, `imgbusa`, `logsajez`, `rdv` e `vscsa`; 99 das seções SA do primeiro
+turno e 33 das do segundo são do exterior (ZZ). As 54 seções só com BU são todas do
+ZZ no primeiro turno. As seções com BU e RDV mas sem log são MG 51390/0244/0091 e RN
+16918/0054/0090 no primeiro turno, e PA 04650/0006/0059, 0060, 0072, 0109 e 0111 no
+segundo. Nenhum BWEB de 2022 foi conferido.
+
+Os logs registram falhas de relógio como ocorreram: quatro sessões do primeiro turno
+reiniciam em 01/01/2009 (uma, BA 39799/0106/0049, no meio de um voto no dia da
+eleição), e PE 25097/0091/0032 reinicia durante a preparação em 23/08/1933 antes de
+um operador acertar a data com o aplicativo ADH. Os bytes passam em todos os CRC e
+no SHA-256 do arquivo; são eventos de relógio da urna para a Fase 22, não
+corrupção.
 
 ## Limites
 
