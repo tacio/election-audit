@@ -1,6 +1,6 @@
 # Transparency and operational observations
 
-Document-ID: EA-OBSERVATIONS · Revision: 1 · Language: en
+Document-ID: EA-OBSERVATIONS · Revision: 2 · Language: en
 
 [Português](../pt-BR/observations.md) · [Implementation index](implementation-index.md)
 
@@ -37,7 +37,7 @@ its date.
 
 | ID | Observation | Evidence | Effect on the audit |
 | --- | --- | --- | --- |
-| O1 | When an urn is replaced, its package can hold the same log twice, from internal (`…MI.jez`) and external (`…ME.jez`) memory | Phase 22, round-1 I5 cases with more completions than attendance | Sessions are deduplicated by block lineage (Phase 22 section table) |
+| O1 | When an urn is replaced, its package can hold the same log twice, from internal (`…MI.jez`) and external (`…ME.jez`) memory | Phase 22, round-1 I5 cases with more completions than attendance | Sessions are deduplicated by block lineage ([section table](section-table.md#rules)) |
 | O2 | A runoff log contains the urn's whole history: setup in September, round 1 and the runoff | Phase 21 | Sessions are selected by round, never by file |
 | O3 | Urn clocks run on local time; voting closes at 17:00 Brasília time, so the configured closing reading is 15:00 in AC; urns print it when someone tries to close early | Phase 22, AC 2026 and 2022 | The closing time is a per-municipality rule, not one national hour |
 | O4 | Operators set urn clocks with the ADH application; urns log time-zone adjustments when loaded, and a daylight-saving adjustment message appears 7313 times in the 2026 runoff vocabulary although Brazil has no daylight saving | Phase 21 vocabulary; Phase 22 v3 columns | Clock evidence is recorded per session; time-of-day measures need a resolved clock |
@@ -47,6 +47,7 @@ its date.
 | O8 | The EA20 round-1 results for ZZ (186 cities and the ZZ total) were regenerated on 2026-10-24, after the round-1 generation on 2026-10-05 | [Phase 19 handoff](handoffs/task-19.md) | Hierarchy checks use the final regeneration |
 | O9 | The certificate authorities issued their revocation lists on 2026-09-27 with 90-day validity; `AC URNA` revoked three urn certificates on 2025-05-16 | `tse-crls-20261105-complete/` | Phase 20b checks that no 2026 signature uses a revoked certificate |
 | O10 | The 29 totalization report packages (`Relatorio_Resultado_Totalizacao_2026_<UF>.zip`: 27 UFs, BR, ZZ) are re-zipped by a scheduled job every few hours (seen 2026-11-03 at 11:30, 19:30 and 22:30 GMT, and 2026-11-04 at 08:30 GMT) with unchanged members; the PDFs inside change after court decisions: 18 round-1 PDFs were regenerated between 2026-10-07 and 2026-10-24, including RJ after the governor retotalization and MS after the deputy retotalization; every report says "sujeito a modificações" | [Acquisition reference](acquisition-reference.md#totalization-reports-are-a-moving-target) | Published results are point-in-time snapshots: the audit reads the result time printed in each PDF, compares snapshots by member CRC, not by archive hash, and expects retotalizations for months |
+| O11 | In 2026 round 2, operators set urn clocks back by about one hour with ADH before voting in 82 Mato Grosso sections (shifts near −3600 s; three municipalities, mostly zone 0053); no Mato Grosso section had such a setting in round 1. The likely cause, urns loaded on Brasília time, is not confirmed | [Section table](section-table.md#national-results), `clock_adh_shift_s` | These sessions are `adjusted`: their readings follow the setting, and time-of-day measures keep them |
 
 ## Sources
 

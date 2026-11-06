@@ -148,6 +148,10 @@ integrity-docs *args:
 integrity-check *args:
     rtk proxy uv run --locked election-audit integrity-check "$@"
 
+# Phase 22 section feature table v2 (sections, crosswalk units, ledger).
+section-table *args:
+    rtk proxy uv run --locked election-audit section-table "$@"
+
 # Benchmark read orders or stage certified raw objects onto a new verified root.
 stage-sources *args:
     rtk proxy uv run --locked election-audit stage-sources "$@"

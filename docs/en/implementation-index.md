@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 29 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 30 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -8,7 +8,7 @@ This is the single current-state entry point. It says what exists, what has
 actually run, where the results are and what comes next. Guides under `docs/en/`
 describe how each tool behaves. Handoffs under `docs/en/handoffs/` are dated
 records of what each task did at the time; read them for detail, not for status.
-Plans live in `research/`. State below is as of **5 November 2026**.
+Plans live in `research/`. State below is as of **6 November 2026**.
 
 ## Current state
 
@@ -104,6 +104,22 @@ documents, every one matching its browser hash
 ([acquisition reference](acquisition-reference.md#integrity-test-documents-tre-sites)).
 See the [Phase 19 handoff](handoffs/task-19.md).
 
+**Phase 22 (section table v2): complete for 2026 and 2022.** Semantic pass
+`session-aggregates-v3` adds device model, software and clock evidence per session.
+It ran nationally for both years and rounds with no errors, and every column shared
+with the earlier releases is equal in every row
+([semantic pass](semantic-pass.md#version-3-phase-22)). `section-table build`
+wrote 998496 section rows in 499248 harmonized units for 2026 and 945386 rows in
+472693 units for 2022, into `~/data/election-audit-stage/phase22/table-{2026,2022}-20261106/`.
+Copies of one session in internal and external memory are counted once. Clocks are
+judged against legal closing times, with Amazonas resolved from the closing times
+the urns print. Every unit keeps the same principal section in both rounds.
+Results and operational measures are written only under `restricted/` and were not
+read. Open: eight 2026 round-1 sections whose log model differs from the BU signer,
+and Amazonas sections without a close rule (94 in 2026, 704 in 2022), both moved to
+Phase 20b. See the [section table guide](section-table.md#national-results), the
+[observation register](observations.md) and the [Phase 22 handoff](handoffs/task-22.md).
+
 **Phase 21 (semantic pass): complete for both 2026 rounds and 2022.**
 `semantic-pass` matched the event-level adapter on 400 of 400 sampled AC objects
 (84469 completed cycles). The national runs processed 498580 round-1 and 498581
@@ -163,20 +179,21 @@ No national electoral result, national margin, fitted national model or fraud
 label exists.
 
 **Checks.** The full offline gate `just check` passes (lock, format, lint,
-contracts, docs, documented commands and all 371 tests).
+contracts, docs, documented commands and all 381 tests).
 
 ## Next step
 
-Phase 22: group multi-run sessions and apply the clock rules, starting from the
-Phase 20 I5 and I6 discrepancy tables. Phase 20b (Ed521 and certificate-chain
-verification, the I6 prefix re-read, the missing I2 and I8 sources) does not block
-Phase 22 but must be completed, or its gaps written into the protocol, before the
-Phase 23 freeze. File the TCU consolidated integrity test
+Phase 20b, which gates the Phase 23 freeze: Ed521 and certificate-chain
+verification and the national I1 rerun, the I6 prefix re-read, the missing I2 and
+I8 sources, the checks added from DataUrnas-BR and the Phase 22 items (eight model
+differences, Amazonas close rules). Its gaps that cannot be closed are written into
+the protocol. TSE's reply to the root-certificate request (protocol
+83529705172533) is due by 25 November 2026. File the TCU consolidated integrity test
 report when it is published (due within 30 days of the second round). The
 [study protocol](../../research/analysis-plan.md) (Revision 4) defines the claims,
 the threat-to-observable map, the integrity checks I1–I9, the confirmatory tests
 C1–C6, the power study and the data policy; the
-[completion plan](../../research/completion-plan.md) (Revision 12) defines
+[completion plan](../../research/completion-plan.md) (Revision 14) defines
 Phases 19–26. The protocol is a draft until it is frozen and publicly
 pre-registered in Phase 23.
 
@@ -248,8 +265,9 @@ checks (177 tests).
 | 19 | Complete: BWEB, BU/RDV/log archives, voter profile, correspondences, GEDAI, EA20 hierarchy, pinned manifests, both rounds and 2022 | Integrity test documents for the 17 courts outside the sample; TCU consolidated report | [19](handoffs/task-19.md) |
 | 20 | Complete: I1–I9 for 2026, both rounds, all sections; ECDSA verified, BWEB, EA20 and correspondences agree | Ed521 signatures, certificate chains, I6 prefix re-read, I5/I6 open differences, I8, 2022 | [20](handoffs/task-20.md) |
 | 21 | Complete: 2026 both rounds (v1, reproduced by v2 on AC) and 2022 both rounds (v2); ledgers reconcile every section; SA logs attributed | Grouping multi-run sessions and clock rules move to Phase 22 | [21](handoffs/task-21.md) |
-| 20b | Not started: Ed521 and certificate chains, I1 rerun, I6 prefix re-read, I2 municipal-election source, I8; gates the Phase 23 freeze | All | — |
-| 22–26 | Not started; defined in the [completion plan](../../research/completion-plan.md#revised-phases) | All | — |
+| 22 | Complete: semantic pass v3 nationally (2026 and 2022, equal to earlier releases on shared columns); section tables for both years with crosswalk, clock rules and ledger | Results and operational values unread until the freeze; model differences and Amazonas close rules move to Phase 20b | [22](handoffs/task-22.md) |
+| 20b | In progress in a separate worktree: Ed521 implemented and confirmed from TSE's reference code; CA certificates and revocation lists frozen; national chains, I1 rerun, I6 prefix re-read, I2 municipal source, I8 and the added checks remain; gates the Phase 23 freeze | Roots requested from TSE | — |
+| 23–26 | Not started; defined in the [completion plan](../../research/completion-plan.md#revised-phases) | All | — |
 
 ## Where results are
 
@@ -267,6 +285,8 @@ paths are on the reference machine's output volume
 | Phase 19 bulk BU/RDV/log archives, 2026 and 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` on the output volume |
 | Phase 20 integrity-check releases (sections, BWEB, hierarchy, correspondences, logs), AC/ZZ development runs | `~/data/election-audit-stage/phase20/` |
 | Phase 21 equivalence reports, AC development pass, AC v2 reproduction, national passes (2026 and 2022) | `~/data/election-audit-stage/phase21/` |
+| Phase 22 v3 semantic passes, section tables (2026, 2022), AC development runs, Phase 20 root selections | `~/data/election-audit-stage/phase22/` |
+| TSE 2026 format package (specifications, reference verifier, CA certificates) and the five revocation lists, frozen | `~/data/election-audit-stage/inputs/tse-format-docs-20261105/`, `~/data/election-audit-stage/inputs/tse-crls-20261105-complete/` |
 | SA (contingency counting) logs per round and their section summary | `~/data/election-audit-stage/sa-logs/` |
 | EA20 hierarchical presidential results, both rounds | `~/data/election-audit-stage/results-hierarchy/` |
 | Integrity test documents, ten-court sample, with browser record files; the original browser downloads | `~/data/election-audit-stage/inputs/integrity-tests-2026-sample-20261104/`; `~/data/election-audit-stage/integrity-downloads-20261104/` |
@@ -287,20 +307,21 @@ paths are on the reference machine's output volume
 | Area | Modules and guides |
 | --- | --- |
 | Runtime | `pyproject.toml`, `uv.lock`, `.python-version`; `uv sync --locked` |
-| CLI | `election_audit/cli.py`. Legacy: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensions: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export stage-sources bulk-download semantic-pass sa-logs results-hierarchy integrity-docs integrity-check` |
+| CLI | `election_audit/cli.py`. Legacy: `download resume inspect doctor`. Pipeline: `snapshot snapshot-inspect parse reconstruct build validate query report import-results analyze demo pilot reproduce review-bundle backfill`. Extensions: `national electoral-verify operational-review features research-protocol research-models investigations dashboard dashboard-export stage-sources bulk-download semantic-pass sa-logs results-hierarchy integrity-docs integrity-check section-table` |
 | Recipes | `justfile`; one recipe per CLI command plus `setup doctor fmt lint test contracts-check docs-check docs-command-check check` |
 | Acquisition | `scripts/download_tse_logs.py` (`--round 1` or `--round 2`), `election_audit/elections.py`; SSD staging `source_staging` (`stage-sources`); open-data archives `bulk_acquisition` (`bulk-download`); EA20 hierarchy `results_hierarchy` (`results-hierarchy`); TRE integrity test documents `integrity_documents` (`integrity-docs`); certified manifest pins `resources/pins/`; [acquisition reference](acquisition-reference.md) |
 | Snapshot/source/coverage | `source_inventory`, `coverage`, `snapshots`; [snapshots](snapshots.md) |
 | Structural parse | `archive_parsing` (`jez-structural-v1`), `sevenzip` (2022 7z logs); [archive parsing](archive-parsing.md) |
-| Operational reconstruction | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Phase 13), `semantic_pass` (`session-aggregates-v2`, Phase 21; rules `real-log-rules.json` and `real-log-rules-2022.json`), `sa_logs` (`sa-log-summary-v1`); [reconstruction](reconstruction.md), [semantic pass](semantic-pass.md) |
+| Operational reconstruction | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Phase 13), `semantic_pass` (`session-aggregates-v3`, Phases 21–22; rules `real-log-rules.json` and `real-log-rules-2022.json`), `sa_logs` (`sa-log-summary-v1`); [reconstruction](reconstruction.md), [semantic pass](semantic-pass.md) |
 | Operational releases | `publication`, `operational_marts`, `release_tools`; [publication](publication.md) |
 | National structural processing | Summary path: `national_parallel`, `national_summary`, `national_summary_release`, `national_summary_tools`, `national_summary_tuning`, `national_resources`; [feature-oriented processing](feature-oriented-processing.md). Event-level path: `national_benchmark`, `national_tuning`, `national_workload`, `national`, `national_storage`, `national_relocation`, `national_migration`, `national_overnight`; [national processing](national-processing.md) |
 | Integrity checks | `integrity_checks` (`integrity-sections-v1`, `integrity-logs-v1`; signature layout `resources/assinatura-2026-observed.asn1`); [integrity checks](integrity-checks.md) |
 | Electoral imports and verification | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` and `electoral_verification` (Phase 12); [electoral results](electoral-results.md). `electoral_references` is an unwired, untested prototype for official reference sets |
 | Analysis foundation | `analysis`, `analysis_partitions`, `analysis_ledgers`, `analysis_reports`; [analysis](analysis.md) |
+| Section table | `section_table` (`section-features-v2`, Phase 22); [section table](section-table.md), [observation register](observations.md) |
 | Research path | `features` (Phase 14), `research_protocol` and `research_evaluation` (Phase 15), `research_models` (Phase 16), `investigations` (Phase 17); see their handoffs |
 | Dashboard | `dashboard`, `dashboard_data`, `dashboard_ui`, `dashboard_development`, `election_audit/notebooks/` (Phase 18) |
-| Reproduction | `reproduction`, `pilot`, `walkthrough`; [reproduction](reproduction.md), [backfill](backfill.md) |
+| Reproduction | `reproduction`, `pilot`, `walkthrough`; [reproduction](reproduction.md) (national run times and resources: [what to expect](reproduction.md#what-to-expect-on-the-national-data)), [backfill](backfill.md) |
 | Contracts | `election_audit/resources/contracts/schema.json` and `features.json`; `contracts.py`; [schema dictionary](schema-dictionary.md), [feature readiness](feature-readiness.md), [transformation conventions](transformation-conventions.md) |
 | Research documents | [study protocol](../../research/analysis-plan.md), [completion plan](../../research/completion-plan.md), [download sources](../../research/download-sources.md), [related work](../../research/related-work.md) |
 | Documentation checks | `scripts/check_docs.py` (pairs, revisions, links, fenced parity), `scripts/check_doc_commands.py` (flags via `--help`, SQL syntax) |

@@ -1,6 +1,6 @@
 # Passada semântica em fluxo (Fase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 4 · Language: pt-BR
+Document-ID: EA-SEMANTIC-PASS · Revision: 5 · Language: pt-BR
 
 [English](../en/semantic-pass.md) · [Índice de implementação](implementation-index.md)
 
@@ -102,6 +102,35 @@ arquivos `busa`, `logsa`, `rdv` e `sa` e nenhum `log` da urna. Duas seções de 
 (41238/0039/0168, 50075/0047/0041) usaram SA só no primeiro turno. A seção SP
 64777/0395/0298 foi publicada no segundo turno com arquivos `bu`, `rdv` e `vota` e
 sem log.
+
+## Versão 3 (Fase 22)
+
+`session-aggregates-v3` acrescenta nove colunas de sessão para a
+[tabela por seção](section-table.md) e não muda mais nada: `model`,
+`software_version`, a evidência de relógio registrada antes da sessão
+(`clock_adh_before`, `clock_adh_shift_s_before`, `clock_tz_shifts_before`,
+`clock_tz_shift_s_before`, `clock_dst_before`), `configured_close` e
+`segment_ordinal`. Os contadores de relógio se acumulam por fluxo. A tabela por
+seção descreve cada coluna.
+
+As quatro execuções nacionais usaram 5 workers em 5–6 de novembro de 2026, sem
+erros por objeto. O tempo ativo exclui duas suspensões da máquina.
+
+| Ano | Turno | Objetos | Sessões | Segmentos | Tempo ativo |
+| --- | --- | --- | --- | --- | --- |
+| 2026 | 1 | 498580 | 1704924 | 5048597 | 8002 s |
+| 2026 | 2 | 498581 | 3393756 | 9474325 | 12808 s |
+| 2022 | 1 | 471859 | 1805887 | 5242171 | 7277 s |
+| 2022 | 2 | 471983 | 3570943 | 9845999 | 11809 s |
+
+Aceitação, por execução: todo shard de sessões tem as nove colunas, e toda coluna
+em comum com a versão anterior (2026 v1, 2022 v2) é igual em todas as linhas de
+sessões, segmentos e objetos, nos dois sentidos. As raízes são
+`~/data/election-audit-stage/phase22/v3-national-r{1,2}-20261105/` e
+`v3-national-2022-r{1,2}-20261105/`. Cada execução tem uma só versão de software
+nas sessões oficiais (`10.23.0.0 - Praia da Barra do Cahy` em 2026,
+`8.26.0.0 - Onça-pintada` em 2022). Algumas sessões não têm linha de versão: 1 no
+1º turno de 2026, 8 no 1º turno de 2022, 1 no 2º turno de 2022.
 
 ## Logs de apuração de contingência (SA)
 

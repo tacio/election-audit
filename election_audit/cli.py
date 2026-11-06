@@ -46,6 +46,7 @@ def main(argv=None):
         "results-hierarchy": ("election_audit.results_hierarchy", "results_hierarchy_main"),
         "integrity-docs": ("election_audit.integrity_documents", "integrity_documents_main"),
         "integrity-check": ("election_audit.integrity_checks", "integrity_check_main"),
+        "section-table": ("election_audit.section_table", "section_table_main"),
     }
     if args and args[0] in extension_commands:
         module, function = extension_commands[args[0]]

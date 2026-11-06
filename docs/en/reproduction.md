@@ -1,6 +1,6 @@
 # Reproduction and peer review
 
-Document-ID: EA-REPRODUCTION · Revision: 4 · Language: en
+Document-ID: EA-REPRODUCTION · Revision: 5 · Language: en
 
 The offline demo is SYNTHETIC throughout: deterministic tiny ZIP originals exercise mixed device dates, exact copied history, replacement devices, manual request/cancellation, unresolved clocks and malformed nested content. Reviewed session/copy/semantic assertions are generated from exact preserved synthetic line hashes. Expected members 3, unique principals 2, normalized attending voters 10, eligible electors 20 and turnout 0.5 are known fixture numbers. They do not validate real electoral data. Unknown identity links remain unavailable; a registered exploration preserves its null result and complete history without fitting.
 
@@ -49,3 +49,46 @@ Both-language reports share calculations, SQL, coverage, availability, exclusion
 `docs-check` retains paired metadata/revision, links, code-fence parity and Mermaid structure checks. `docs-command-check` inspects shell quoting, known recipes/commands/long flags and DuckDB SQL syntax using fixture/harmless --help paths only. It never executes documented acquisition/backfill commands, SQL, shell substitutions or file arguments. Syntax checks do not establish query meaning, scientific validity or translation quality; those require review.
 
 See [backfill planning](backfill.md), [the implementation index](implementation-index.md) and paired task 9 handoffs for actual acceptance artifacts and remaining work.
+
+## What to expect on the national data
+
+Times measured on the reference machine: Intel Core i7-9750H (6 cores, 12
+threads), 31 GB of RAM, SSD staging on NVMe, and a 2.5-inch 5400 rpm HDD as the
+output volume. Runs used at most half the CPU threads and 6 GiB of RAM in all.
+"Active" excludes machine suspends. "Not recorded" means no measurement was kept;
+nothing below is estimated.
+
+| Step | Command | Scale | Workers | Time | Peak RAM | Output |
+| --- | --- | --- | --- | --- | --- | --- |
+| Urn logs, both rounds (Phase 10) | `download` | 499176 and 499177 log versions, 53.7 GB and 90.6 GB | — | Several days, network-bound; not recorded per round | Not recorded | Raw roots |
+| Open-data inputs (Phase 19) | `bulk-download` | BWEB 4.9 GB (2026) and 1.5 GB (2022); voter profile 3.3 GB and 0.96 GB; BU/RDV/log archives 219.2 GB (2026) and 168.5 GB (2022) | — | Network-bound; not recorded | Not recorded | `inputs/`, `bulk/` |
+| SSD staging, both rounds | `stage-sources copy` | 53.7 GB and 90.6 GB | — | 86 min: copies 931 s and 1587 s, re-hashes 954 s and 1431 s | Not recorded | 144.3 GB on SSD |
+| Integrity checks, 2026, per round (Phase 20) | `integrity-check sections` | 499207 sections | 6 | 64 and 59 min | Not recorded | 618 MB and 325 MB |
+| | `integrity-check bweb` | BWEB 5.1 GB (round 1, every office) and 0.14 GB (round 2) | 1 | 30 min and 66 s | Not recorded | 2.1 MB and 1.2 MB |
+| | `integrity-check hierarchy` | EA20 nodes | 1 | 17 min and 21 s | Not recorded | 96 KB |
+| | `integrity-check correspondence`, `logs` | Per round | 1 | Under a minute each | Not recorded | Under 2 MB |
+| Semantic pass v3, per year and round (Phase 22) | `semantic-pass run` | 2026: 498580 and 498581 objects; 2022: 471859 and 471983 | 5 | Active 8002 s and 12808 s (2026), 7277 s and 11809 s (2022) | About 1.7 GB in all; largest process 1.2 GB | 1.8, 2.9, 1.7 and 2.7 GB |
+| Section table, per year (Phase 22) | `section-table build` | 499248 and 472693 sections per round | 1 | 45 min (2026) and 41 min (2022) | 3.9 GB and 3.3 GB | 192 MB and 183 MB |
+| Offline gate | `just check` | 381 tests | 1 | 113 s | — | — |
+
+After the downloads, reproducing the current releases takes about 17 hours of
+compute: staging, integrity checks, the four semantic passes and both tables. The
+Phase 21 passes (v1 for 2026, v2 for 2022) are not needed, because v3 contains
+every column they have.
+
+What drives the times:
+
+- Round 2 takes longer because each runoff log holds the urn's whole history, from
+  setup through round 1, so it has twice the sessions.
+- 2026 logs are read from the SSD staging. From the HDD, section order read at 1.9–3.5 MB/s
+  and physical order at 73–92 MB/s
+  ([implementation index](implementation-index.md#current-state)).
+- 2022 logs are read straight from the bulk 7z archives on the HDD, in physical
+  order.
+- Round-1 BWEB holds every office, so its checks read 35 times more data than
+  round 2.
+
+Long runs resume with `--resume` and the identical binding. Turn off the desktop's
+automatic suspend for overnight runs: a sleep inhibitor did not prevent one
+suspend, although the runs then resumed without errors. Wrap each national run in
+`/usr/bin/time -v` to record its time and peak memory.

@@ -1,6 +1,6 @@
 # Streaming semantic pass (Phase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 4 · Language: en
+Document-ID: EA-SEMANTIC-PASS · Revision: 5 · Language: en
 
 [Português](../pt-BR/semantic-pass.md) · [Implementation index](implementation-index.md)
 
@@ -98,6 +98,35 @@ SA sections were counted with the contingency counting system: their package lis
 `busa`, `logsa`, `rdv` and `sa` files and no urn `log`. Two MG sections
 (41238/0039/0168, 50075/0047/0041) used SA in round 1 only. SP 64777/0395/0298 was
 published in round 2 with `bu`, `rdv` and `vota` files and no log.
+
+## Version 3 (Phase 22)
+
+`session-aggregates-v3` adds nine session columns for the
+[section table](section-table.md) and changes nothing else: `model`,
+`software_version`, the clock evidence recorded before the session
+(`clock_adh_before`, `clock_adh_shift_s_before`, `clock_tz_shifts_before`,
+`clock_tz_shift_s_before`, `clock_dst_before`), `configured_close` and
+`segment_ordinal`. The clock counters accumulate per stream. The section table
+describes each column.
+
+All four national runs used 5 workers on 5–6 November 2026, with no object
+errors. Active time excludes two machine suspends.
+
+| Year | Round | Objects | Sessions | Segments | Active time |
+| --- | --- | --- | --- | --- | --- |
+| 2026 | 1 | 498580 | 1704924 | 5048597 | 8002 s |
+| 2026 | 2 | 498581 | 3393756 | 9474325 | 12808 s |
+| 2022 | 1 | 471859 | 1805887 | 5242171 | 7277 s |
+| 2022 | 2 | 471983 | 3570943 | 9845999 | 11809 s |
+
+Acceptance, per run: every session shard has the nine columns, and every column
+shared with the earlier release (2026 v1, 2022 v2) is equal in every session,
+segment and object row, both ways. The roots are
+`~/data/election-audit-stage/phase22/v3-national-r{1,2}-20261105/` and
+`v3-national-2022-r{1,2}-20261105/`. Each run has a single software version among
+official sessions (`10.23.0.0 - Praia da Barra do Cahy` in 2026,
+`8.26.0.0 - Onça-pintada` in 2022). A few sessions have no version line: 1 in
+2026 round 1, 8 in 2022 round 1, 1 in 2022 round 2.
 
 ## Contingency counting (SA) logs
 

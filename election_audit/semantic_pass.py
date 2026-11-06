@@ -48,7 +48,7 @@ from election_audit.elections import election_for_round
 from election_audit.national_migration import atomic, sha
 from election_audit.operational_review import classify, rules_for
 
-VERSION = "session-aggregates-v2"  # v2: seconds columns are int64
+VERSION = "session-aggregates-v3"  # v2: int64 seconds; v3: device and clock columns
 ADAPTER_VERSION = "real-operational-v1"
 SHARD_OBJECTS = 500
 VOCABULARY_LIMIT = 4000
@@ -59,6 +59,15 @@ BULK_YEARS = (2022,)  # 2026 bulk archives hold the protected logs; 2026 reads t
 URL = re.compile(r"/arquivo-urna/(\d+)/dados/([a-z]{2})/(\d+)/(\d+)/(\d+)/")
 DIGITS = re.compile(r"[0-9]+")
 HEXRUN = re.compile(r"\b[0-9A-Fa-f]{12,}\b")
+MODEL_PREFIX = "Identificação do Modelo de Urna: "
+VERSION_PREFIX = "Versão da aplicação: "
+STAMP = r"(\d{2}/\d{2}/\d{4}) - (\d{2}:\d{2}:\d{2})"
+ADH_SET = re.compile(rf"Ajuste de Data e Hora {STAMP} foi digitada pelo operador")
+DST_SHIFT = "Horário da urna alterado devido a horário de verão"
+CLOSE_FLOOR = re.compile(r"Encerramento só pode ser solicitado após as (\d{2}:\d{2}:\d{2}) horas")
+TZ_SHIFT = re.compile(
+    rf"Data e hora da urna alterada de {STAMP} para {STAMP} por ajuste de fuso horário"
+)
 CYCLE_STATES = ("completed", "suspended", "cancelled", "unresolved")
 METHODS = ("biometric", "manual", "unknown")
 
@@ -97,6 +106,15 @@ SESSION_SCHEMA = pa.schema(
         ("completion_gap_max_s", pa.int64()),
         ("reading_backsteps", pa.int32()),
         ("reading_backstep_max_s", pa.int64()),
+        ("model", pa.string()),
+        ("software_version", pa.string()),
+        ("clock_adh_before", pa.int32()),
+        ("clock_adh_shift_s_before", pa.int64()),
+        ("clock_tz_shifts_before", pa.int32()),
+        ("clock_tz_shift_s_before", pa.int64()),
+        ("clock_dst_before", pa.int32()),
+        ("configured_close", pa.string()),
+        ("segment_ordinal", pa.int32()),
     ]
 )
 SEGMENT_SCHEMA = pa.schema(
@@ -264,6 +282,7 @@ class ObjectSummary:
         self.stream = self.session = self.pending = self.segment = None
         self.phase = None
         self.software = False
+        self.clock = {"model": None, "adh": 0, "adh_shift": 0, "tz": 0, "tz_shift": 0, "dst": 0}
         self._templates, self._classes = {}, {}
 
     # ---- vocabulary and classification caches
@@ -350,11 +369,35 @@ class ObjectSummary:
             self.sessions.append(session)
         self.session, self.software = None, False
 
+    def _device_clock(self, application, message, reading):
+        """Device model and clock settings of the current stream, as read before a session."""
+        clock = self.clock
+        if message.startswith(MODEL_PREFIX):
+            model = message[len(MODEL_PREFIX) :].strip()
+            if re.fullmatch(r"UE[0-9]{4}", model):
+                clock["model"] = model
+                if self.session is not None and self.session["model"] is None:
+                    self.session["model"] = model
+        elif application == "ADH" and (found := ADH_SET.fullmatch(message)):
+            typed = reading_seconds(f"{found[1]} {found[2]}")
+            clock["adh"] += 1
+            if typed is not None:
+                clock["adh_shift"] += typed - reading
+        elif message == DST_SHIFT:
+            clock["dst"] += 1
+        elif found := TZ_SHIFT.fullmatch(message):
+            before = reading_seconds(f"{found[1]} {found[2]}")
+            after = reading_seconds(f"{found[3]} {found[4]}")
+            clock["tz"] += 1
+            if before is not None and after is not None:
+                clock["tz_shift"] += after - before
+
     def _new_stream(self, key, device, path):
         if self.stream is not None:
             self._finish_session("stream_end")
         self._close_segment()
         self.stream, self.phase = key, None
+        self.clock = {"model": None, "adh": 0, "adh_shift": 0, "tz": 0, "tz_shift": 0, "dst": 0}
         self.stream_ordinal += 1
         self._segment_ordinal = 0
         self._last_reading = None
@@ -389,6 +432,10 @@ class ObjectSummary:
             self._new_stream(key, device, path)
         kind, value = self._classify(application, message)
         self.kinds[kind] += 1
+        if message.startswith(
+            ("Identificação", "Ajuste de Data", "Data e hora da urna", "Horário da urna")
+        ):
+            self._device_clock(application, message, reading)
         template = self._template(application, message)
         if template in self.vocabulary or len(self.vocabulary) < VOCABULARY_LIMIT:
             self.vocabulary[template] += 1
@@ -442,6 +489,15 @@ class ObjectSummary:
                 "completions_by_reading_hour": [0] * 24,
                 "reading_backsteps": 0,
                 "reading_backstep_max_s": None,
+                "model": self.clock["model"],
+                "software_version": None,
+                "clock_adh_before": self.clock["adh"],
+                "clock_adh_shift_s_before": self.clock["adh_shift"],
+                "clock_tz_shifts_before": self.clock["tz"],
+                "clock_tz_shift_s_before": self.clock["tz_shift"],
+                "clock_dst_before": self.clock["dst"],
+                "configured_close": None,
+                "segment_ordinal": self.segment["segment_ordinal"],
                 "_completions": [],
             }
             self._last_reading = None
@@ -456,6 +512,21 @@ class ObjectSummary:
                     step, session["reading_backstep_max_s"] or 0
                 )
             self._last_reading = reading
+        if (
+            session is not None
+            and application == "VOTA"
+            and session["software_version"] is None
+            and message.startswith(VERSION_PREFIX)
+        ):
+            session["software_version"] = message[len(VERSION_PREFIX) :].strip()[:80]
+        if (
+            session is not None
+            and application == "VOTA"
+            and session["configured_close"] is None
+            and message.startswith("Encerramento só")
+            and (found := CLOSE_FLOOR.fullmatch(message))
+        ):
+            session["configured_close"] = found[1]
         if kind == "supported_software" and session is not None:
             self.software, session["software_supported"] = True, True
         active = (

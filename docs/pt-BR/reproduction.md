@@ -1,6 +1,6 @@
 # Reprodução e revisão por pares
 
-Document-ID: EA-REPRODUCTION · Revision: 4 · Language: pt-BR
+Document-ID: EA-REPRODUCTION · Revision: 5 · Language: pt-BR
 
 A demonstração sem rede é inteiramente SINTÉTICA: pequenos originais ZIP determinísticos exercitam datas mistas do dispositivo, histórico copiado exato, substituição de dispositivos, solicitação manual/cancelamento, relógios não resolvidos e conteúdo aninhado malformado. Asserções revisadas de sessão/cópia/semântica são geradas com hashes exatos de linhas sintéticas preservadas. Membros esperados 3, principais únicos 2, comparecimento normalizado 10, eleitores aptos 20 e comparecimento proporcional 0.5 são números conhecidos da fixture. Não validam dados eleitorais reais. Ligações de identidade desconhecidas ficam indisponíveis; exploração registrada preserva resultado nulo e histórico completo sem ajuste de modelo.
 
@@ -49,3 +49,45 @@ Relatórios nos dois idiomas compartilham cálculos, SQL, cobertura, disponibili
 `docs-check` mantém verificações de metadados/revisões pareados, links, igualdade de blocos de código e estrutura Mermaid. `docs-command-check` inspeciona aspas shell, receitas/comandos/opções longas conhecidas e sintaxe SQL DuckDB usando somente fixtures/caminhos inofensivos --help. Nunca executa comandos documentados de aquisição/processamento retroativo, SQL, substituições shell ou argumentos de arquivo. Sintaxe não estabelece significado da consulta, validade científica ou qualidade da tradução; exigem revisão.
 
 Veja [planejamento retroativo](backfill.md), [índice de implementação](implementation-index.md) e handoffs pareados da tarefa 9 para artefatos reais de aceitação e trabalho restante.
+
+## O que esperar nos dados nacionais
+
+Tempos medidos na máquina de referência: Intel Core i7-9750H (6 núcleos, 12
+threads), 31 GB de RAM, cópia de trabalho em SSD NVMe e um HDD de 2,5 polegadas e
+5400 rpm como volume de saída. As execuções usaram no máximo metade das threads da
+CPU e 6 GiB de RAM no total. "Ativo" exclui suspensões da máquina. "Não registrado"
+quer dizer que nenhuma medição foi guardada; nada abaixo é estimado.
+
+| Etapa | Comando | Escala | Workers | Tempo | Pico de RAM | Saída |
+| --- | --- | --- | --- | --- | --- | --- |
+| Logs das urnas, dois turnos (Fase 10) | `download` | 499176 e 499177 versões de log, 53.7 GB e 90.6 GB | — | Vários dias, limitado pela rede; não registrado por turno | Não registrado | Raízes brutas |
+| Entradas de dados abertos (Fase 19) | `bulk-download` | BWEB 4.9 GB (2026) e 1.5 GB (2022); perfil do eleitorado 3.3 GB e 0.96 GB; arquivos de BU/RDV/log 219.2 GB (2026) e 168.5 GB (2022) | — | Limitado pela rede; não registrado | Não registrado | `inputs/`, `bulk/` |
+| Cópia no SSD, dois turnos | `stage-sources copy` | 53.7 GB e 90.6 GB | — | 86 min: cópias 931 s e 1587 s, novos hashes 954 s e 1431 s | Não registrado | 144.3 GB no SSD |
+| Verificações de integridade, 2026, por turno (Fase 20) | `integrity-check sections` | 499207 seções | 6 | 64 e 59 min | Não registrado | 618 MB e 325 MB |
+| | `integrity-check bweb` | BWEB 5.1 GB (1º turno, todos os cargos) e 0.14 GB (2º turno) | 1 | 30 min e 66 s | Não registrado | 2.1 MB e 1.2 MB |
+| | `integrity-check hierarchy` | Nós do EA20 | 1 | 17 min e 21 s | Não registrado | 96 KB |
+| | `integrity-check correspondence`, `logs` | Por turno | 1 | Menos de um minuto cada | Não registrado | Menos de 2 MB |
+| Passada semântica v3, por ano e turno (Fase 22) | `semantic-pass run` | 2026: 498580 e 498581 objetos; 2022: 471859 e 471983 | 5 | Ativo 8002 s e 12808 s (2026), 7277 s e 11809 s (2022) | Cerca de 1.7 GB no total; maior processo 1.2 GB | 1.8, 2.9, 1.7 e 2.7 GB |
+| Tabela por seção, por ano (Fase 22) | `section-table build` | 499248 e 472693 seções por turno | 1 | 45 min (2026) e 41 min (2022) | 3.9 GB e 3.3 GB | 192 MB e 183 MB |
+| Verificação offline | `just check` | 381 testes | 1 | 113 s | — | — |
+
+Depois dos downloads, reproduzir as versões atuais leva cerca de 17 horas de
+processamento: cópia no SSD, verificações de integridade, as quatro passadas
+semânticas e as duas tabelas. As passadas da Fase 21 (v1 para 2026, v2 para 2022)
+não são necessárias, porque a v3 contém todas as colunas delas.
+
+O que determina os tempos:
+
+- O 2º turno demora mais porque cada log do 2º turno guarda toda a história da urna,
+  da preparação ao 1º turno, e por isso tem o dobro de sessões.
+- Os logs de 2026 são lidos da cópia no SSD. No HDD, a ordem das seções leu a 1.9–3.5 MB/s e a
+  ordem física a 73–92 MB/s
+  ([índice de implementação](implementation-index.md#estado-atual)).
+- Os logs de 2022 são lidos direto dos arquivos 7z no HDD, na ordem física.
+- O BWEB do 1º turno traz todos os cargos, então suas verificações leem 35 vezes
+  mais dados que no 2º turno.
+
+Execuções longas retomam com `--resume` e o mesmo vínculo. Desligue a suspensão
+automática do desktop para execuções noturnas: um bloqueio de suspensão não impediu
+uma suspensão, embora as execuções tenham retomado sem erros. Envolva cada execução
+nacional em `/usr/bin/time -v` para registrar tempo e pico de memória.

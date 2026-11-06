@@ -1,6 +1,6 @@
 # Observações de transparência e de operação
 
-Document-ID: EA-OBSERVATIONS · Revision: 1 · Language: pt-BR
+Document-ID: EA-OBSERVATIONS · Revision: 2 · Language: pt-BR
 
 [English](../en/observations.md) · [Índice de implementação](implementation-index.md)
 
@@ -38,7 +38,7 @@ acrescentada como resolução, com sua data.
 
 | ID | Observação | Evidência | Efeito sobre a auditoria |
 | --- | --- | --- | --- |
-| O1 | Quando uma urna é substituída, seu pacote pode trazer o mesmo log duas vezes, da memória interna (`…MI.jez`) e da externa (`…ME.jez`) | Fase 22, casos de I5 do 1º turno com mais votos concluídos que comparecimento | As sessões são deduplicadas pela linhagem dos blocos (tabela por seção da Fase 22) |
+| O1 | Quando uma urna é substituída, seu pacote pode trazer o mesmo log duas vezes, da memória interna (`…MI.jez`) e da externa (`…ME.jez`) | Fase 22, casos de I5 do 1º turno com mais votos concluídos que comparecimento | As sessões são deduplicadas pela linhagem dos blocos ([tabela por seção](section-table.md#regras)) |
 | O2 | O log do segundo turno contém toda a história da urna: preparação em setembro, 1º turno e 2º turno | Fase 21 | As sessões são selecionadas pelo turno, nunca pelo arquivo |
 | O3 | Os relógios das urnas marcam a hora local; a votação termina às 17:00 de Brasília, então a leitura configurada de encerramento é 15:00 no AC; as urnas a imprimem quando alguém tenta encerrar antes da hora | Fase 22, AC 2026 e 2022 | O horário de encerramento é uma regra por município, não uma hora nacional |
 | O4 | Operadores ajustam o relógio das urnas com o aplicativo ADH; as urnas registram ajustes de fuso na carga, e uma mensagem de ajuste de horário de verão aparece 7313 vezes no vocabulário do 2º turno de 2026, embora o Brasil não tenha horário de verão | Vocabulário da Fase 21; colunas v3 da Fase 22 | A evidência de relógio é registrada por sessão; medidas de horário exigem relógio resolvido |
@@ -48,6 +48,7 @@ acrescentada como resolução, com sua data.
 | O8 | Os resultados EA20 do 1º turno do ZZ (186 cidades e o total do ZZ) foram regerados em 2026-10-24, depois da geração do 1º turno em 2026-10-05 | [Handoff da Fase 19](handoffs/task-19.md) | As verificações de hierarquia usam a regeração final |
 | O9 | As autoridades certificadoras emitiram suas listas de revogados em 2026-09-27 com validade de 90 dias; a `AC URNA` revogou três certificados de urna em 2025-05-16 | `tse-crls-20261105-complete/` | A Fase 20b verifica que nenhuma assinatura de 2026 usa um certificado revogado |
 | O10 | Os 29 pacotes de relatórios de totalização (`Relatorio_Resultado_Totalizacao_2026_<UF>.zip`: 27 UFs, BR, ZZ) são recompactados por uma rotina agendada a cada poucas horas (visto em 2026-11-03 às 11:30, 19:30 e 22:30 GMT, e em 2026-11-04 às 08:30 GMT) com membros inalterados; os PDFs dentro mudam após decisões judiciais: 18 PDFs do 1º turno foram regerados entre 2026-10-07 e 2026-10-24, inclusive RJ após a retotalização de governador e MS após a de deputado; todo relatório diz "sujeito a modificações" | [Referência de aquisição](acquisition-reference.md#relatórios-de-totalização-mudam-com-o-tempo) | Resultados publicados são retratos de um momento: a auditoria lê a hora do resultado impressa em cada PDF, compara retratos pelo CRC dos membros, não pelo hash do arquivo, e espera retotalizações por meses |
+| O11 | No 2º turno de 2026, operadores atrasaram em cerca de uma hora o relógio das urnas com o ADH antes da votação em 82 seções de Mato Grosso (deslocamentos perto de −3600 s; três municípios, a maioria na zona 0053); nenhuma seção de Mato Grosso teve esse ajuste no 1º turno. A causa provável, urnas carregadas no horário de Brasília, não está confirmada | [Tabela por seção](section-table.md#resultados-nacionais), `clock_adh_shift_s` | Essas sessões são `adjusted`: suas leituras seguem o ajuste, e as medidas de horário as mantêm |
 
 ## Fontes
 
