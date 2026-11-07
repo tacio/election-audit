@@ -1,6 +1,6 @@
 # Tier 1 integrity checks (Phase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 2 · Language: en
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 3 · Language: en
 
 [Português](../pt-BR/integrity-checks.md) · [Implementation index](implementation-index.md)
 
@@ -271,16 +271,92 @@ commit before the `v0.1.0` tag, with the same verification code; the AC runs on 
 PyPI wheel are equal to them row for row. The manifest records the version, the SIMD
 backend and the SHA-256 of the native module.
 
+## Phase 20b: I6 prefix re-read
+
+`integrity-check prefix` (`integrity-round1-prefix-v1`, module `round1_prefix`)
+replaces the fingerprint-only I6 comparison for every pair of round-1 blocks whose
+lengths differ. It re-reads, from the certified staging, only objects the Phase 21
+releases already read, so the protected/stress logs stay unread, and re-hashes each
+object against its certified SHA-256. Streams and segments are rebuilt from the
+line counts Phase 21 recorded; a rebuilt segment is used only if it reproduces the
+recorded fingerprint and first-line hash, otherwise the pair is
+`realignment_failed`. The first N lines of the longer block are then hashed and
+compared with the shorter block's fingerprint. Pairs that still differ are read on
+both sides and described by their common prefix, the round-1 lines found again
+afterwards and up to ten digit-masked message templates of the differing lines, in
+`differences.jsonl`. The release also holds `pairs.parquet` (one row per round-1
+block pair of different content) and `sections.parquet`, which keeps the
+`integrity-logs-v1` status as `i6_v1` next to the revised `i6` and counts blocks by
+state.
+
+Run of 7 November 2026:
+
+```sh
+just integrity-check prefix \
+  --logs ~/data/election-audit-stage/phase20/national-r2-logs-v1-20261105 \
+  --semantic ~/data/election-audit-stage/phase21/national-r2-20261103 \
+  --semantic-round1 ~/data/election-audit-stage/phase21/national-r1-20261103 \
+  --output ~/data/election-audit-stage/phase20b-i6/national-v1-20261107 --workers 6
+```
+
+| Round-1 block pairs | Pairs | Status |
+| --- | --- | --- |
+| Last round-1 block, runoff longer, first N lines equal | 496793 | `prefix_open` |
+| Last round-1 block, still differs | 3 | `differs` |
+| Closed round-1 block, runoff shorter and a prefix of it | 6 | `runoff_prefix_of_round1` |
+| Closed round-1 block, still differs | 110 | `differs` |
+
+No object failed and no segment failed to rebuild. Every open last block of the
+round-1 log is an exact prefix of its runoff copy: 493125 sections are now
+`equal_open_prefix_equal`, where `integrity-logs-v1` left 493122 as
+`equal_closed_open_prefix_unverified` and 3 as `open_prefix_unverified`.
+
+The 113 pairs that still differ were read line by line:
+
+- 97 are the same lines with different block limits. The runoff block is an
+  in-order subsequence of the round-1 log's stream that skips only lines written
+  when the urn restarts, before `Iniciando registro do log na MI e na ME` (95 skip
+  exactly six: `Início das operações do logd`, `Urna ligada em …`,
+  `Estrutura de diretórios da ME: OK`, `Iniciando aplicação - #º turno`, the
+  software version and the urn model). Without the context-reset line the block does
+  not close, so it runs on into the startup lines
+  ([O14](observations.md#operations)).
+- 15 are in sections whose logs carry several memories of an urn (MI and ME
+  members, contingency `-01` members). In 12 every runoff line is in the round-1 log
+  in another stream; in 3 the round-1 log holds the external-memory copy and lacks
+  the same three restart lines.
+- 1, rj/60011/0008/0061, is a real disagreement among copies of one urn's
+  election day ([O15](observations.md#operations)). The published round-1 log has 311
+  computed votes, equal to BU attendance; the external-memory copy carried in the
+  runoff log has 305, ends later and has corrupted bytes; the internal-memory copy has
+  303. The round-1 log's stream is broken by one line whose urn identifier differs in
+  two digits, which is why Phase 21 counted only one session of 36 votes and I5
+  reported this section.
+
+Of the 7079 round-1 blocks present only in the runoff log, 5809 start after the
+round-1 log's last line on the same urn and 1269 are on urns with no round-1 block in
+the round-1 log (mostly memories of other urns carried in multi-member objects); one
+is unexplained. 1464 sections have no round-1 block in the runoff log, 162 a
+different urn and 2 no round-1 log, as before.
+
+| Run | Objects read | Wall time | CPU time | Peak memory |
+| --- | --- | --- | --- | --- |
+| Round 2, prefix v1 | 496793 | 1:19:42 | 26699 s | 3.6 GB |
+
+Six workers; the peak is the planning process, which holds the block pairs in
+DuckDB and Python. The release is 36 MB, the per-chunk shards 198 MB.
+
 ## Limits
 
 - Certificate chains are verified only up to the intermediate CAs; the root and
   `AC URNA v2` certificates are not public.
-- I6 does not verify the open last block; a prefix check needs a raw re-read of the
-  non-protected logs.
+- I6 covers only the non-protected logs; the 596 protected/stress logs are read
+  after the Phase 23 freeze. One round-1 block present only in the runoff log is
+  unexplained.
 - I8 has no source.
 - The ten municipal elections held with the runoff are not in the national BWEB, so
   I2 does not cover them.
-- I5 and I6 have open differences (85/36 and 99 sections) that need the session
-  grouping of Phase 22 or a raw re-read.
+- I5 has open differences (85/36 sections); one round-1 difference is the broken
+  stream of rj/60011/0008/0061 (O15).
 - Agreement among artifacts of the same software chain shows consistency, not voter
   intent.

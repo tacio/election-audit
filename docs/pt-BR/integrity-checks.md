@@ -1,6 +1,6 @@
 # Verificações de integridade de nível 1 (Fase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 2 · Language: pt-BR
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 3 · Language: pt-BR
 
 [English](../en/integrity-checks.md) · [Índice de implementação](implementation-index.md)
 
@@ -289,16 +289,92 @@ Todas as execuções usaram seis processos. As execuções v3 usaram uma wheel l
 as execuções do AC com a wheel do PyPI são iguais a elas linha a linha. O manifesto
 registra a versão, o backend SIMD e o SHA-256 do módulo nativo.
 
+## Fase 20b: releitura por prefixo do I6
+
+`integrity-check prefix` (`integrity-round1-prefix-v1`, módulo `round1_prefix`)
+substitui a comparação do I6 só por impressão digital em todo par de blocos do 1º
+turno de comprimentos diferentes. Ele relê, da cópia certificada, só objetos que as
+versões da Fase 21 já leram, de modo que os logs protegidos/de estresse continuam sem
+leitura, e confere o SHA-256 certificado de cada objeto. Fluxos e segmentos são
+reconstruídos a partir das contagens de linhas registradas na Fase 21; um segmento
+reconstruído só é usado se reproduzir a impressão digital e o hash da primeira linha
+registrados; caso contrário o par fica `realignment_failed`. Em seguida, as primeiras
+N linhas do bloco mais longo são resumidas e comparadas com a impressão digital do
+bloco mais curto. Os pares que ainda diferem são lidos dos dois lados e descritos
+pelo prefixo comum, pelas linhas do 1º turno reencontradas depois e por até dez
+modelos de mensagem das linhas diferentes, com dígitos mascarados, em
+`differences.jsonl`. A versão também traz `pairs.parquet` (uma linha por par de
+blocos do 1º turno de conteúdo diferente) e `sections.parquet`, que mantém a situação
+do `integrity-logs-v1` como `i6_v1` ao lado do `i6` revisto e conta os blocos por
+estado.
+
+Execução de 7 de novembro de 2026:
+
+```sh
+just integrity-check prefix \
+  --logs ~/data/election-audit-stage/phase20/national-r2-logs-v1-20261105 \
+  --semantic ~/data/election-audit-stage/phase21/national-r2-20261103 \
+  --semantic-round1 ~/data/election-audit-stage/phase21/national-r1-20261103 \
+  --output ~/data/election-audit-stage/phase20b-i6/national-v1-20261107 --workers 6
+```
+
+| Pares de blocos do 1º turno | Pares | Situação |
+| --- | --- | --- |
+| Último bloco do 1º turno, segundo turno mais longo, primeiras N linhas iguais | 496793 | `prefix_open` |
+| Último bloco do 1º turno, ainda difere | 3 | `differs` |
+| Bloco do 1º turno fechado, segundo turno mais curto e prefixo dele | 6 | `runoff_prefix_of_round1` |
+| Bloco do 1º turno fechado, ainda difere | 110 | `differs` |
+
+Nenhum objeto falhou e nenhum segmento deixou de ser reconstruído. Todo último bloco
+aberto do log do 1º turno é prefixo exato da sua cópia no segundo turno: 493125
+seções agora são `equal_open_prefix_equal`, onde o `integrity-logs-v1` deixou 493122
+como `equal_closed_open_prefix_unverified` e 3 como `open_prefix_unverified`.
+
+Os 113 pares que ainda diferem foram lidos linha a linha:
+
+- 97 são as mesmas linhas com limites de bloco diferentes. O bloco do segundo turno é
+  uma subsequência em ordem do fluxo do log do 1º turno que pula só linhas escritas
+  quando a urna reinicia, antes de `Iniciando registro do log na MI e na ME` (95
+  pulam exatamente seis: `Início das operações do logd`, `Urna ligada em …`,
+  `Estrutura de diretórios da ME: OK`, `Iniciando aplicação - #º turno`, a versão do
+  software e o modelo da urna). Sem a linha de mudança de contexto o bloco não fecha e
+  segue pelas linhas de inicialização ([O14](observations.md#operação)).
+- 15 estão em seções cujos logs trazem várias memórias de uma urna (membros MI e ME,
+  membros `-01` de contingência). Em 12, toda linha do segundo turno está no log do 1º
+  turno em outro fluxo; em 3, o log do 1º turno traz a cópia da memória externa e não
+  tem as mesmas três linhas de reinício.
+- 1, rj/60011/0008/0061, é uma divergência real entre cópias do dia de eleição de uma
+  urna ([O15](observations.md#operação)). O log publicado do 1º turno tem 311 votos
+  computados, igual ao comparecimento do BU; a cópia da memória externa levada no log
+  do segundo turno tem 305, termina mais tarde e tem bytes corrompidos; a cópia da
+  memória interna tem 303. O fluxo do log do 1º turno é quebrado por uma linha cujo
+  identificador de urna difere em dois dígitos, por isso a Fase 21 contou só uma
+  sessão de 36 votos e o I5 apontou esta seção.
+
+Dos 7079 blocos do 1º turno presentes só no log do segundo turno, 5809 começam depois
+da última linha do log do 1º turno na mesma urna e 1269 estão em urnas sem bloco do 1º
+turno no log do 1º turno (em geral memórias de outras urnas levadas em objetos com
+vários membros); um não tem explicação. 1464 seções não têm bloco do 1º turno no log do
+segundo turno, 162 têm outra urna e 2 não têm log do 1º turno, como antes.
+
+| Execução | Objetos lidos | Tempo de relógio | Tempo de CPU | Memória máxima |
+| --- | --- | --- | --- | --- |
+| 2º turno, prefixo v1 | 496793 | 1:19:42 | 26699 s | 3.6 GB |
+
+Seis processos; o pico é o processo de planejamento, que mantém os pares de blocos no
+DuckDB e no Python. A versão tem 36 MB e os fragmentos por lote 198 MB.
+
 ## Limites
 
 - As cadeias de certificados são verificadas só até as ACs intermediárias; os
   certificados raiz e da `AC URNA v2` não são públicos.
-- O I6 não verifica o último bloco aberto; uma comparação por prefixo exige reler os
-  logs não protegidos.
+- O I6 cobre só os logs não protegidos; os 596 logs protegidos/de estresse são lidos
+  depois do congelamento da Fase 23. Um bloco do 1º turno presente só no log do
+  segundo turno não tem explicação.
 - O I8 não tem fonte.
 - As dez eleições municipais realizadas com o segundo turno não estão no BWEB nacional,
   então o I2 não as cobre.
-- I5 e I6 têm diferenças em aberto (85/36 e 99 seções) que exigem o agrupamento de
-  sessões da Fase 22 ou uma releitura bruta.
+- O I5 tem diferenças em aberto (85/36 seções); uma diferença do 1º turno é o fluxo
+  quebrado de rj/60011/0008/0061 (O15).
 - A concordância entre artefatos da mesma cadeia de software mostra consistência, não
   a intenção do eleitor.

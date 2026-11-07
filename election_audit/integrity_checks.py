@@ -2416,7 +2416,31 @@ def integrity_check_main(argv=None):
     logs.add_argument("--semantic", required=True, help="Phase 21 semantic-pass root (same round).")
     logs.add_argument("--semantic-round1", help="Round-1 semantic-pass root, for I6 on round 2.")
     logs.add_argument("--output", required=True, help="New output directory.")
+    prefix = sub.add_parser(
+        "prefix", help="I6 re-read: verify round-1 block prefixes line by line (round 2)."
+    )
+    prefix.add_argument("--logs", required=True, help="Round-2 logs release root (I5-I7).")
+    prefix.add_argument("--semantic", required=True, help="Round-2 semantic-pass root.")
+    prefix.add_argument("--semantic-round1", required=True, help="Round-1 semantic-pass root.")
+    prefix.add_argument("--output", required=True, help="New output directory.")
+    prefix.add_argument("--workers", type=int, default=4, help="Worker processes.")
+    prefix.add_argument("--uf", action="append", help="Restrict to UF (repeatable; lower case).")
+    prefix.add_argument("--resume", action="store_true", help="Resume the same pass.")
     args = parser.parse_args(argv)
+    if args.command == "prefix":
+        from election_audit.round1_prefix import run_prefix
+
+        result = run_prefix(
+            args.logs,
+            args.semantic,
+            args.semantic_round1,
+            args.output,
+            workers=args.workers,
+            ufs=[u.lower() for u in args.uf] if args.uf else None,
+            resume=args.resume,
+        )
+        print(json.dumps(result["summary"]))
+        return 0
     if args.command == "logs":
         result = run_logs(
             args.sections, args.semantic, args.output, semantic_round1=args.semantic_round1
