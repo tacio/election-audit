@@ -54,8 +54,13 @@ class SectionCheckTests(unittest.TestCase):
         self.assertEqual((row["i1_listed"], row["i1_listed_published"]), (11, 4))
         self.assertTrue(row["i1_sw_self_hash"] and row["i1_hw_self_hash"] and row["i1_lists_agree"])
         self.assertEqual((row["hw_algorithm"], row["hw_bits"]), ("eddsa", 521))
-        self.assertEqual(row["i1_signature_math"], "not_verified_ed521")
+        self.assertEqual(row["i1_signature_math"], "verified")
+        self.assertEqual((row["i1_file_signatures_ok"], row["i1_file_signatures_failed"]), (4, 0))
+        self.assertEqual((row["chain_signature_ok"], row["chain_signature_failed"]), (2, 0))
         self.assertEqual((row["cert_issuer"], row["cert_valid_at_election"]), ("AC UE2022", None))
+        self.assertEqual((row["pki_issuer_signature"], row["pki_revoked"]), ("verified", False))
+        self.assertEqual(row["equipment"], "ue2022/eddsa")
+        self.assertTrue(row["key_set"].isdigit())
         self.assertEqual((row["chain_ok"], row["chain_failed"], row["i3_equal"]), (2, 0, 2))
         self.assertEqual(
             [(c["election"], c["cargo"], c["i3"]) for c in contests],
@@ -156,18 +161,24 @@ class SectionCheckTests(unittest.TestCase):
                 },
                 "conteudoAutoAssinado": content,
             }
-            if certificate:
-                part["certificadoDigital"] = certificate
+            part["informacaoChave"] = (
+                ("certificadoDigital", certificate)
+                if certificate
+                else ("tagChaves", "202609110000")
+            )
             return part
 
         return codec.encode(
-            "EntidadeAssinaturaResultado",
+            self.ic.SIGNATURE_TYPE,
             {
                 "assinaturaSW": side("cepesc"),
                 "assinaturaHW": side(
                     "ecdsa", cert.public_bytes(serialization.Encoding.DER) + b"\x00"
                 ),
-                "equipamento": {"modeloEquipamento": "ue2015", "desconhecido": "v2"},
+                "origemAssinaturaHW": {
+                    "modeloEquipamento": "ue2015",
+                    "algoritmoAssinatura": "ecdsa",
+                },
             },
         )
 
@@ -185,6 +196,188 @@ class SectionCheckTests(unittest.TestCase):
         changed = dict(published, **{"o1-log.jez": hashlib.sha512(b"other").digest()})
         row, _ = self.ic.check_signatures(self.ecdsa_vsc(files), changed, "2026-10-25")
         self.assertEqual((row["i1_file_signatures_ok"], row["i1_file_signatures_failed"]), (1, 1))
+
+
+class Ed521Tests(unittest.TestCase):
+    """DOC-ICP-01.01 E-521 arithmetic and signatures, with no optional dependency."""
+
+    def test_base_point_has_order_l_and_lies_on_the_curve(self):
+        from election_audit import ed521
+
+        x, y = ed521.BASE_X, ed521.BASE_Y
+        self.assertEqual((x * x + y * y - 1 - ed521.D * x * x * y * y) % ed521.P, 0)
+        identity = ed521._multiply(ed521.L, ed521.BASE)
+        self.assertTrue(ed521._equal(identity, ed521._IDENTITY))
+        self.assertFalse(ed521._equal(ed521._multiply(ed521.L - 1, ed521.BASE), ed521._IDENTITY))
+        self.assertEqual(ed521.decode(ed521.encode(ed521.BASE)), ed521.BASE)
+
+    def test_fast_multiplication_agrees_with_double_and_add(self):
+        import random
+
+        from election_audit import ed521
+
+        point = ed521._multiply(123456789, ed521.BASE)
+        self.assertTrue(ed521._equal(ed521._double(point), ed521._add(point, point)))
+        rng = random.Random(20261106)
+        scalars = [0, 1, 15, 16, ed521.L - 1] + [rng.randrange(ed521.L) for _ in range(6)]
+        for scalar in scalars:
+            with self.subTest(scalar=scalar):
+                expected = ed521._multiply(scalar, ed521.BASE)
+                self.assertTrue(ed521._equal(ed521._base_multiply(scalar), expected))
+                self.assertTrue(ed521._equal(ed521._fast_multiply(scalar, ed521.BASE), expected))
+                other = ed521._multiply(scalar, point)
+                self.assertTrue(ed521._equal(ed521._fast_multiply(scalar, point), other))
+
+    def test_sign_verify_round_trip(self):
+        from election_audit import ed521
+
+        seed = bytes(range(66))
+        key, message = ed521.public_key(seed), b"boletim de urna"
+        signature = ed521.sign(seed, message)
+        self.assertEqual(len(signature), 132)
+        self.assertTrue(ed521.verify(key, signature, message))
+        self.assertFalse(ed521.verify(key, signature, message + b"!"))
+        self.assertFalse(ed521.verify(ed521.public_key(bytes(66)), signature, message))
+        changed = bytearray(signature)
+        changed[70] ^= 1
+        self.assertFalse(ed521.verify(key, bytes(changed), message))
+        too_large = signature[:66] + (int.from_bytes(signature[66:], "little") + ed521.L).to_bytes(
+            66, "little"
+        )
+        self.assertFalse(ed521.verify(key, too_large, message))  # S must be below L
+        self.assertFalse(ed521.verify(key, signature[:131], message))
+
+
+@unittest.skipUnless(importlib.util.find_spec("ed521rs"), "verification extra is not installed")
+class Ed521rsParityTests(unittest.TestCase):
+    """``ed521rs`` (used by the section pass) gives ``election_audit.ed521``'s verdicts."""
+
+    def cases(self):
+        import random
+
+        from election_audit import ed521
+
+        rng = random.Random(20261106)
+        for index in range(12):
+            seed, message = rng.randbytes(66), rng.randbytes(64)
+            key, signature = ed521.public_key(seed), ed521.sign(seed, message)
+            yield key, signature, message
+            yield key, signature, message[:-1] + bytes([message[-1] ^ 1])
+            changed = bytearray(signature)
+            changed[rng.randrange(132)] ^= 1 << rng.randrange(8)
+            yield key, bytes(changed), message
+            if index < 3:
+                s = int.from_bytes(signature[66:], "little") + ed521.L  # non-canonical S
+                yield key, signature[:66] + s.to_bytes(66, "little"), message
+                yield key, signature[:131], message
+                yield bytes(66), signature, message
+
+    def test_strict_verdicts_match_the_python_reference(self):
+        import ed521rs
+
+        from election_audit import ed521
+
+        verdicts = []
+        for key, signature, message in self.cases():
+            expected = ed521.verify(key, signature, message)
+            verdicts.append(expected)
+            try:
+                got = ed521rs.verify(key, signature, message)
+            except ValueError:
+                got = False
+            self.assertEqual(got, expected)
+        self.assertEqual(verdicts.count(True), 12)
+
+    def test_the_verifier_counts_ecpy_disagreements(self):
+        from election_audit import ed521
+        from election_audit import integrity_checks as ic
+
+        seed, digest = bytes(range(66)), hashlib.sha512(b"bu").digest()
+        key = ed521.public_key(seed)
+        signature = ed521.sign(seed, hashlib.sha512(digest).digest())
+        verify = ic.Ed521Verifier(key)
+        self.assertTrue(verify(digest, signature))
+        self.assertFalse(verify(digest[::-1], signature))
+        self.assertEqual(verify.disagreements, 0)
+        s = int.from_bytes(signature[66:], "little") + ed521.L
+        self.assertFalse(verify(digest, signature[:66] + s.to_bytes(66, "little")))
+        self.assertEqual(verify.disagreements, 1)  # ECPy accepts S >= L
+        self.assertEqual(ic.ed521_implementation()["implementation"], "ed521rs")
+
+
+@unittest.skipUnless(importlib.util.find_spec("asn1tools"), "verification extra is not installed")
+class UrnEd521Tests(unittest.TestCase):
+    """The real UE2022 fixture: every hardware signature verifies, changes are caught."""
+
+    def setUp(self):
+        from cryptography import x509
+        from cryptography.hazmat.primitives.serialization import Encoding
+
+        from election_audit import ed521
+        from election_audit import integrity_checks as ic
+
+        self.ed521, self.ic = ed521, ic
+        self.raw = (FIXTURE / f"{PREFIX}-vota.vsc").read_bytes()
+        self.hardware = ic.signature_codec().decode(self.ic.SIGNATURE_TYPE, self.raw)[
+            "assinaturaHW"
+        ]
+        certificate = x509.load_pem_x509_certificate(self.hardware["informacaoChave"][1])
+        self.key = ed521.certificate_public_key(certificate.public_bytes(Encoding.DER))
+
+    def signed(self, digest, signature):
+        return self.ed521.verify(self.key, signature, hashlib.sha512(digest).digest())
+
+    def test_self_and_file_signatures_verify(self):
+        auto = self.hardware["autoAssinado"]["assinatura"]
+        self.assertEqual(len(self.key), 66)
+        self.assertTrue(self.signed(auto["hash"], auto["assinatura"]))
+        listed = self.ic.signature_codec().decode(
+            "Assinatura", self.hardware["conteudoAutoAssinado"]
+        )["arquivosAssinados"]
+        self.assertEqual(len(listed), 11)
+        for entry in listed:
+            self.assertTrue(
+                self.signed(entry["assinatura"]["hash"], entry["assinatura"]["assinatura"])
+            )
+            path = FIXTURE / entry["nomeArquivo"]
+            if path.exists():
+                self.assertEqual(
+                    hashlib.sha512(path.read_bytes()).digest(), entry["assinatura"]["hash"]
+                )
+
+    def test_a_flipped_hash_or_the_unhashed_digest_fails(self):
+        auto = self.hardware["autoAssinado"]["assinatura"]
+        flipped = bytes([auto["hash"][0] ^ 1]) + auto["hash"][1:]
+        self.assertFalse(self.signed(flipped, auto["assinatura"]))
+        self.assertFalse(self.ed521.verify(self.key, auto["assinatura"], auto["hash"]))
+
+    def test_a_changed_signature_is_reported_as_failed(self):
+        codec = self.ic.signature_codec()
+        entity = codec.decode(self.ic.SIGNATURE_TYPE, self.raw)
+        signature = bytearray(entity["assinaturaHW"]["autoAssinado"]["assinatura"]["assinatura"])
+        signature[100] ^= 0x10
+        entity["assinaturaHW"]["autoAssinado"]["assinatura"]["assinatura"] = bytes(signature)
+        row, _ = self.ic.check_signatures(codec.encode(self.ic.SIGNATURE_TYPE, entity), {})
+        self.assertEqual(row["i1_signature_math"], "failed")
+        row, verify = self.ic.check_signatures(self.raw, {})
+        self.assertEqual(row["i1_signature_math"], "verified")
+        self.assertEqual(row["ed521_ecpy_disagreements"], 0)
+        self.assertFalse(verify(b"\x00" * 64, signature))
+
+    def test_other_key_types_have_no_ed521_key(self):
+        from cryptography import x509
+        from cryptography.hazmat.primitives.serialization import Encoding
+
+        self.assertIsNone(self.ed521.certificate_public_key(b"\x30\x00"))
+        # An ECDSA certificate from the ECDSA test helper carries no Ed521 key.
+        helper = SectionCheckTests("test_ecdsa_urn_signatures_are_verified")
+        helper.setUp()
+        entity = self.ic.signature_codec().decode(
+            self.ic.SIGNATURE_TYPE, helper.ecdsa_vsc({"o1-bu.dat": b"x"})
+        )
+        raw = entity["assinaturaHW"]["informacaoChave"][1]
+        der = x509.load_der_x509_certificate(raw[: 4 + int.from_bytes(raw[2:4], "big")])
+        self.assertIsNone(self.ed521.certificate_public_key(der.public_bytes(Encoding.DER)))
 
 
 @unittest.skipUnless(importlib.util.find_spec("asn1tools"), "verification extra is not installed")

@@ -1,6 +1,6 @@
 # Reproduction and peer review
 
-Document-ID: EA-REPRODUCTION · Revision: 5 · Language: en
+Document-ID: EA-REPRODUCTION · Revision: 6 · Language: en
 
 The offline demo is SYNTHETIC throughout: deterministic tiny ZIP originals exercise mixed device dates, exact copied history, replacement devices, manual request/cancellation, unresolved clocks and malformed nested content. Reviewed session/copy/semantic assertions are generated from exact preserved synthetic line hashes. Expected members 3, unique principals 2, normalized attending voters 10, eligible electors 20 and turnout 0.5 are known fixture numbers. They do not validate real electoral data. Unknown identity links remain unavailable; a registered exploration preserves its null result and complete history without fitting.
 
@@ -67,9 +67,10 @@ nothing below is estimated.
 | | `integrity-check bweb` | BWEB 5.1 GB (round 1, every office) and 0.14 GB (round 2) | 1 | 30 min and 66 s | Not recorded | 2.1 MB and 1.2 MB |
 | | `integrity-check hierarchy` | EA20 nodes | 1 | 17 min and 21 s | Not recorded | 96 KB |
 | | `integrity-check correspondence`, `logs` | Per round | 1 | Under a minute each | Not recorded | Under 2 MB |
+| Integrity sections v3, 2026, per round (Phase 20b) | `integrity-check sections` | 499207 sections, Ed521 with `ed521rs` | 6 | 1:07:49 and 1:00:38; CPU 10210 s and 5411 s (pure-Python v2: 2:57:15 and 2:21:17) | 4.9 GB and 4.2 GB (largest process) | 629 MB and 337 MB |
 | Semantic pass v3, per year and round (Phase 22) | `semantic-pass run` | 2026: 498580 and 498581 objects; 2022: 471859 and 471983 | 5 | Active 8002 s and 12808 s (2026), 7277 s and 11809 s (2022) | About 1.7 GB in all; largest process 1.2 GB | 1.8, 2.9, 1.7 and 2.7 GB |
-| Section table, per year (Phase 22) | `section-table build` | 499248 and 472693 sections per round | 1 | 45 min (2026) and 41 min (2022) | 3.9 GB and 3.3 GB | 192 MB and 183 MB |
-| Offline gate | `just check` | 381 tests | 1 | 113 s | — | — |
+| Section table v3, per year (Phases 22 and 20b) | `section-table build` | 499248 and 472693 sections per round | 1 | 47 min (2026) and 78 min (2022); v2: 45 and 41 min | 3.7 GB and 3.0 GB | 192 MB and 183 MB |
+| Offline gate | `just check` | 394 tests | 1 | 117 s | — | — |
 
 After the downloads, reproducing the current releases takes about 17 hours of
 compute: staging, integrity checks, the four semantic passes and both tables. The

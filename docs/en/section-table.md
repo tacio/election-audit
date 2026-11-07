@@ -1,6 +1,6 @@
-# Section feature table v2 (Phase 22)
+# Section feature table v3 (Phases 22 and 20b)
 
-Document-ID: EA-SECTION-TABLE · Revision: 2 · Language: en
+Document-ID: EA-SECTION-TABLE · Revision: 3 · Language: en
 
 [Português](../pt-BR/section-table.md) · [Implementation index](implementation-index.md)
 
@@ -88,8 +88,15 @@ Lei 12.876/2013):
 | `law_uf` | UFs with a single zone (AC −2 h; MT, MS, RO, RR −1 h; the others 0 h) | 15:00, 16:00 or 17:00 |
 | `law_noronha` | Fernando de Noronha (PE) | 18:00 |
 | `abroad` | ZZ | 17:00 |
-| `am_configured` | Amazonas, split by a line rather than by municipality | The configured close printed by the municipality's urns, when every observation in the year agrees |
-| `unresolved` | Amazonas municipalities without such agreement | Unavailable |
+| `am_configured` | Amazonas, split by a line rather than by municipality | The configured close printed by the municipality's urns, when every observation in the year agrees with the list below |
+| `am_list` | Amazonas municipalities whose urns printed no configured close | 15:00 for the eleven municipalities on Acre time, 16:00 for the others |
+| `unresolved` | Amazonas municipalities whose printed closes disagree with each other or with the list | Unavailable |
+
+The eleven Amazonas municipalities on Acre time (UTC−5) are pinned in
+`resources/am-acre-time-municipalities.json` with their sources: TRE-AM notices for
+2024 and 2026, TSE's polling-place files and the urns' own prints
+([observation O12](observations.md#operations)). TSE publishes no dataset of
+municipal time zones ([T10](observations.md#transparency)).
 
 **Clock state.** The first condition that matches decides the state. Time-of-day
 measures need `ok` or `adjusted`.
@@ -140,10 +147,10 @@ just section-table build --year 2026 \
   --electorate-root ~/data/election-audit-stage/inputs/eleitorado-2026 \
   --semantic-r1 ~/data/election-audit-stage/phase22/v3-national-r1-20261105 \
   --semantic-r2 ~/data/election-audit-stage/phase22/v3-national-r2-20261105 \
-  --integrity-r1 "$(cat ~/data/election-audit-stage/phase22/integrity-r1.json)" \
-  --integrity-r2 "$(cat ~/data/election-audit-stage/phase22/integrity-r2.json)" \
+  --integrity-r1 "$(cat ~/data/election-audit-stage/phase22/integrity-v3-r1.json)" \
+  --integrity-r2 "$(cat ~/data/election-audit-stage/phase22/integrity-v3-r2.json)" \
   --exclusions data/national/phase11-protection-2026-10-31/exclusions.json \
-  --output ~/data/election-audit-stage/phase22/table-2026-20261106
+  --output ~/data/election-audit-stage/phase22/table-2026-v3-20261107
 ```
 
 `--integrity-r1`/`--integrity-r2` take a JSON object with the Phase 20 roots of the
@@ -151,7 +158,7 @@ round (`sections`, `logs`, `bweb`, `correspondence`). For 2022, omit the integri
 and exclusion options. The build runs in a single process with two DuckDB threads
 and `--memory-limit` (1 GB by default). It holds rows in Python for one chunk at a
 time: whole municipalities of one UF, about 10000 sections, because close rules
-and units never cross a municipality. Nationally it took 45 and 41 minutes (2026, 2022) with a peak of 3.9 and 3.3 GB. Unit tests:
+and units never cross a municipality. Nationally, version 3 took 47 and 78 minutes (2026, 2022) with a peak of 3.7 and 3.0 GB. Unit tests:
 `tests/test_section_table.py`.
 
 ## Development results
@@ -173,9 +180,10 @@ round 2), which confirms that urn clocks run on local time.
 
 ## National results
 
-Built on 5–6 November 2026 in `~/data/election-audit-stage/phase22/table-2026-20261106/`
-and `table-2022-20261106/` (counts only; results and operational values stay
-unread):
+Version 3, built on 6–7 November 2026 in
+`~/data/election-audit-stage/phase22/table-2026-v3-20261107/` (on the Phase 20b
+integrity sections v3) and `table-2022-v3-20261106/` (counts only; results and
+operational values stay unread):
 
 | | 2026 r1 | 2026 r2 | 2022 r1 | 2022 r2 |
 | --- | --- | --- | --- | --- |
@@ -185,8 +193,8 @@ unread):
 | With sessions / no official session / no log | 496944 / 1636 / 72 | 497132 / 1449 / 71 | 470846 / 1013 / 834 | 470976 / 1007 / 710 |
 | Protected (logs unread) | 596 | 596 | 0 | 0 |
 | Operations ready / partial / unavailable | 332276 / 164668 / 2304 | 357986 / 139146 / 2116 | 260753 / 210092 / 1848 | 299891 / 171085 / 1717 |
-| Clock `ok` / `adjusted` | 495341 / 1451 | 495372 / 1651 | 468878 / 1201 | 468845 / 1435 |
-| Clock `backstep` / `overlap` / `no_close_rule` | 34 / 24 / 94 | 9 / 7 / 93 | 23 / 59 / 685 | 4 / 15 / 677 |
+| Clock `ok` / `adjusted` | 495435 / 1451 | 495465 / 1651 | 469563 / 1201 | 469521 / 1436 |
+| Clock `backstep` / `overlap` / `no_close_rule` | 34 / 24 / 0 | 9 / 7 / 0 | 23 / 59 / 0 | 4 / 15 / 0 |
 | Log model agrees / differs with the BU | 496936 / 8 | 497132 / 0 | — | — |
 
 Every unit is `same_principal` in both years: 499248 units in 2026 (499205
@@ -198,7 +206,7 @@ share them):
 | --- | --- | --- |
 | `law_uf` | 489730 | 464164 |
 | `am_configured` | 8063 | 6752 |
-| `unresolved` | 94 | 704 |
+| `am_list` | 94 | 704 |
 | `abroad` | 1351 | 1064 |
 | `law_noronha` | 10 | 9 |
 
@@ -211,12 +219,19 @@ Observations:
   municipalities, mostly in zone 0053
   ([observation O11](observations.md#operations)).
 - In 2026 round 1, eight sections have a last-session log model that differs from
-  the BU signer's model. Six have a single device and session; two (RJ
-  60011/0214/0023 and 0024) used a reserve urn. Phase 20b compares the log's urn
-  with the signing certificate.
-- In 2022, 704 Amazonas sections have no close rule, against 94 in 2026, because
-  their municipalities printed more than one configured close. Phase 20b tests the
-  western Amazonas time-zone list against the printed closes.
+  the BU signer's model. In six, the signature file was signed by another urn
+  ([observation O13](observations.md#operations)); two (RJ 60011/0214/0023 and 0024)
+  used a reserve urn.
+- The `am_list` sections (94 in 2026, 704 in 2022) are in municipalities whose urns
+  printed no configured close in the year: no one tried to close early, so the
+  close is taken from the list (2026: 32 at 15:00 and 62 at 16:00; 2022: 88 and
+  616). Version 2 left them `unresolved`, and earlier versions of this page gave the
+  wrong cause (more than one printed close). No printed close contradicts the list
+  in either year.
+- Compared with version 2, only Amazonas close rules and their clock and timing
+  states change, plus, in 2026, the integrity fields of Phase 20b: `i1_signature`
+  becomes `verified` for every Ed521 section and the urn type `reservaSecao` reads
+  `contingenciaSecao`. Result and unit files are identical.
 
 ## Limits
 

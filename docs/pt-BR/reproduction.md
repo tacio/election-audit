@@ -1,6 +1,6 @@
 # Reprodução e revisão por pares
 
-Document-ID: EA-REPRODUCTION · Revision: 5 · Language: pt-BR
+Document-ID: EA-REPRODUCTION · Revision: 6 · Language: pt-BR
 
 A demonstração sem rede é inteiramente SINTÉTICA: pequenos originais ZIP determinísticos exercitam datas mistas do dispositivo, histórico copiado exato, substituição de dispositivos, solicitação manual/cancelamento, relógios não resolvidos e conteúdo aninhado malformado. Asserções revisadas de sessão/cópia/semântica são geradas com hashes exatos de linhas sintéticas preservadas. Membros esperados 3, principais únicos 2, comparecimento normalizado 10, eleitores aptos 20 e comparecimento proporcional 0.5 são números conhecidos da fixture. Não validam dados eleitorais reais. Ligações de identidade desconhecidas ficam indisponíveis; exploração registrada preserva resultado nulo e histórico completo sem ajuste de modelo.
 
@@ -67,9 +67,10 @@ quer dizer que nenhuma medição foi guardada; nada abaixo é estimado.
 | | `integrity-check bweb` | BWEB 5.1 GB (1º turno, todos os cargos) e 0.14 GB (2º turno) | 1 | 30 min e 66 s | Não registrado | 2.1 MB e 1.2 MB |
 | | `integrity-check hierarchy` | Nós do EA20 | 1 | 17 min e 21 s | Não registrado | 96 KB |
 | | `integrity-check correspondence`, `logs` | Por turno | 1 | Menos de um minuto cada | Não registrado | Menos de 2 MB |
+| Seções de integridade v3, 2026, por turno (Fase 20b) | `integrity-check sections` | 499207 seções, Ed521 com `ed521rs` | 6 | 1:07:49 e 1:00:38; CPU 10210 s e 5411 s (v2 em Python puro: 2:57:15 e 2:21:17) | 4.9 GB e 4.2 GB (maior processo) | 629 MB e 337 MB |
 | Passada semântica v3, por ano e turno (Fase 22) | `semantic-pass run` | 2026: 498580 e 498581 objetos; 2022: 471859 e 471983 | 5 | Ativo 8002 s e 12808 s (2026), 7277 s e 11809 s (2022) | Cerca de 1.7 GB no total; maior processo 1.2 GB | 1.8, 2.9, 1.7 e 2.7 GB |
-| Tabela por seção, por ano (Fase 22) | `section-table build` | 499248 e 472693 seções por turno | 1 | 45 min (2026) e 41 min (2022) | 3.9 GB e 3.3 GB | 192 MB e 183 MB |
-| Verificação offline | `just check` | 381 testes | 1 | 113 s | — | — |
+| Tabela por seção v3, por ano (Fases 22 e 20b) | `section-table build` | 499248 e 472693 seções por turno | 1 | 47 min (2026) e 78 min (2022); v2: 45 e 41 min | 3.7 GB e 3.0 GB | 192 MB e 183 MB |
+| Verificação offline | `just check` | 394 testes | 1 | 117 s | — | — |
 
 Depois dos downloads, reproduzir as versões atuais leva cerca de 17 horas de
 processamento: cópia no SSD, verificações de integridade, as quatro passadas

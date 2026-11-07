@@ -1,0 +1,48 @@
+{
+  "certificates": {
+    "acurna.der": {
+      "sha256": "dc20a4c3b8aef01794b80efe8e143e1fbf719707e00bb0d4ba8865191dc2731d",
+      "source": "TSE 2026 format package, python/lib/mr_util.py (TSE comment: obtained from dpc.acue2020.tse.jus.br)"
+    },
+    "acue2020.der": {
+      "sha256": "77f31bef3d8eb35f0cc969a2b9bba3ff2a498cc339d29a375d3181e0547c0376",
+      "source": "TSE 2026 format package, python/lib/mr_util.py; SHA-512 listed in TSE's HOLOCRON summary"
+    },
+    "acue2022.der": {
+      "sha256": "6ae65790dae7cc5d97394e461204744c8e2f7a810d0303af828d4d3dbecfa293",
+      "source": "TSE 2026 format package, python/lib/mr_util.py; SHA-512 listed in TSE's HOLOCRON summary"
+    }
+  },
+  "package_sha256": "b5ac413e81121d53de2bb1657af611f84a45fdc84388e9d9821872994bbfbafd",
+  "revocation_lists": {
+    "acurna.crl": {
+      "sha256": "a70dd9d786bb962ab02d5dff370736828242fff278f710afc65a37ae6adf12c4",
+      "url": "http://lcr.acurna.tse.jus.br/acurna.crl"
+    },
+    "acue2020.crl": {
+      "sha256": "dc4c91e7da5fab37ad1c543560ed5ef29c0cccca66dcd12a9fda86690c5a8058",
+      "url": "http://lcr.acue2020.tse.jus.br/acue2020.crl"
+    },
+    "acue2022.crl": {
+      "sha256": "cc9b2ce0721aa1ee418293525db38fb8120cfb2a83b3a1e469384823130a68d7",
+      "url": "http://lcr.acue2022.tse.jus.br/acue2022.crl"
+    },
+    "acurnav2.crl": {
+      "sha256": "c37d7a96baef88772117325d6d6c1a13c7320c8ffdaec0c8ef39efbfd804758e",
+      "url": "http://lcr.acurnav2.tse.jus.br/acurnav2.crl"
+    },
+    "acraizue.crl": {
+      "sha256": "1687bd6805da264da70f816bb5ffc182049c19cd712ee07c462eb9f3570fadbc",
+      "url": "http://lcr.acraizue.tse.jus.br/acraizue.crl"
+    }
+  },
+  "revocation_lists_acquired": "2026-11-05, downloaded by the project owner in a browser; frozen at ~/data/election-audit-stage/inputs/tse-crls-20261105-complete/",
+  "not_public": [
+    "AC RAIZ UE",
+    "AC RAIZ UE v2",
+    "AC URNA v2",
+    "renewed AC URNA"
+  ],
+  "requested": "LAI protocol 83529705172533, 2026-11-05",
+  "revocation_list_urls": "from the CRL distribution point of the certificates each list covers"
+}

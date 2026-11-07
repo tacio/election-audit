@@ -28,6 +28,7 @@ research = [
 verification = [
     "asn1tools>=0.169.0",
     "cryptography>=50.0.2",
+    "ed521rs==0.1.0",
 ]
 
 [dependency-groups]
@@ -38,6 +39,8 @@ packages = ["election_audit", "scripts"]
 
 [tool.uv]
 exclude-newer = "2026-10-29T00:00:00Z"
+# ed521rs 0.1.0 was published on 2026-11-07 (UTC), after the general cutoff.
+exclude-newer-package = { ed521rs = "2026-11-08T00:00:00Z" }
 build-constraint-dependencies = ["pluggy==1.6.0"]
 
 [tool.ruff]

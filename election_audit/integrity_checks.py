@@ -39,17 +39,19 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from election_audit.binary_bu import SCHEMA_SHA as BU_SHA
-from election_audit.binary_bu import codec as bu_codec
+from election_audit import urn_pki
 from election_audit.elections import election_for_round
 from election_audit.national_migration import atomic, sha
 from election_audit.semantic_pass import verified_bulk_archives
 
-VERSION = "integrity-sections-v1"
+VERSION = "integrity-sections-v3"
 SHARD_SECTIONS = 250
 MAX_SMALL = 8 * 1024**2  # BU, RDV and signature files are far smaller
+# TSE's official 2026 specifications (resources/tse-format-2026-official.json).
+BU_SHA = "ef64bf723f774403b423ed0b617f5a83a3f50c0023d0003e18cd29170404ab81"
 RDV_SHA = "282dcde0c7ba1f1bb128fe27443ad8d18f7490416c9546d033910a7ec557a465"
-SIGNATURE_SHA = "2672b0bfb8786915ce094226cffbd818b65c2f35dcc94892e4b258021fc5d0b5"
+SIGNATURE_SHA = "86a0edf579b91e0a6df9f0981521e0229f41cb6cab0ed8a66d8a56f68c1f396f"
+SIGNATURE_TYPE = "EntidadeAssinaturaEcourna"
 MEMBER = re.compile(
     r"o(\d{5})([a-z]{2})(\d{5})(\d{4})(\d{4})-(bu|busa|imgbu|imgbusa|log|logsa|rdv|vota|sa)"
     r"\.(dat|jez|vsc)"
@@ -124,12 +126,18 @@ SECTION_SCHEMA = pa.schema(
         ("i1_published_unlisted", pa.int32()),
         ("i1_lists_agree", pa.bool_()),
         ("i1_detail_json", pa.string()),
-        ("i1_signature_math", pa.string()),  # verified | failed | not_verified_ed521 | ...
+        ("i1_signature_math", pa.string()),  # verified | failed | not_verified
         ("i1_file_signatures_ok", pa.int32()),
         ("i1_file_signatures_failed", pa.int32()),
+        # Ed521 signatures (self, files, BU chain) where ECPy's verdict, TSE's reference, differs
+        ("ed521_ecpy_disagreements", pa.int32()),
         ("cert_subject", pa.string()),
         ("cert_issuer", pa.string()),
         ("cert_valid_at_election", pa.bool_()),
+        ("cert_serial", pa.string()),
+        ("pki_issuer_signature", pa.string()),  # verified | failed | unknown_issuer
+        ("pki_revoked", pa.bool_()),
+        ("pki_ca_valid_at_election", pa.bool_()),
         ("bu_status", pa.string()),
         ("bu_error", pa.string()),
         ("bu_identity", pa.string()),
@@ -207,13 +215,24 @@ def _pinned(name, digest):
 
 
 @lru_cache(maxsize=1)
+def bu_codec():
+    return _pinned("bu-2026-official.asn1", BU_SHA)
+
+
+@lru_cache(maxsize=1)
 def rdv_codec():
-    return _pinned("rdv-2026-mirrored.asn1", RDV_SHA)
+    return _pinned("rdv-2026-official.asn1", RDV_SHA)
 
 
 @lru_cache(maxsize=1)
 def signature_codec():
-    return _pinned("assinatura-2026-observed.asn1", SIGNATURE_SHA)
+    return _pinned("assinatura-2026-official.asn1", SIGNATURE_SHA)
+
+
+def _key_info(part):
+    """(tagChaves, certificadoDigital) of one EntidadeAssinatura; the other is None."""
+    kind, value = part["informacaoChave"]
+    return (value, None) if kind == "tagChaves" else (None, value)
 
 
 def digest(entries):
@@ -235,17 +254,19 @@ def _hex(value):
 
 
 def hardware_verifier(hardware):
-    """ECDSA P-521 verifier for the urn hardware key, or None when it cannot be checked.
+    """Verifier for the urn hardware key, or None when it cannot be checked.
 
-    Observed on 2026 UE2013/UE2015 urns: a DER certificate (sometimes followed by padding)
-    and DER signatures over the 64-byte SHA-512 hash, hashed again with SHA-512.
+    Observed on 2026 urns, both over the 64-byte SHA-512 hash, hashed again with SHA-512:
+    UE2013/UE2015 carry a DER certificate (sometimes followed by padding) and DER ECDSA P-521
+    signatures; UE2020/UE2022 carry a PEM certificate with an Ed521 key and 132-byte Ed521
+    signatures (``election_audit.ed521``).
     """
     from cryptography import x509
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import ec
 
-    raw = hardware.get("certificadoDigital")
+    raw = _key_info(hardware)[1]
     algorithm = hardware["autoAssinado"]["algoritmoAssinatura"]["algoritmo"]
     certificate = None
     try:
@@ -255,7 +276,18 @@ def hardware_verifier(hardware):
             certificate = x509.load_der_x509_certificate(raw[: 4 + int.from_bytes(raw[2:4], "big")])
     except ValueError:
         certificate = None
-    if algorithm != "ecdsa" or certificate is None:
+    if certificate is None:
+        return None, certificate
+    if algorithm == "eddsa":
+        from cryptography.hazmat.primitives.serialization import Encoding
+
+        from election_audit import ed521
+
+        key = ed521.certificate_public_key(certificate.public_bytes(Encoding.DER))
+        if key is None:
+            return None, certificate
+        return Ed521Verifier(key), certificate
+    if algorithm != "ecdsa":
         return None, certificate
     key = certificate.public_key()
     if not isinstance(key, ec.EllipticCurvePublicKey) or key.curve.name != "secp521r1":
@@ -271,11 +303,54 @@ def hardware_verifier(hardware):
     return verify, certificate
 
 
+class Ed521Verifier:
+    """Verdicts of ``ed521rs`` (RFC 8032 decoding, as ``election_audit.ed521``) for one urn key.
+
+    Each signature is also checked as ECPy, TSE's reference verifier, would; ``disagreements``
+    counts the signatures where the two verdicts differ (expected 0)."""
+
+    def __init__(self, key):
+        import ed521rs
+
+        self.keys = {}
+        for mode in ("strict", "ecpy"):
+            try:
+                self.keys[mode] = ed521rs.VerifyingKey(key, mode=mode)
+            except ValueError:
+                self.keys[mode] = None  # the key does not decode: every signature fails
+        self.disagreements = 0
+
+    def _verify(self, mode, signature, message):
+        key = self.keys[mode]
+        return key is not None and key.verify(signature, message)
+
+    def __call__(self, digest_, signature):
+        message = hashlib.sha512(digest_).digest()
+        verdict = self._verify("strict", signature, message)
+        self.disagreements += verdict != self._verify("ecpy", signature, message)
+        return verdict
+
+
+def ed521_implementation():
+    import ed521rs
+    from ed521rs import _native
+
+    return {
+        "implementation": "ed521rs",
+        "version": ed521rs.__version__,
+        "native_sha256": sha(Path(_native.__file__)),
+        "backend": ed521rs.backend(),
+        "verdict": "mode=strict (RFC 8032 decoding; same verdicts as election_audit.ed521)",
+        "cross_check": "mode=ecpy (ECPy 8143d9ac, TSE's reference verifier); "
+        "disagreements in ed521_ecpy_disagreements",
+    }
+
+
 def check_signatures(raw, published, election_date=None):
     """I1. ``published`` maps member name to its SHA-512 digest (bytes).
 
     Returns the row and a verifier for other values signed by the urn hardware key."""
-    entity = signature_codec().decode("EntidadeAssinaturaResultado", raw)
+    entity = signature_codec().decode(SIGNATURE_TYPE, raw)
     lists, row = {}, {}
     for side in ("assinaturaSW", "assinaturaHW"):
         part = entity[side]
@@ -298,16 +373,17 @@ def check_signatures(raw, published, election_date=None):
     )
     unlisted = sorted(n for n in published if n not in names)
     unpublished = sorted(n.rsplit("-", 1)[-1] for n in names - set(published))
-    certificate = hardware.get("certificadoDigital")
+    certificate = _key_info(hardware)[1]
+    origin = entity["origemAssinaturaHW"]
     row.update(
         vsc_status="decoded",
         vsc_error=None,
-        equipment=f"{entity['equipamento']['modeloEquipamento']}/{entity['equipamento']['desconhecido']}",
+        equipment=f"{origin['modeloEquipamento']}/{origin['algoritmoAssinatura']}",
         sw_algorithm=software["autoAssinado"]["algoritmoAssinatura"]["algoritmo"],
         hw_algorithm=hardware["autoAssinado"]["algoritmoAssinatura"]["algoritmo"],
         hw_bits=hardware["autoAssinado"]["algoritmoAssinatura"]["bits"],
         hw_key_name=hardware["autoAssinado"]["usuario"]["nomeUsuario"],
-        key_set=software.get("conjuntoChave") or hardware.get("conjuntoChave"),
+        key_set=_key_info(software)[0] or _key_info(hardware)[0],
         certificate_sha256=hashlib.sha256(certificate).hexdigest() if certificate else None,
         i1_listed=len(names),
         i1_listed_published=len(names & set(published)),
@@ -322,7 +398,7 @@ def check_signatures(raw, published, election_date=None):
     verify, certificate_ = hardware_verifier(hardware)
     file_ok = file_failed = 0
     if verify is None:
-        math = "not_verified_ed521" if row["hw_algorithm"] == "eddsa" else "not_verified"
+        math = "not_verified"
     else:
         auto = hardware["autoAssinado"]["assinatura"]
         math = "verified" if verify(auto["hash"], auto["assinatura"]) else "failed"
@@ -340,9 +416,13 @@ def check_signatures(raw, published, election_date=None):
         i1_signature_math=math,
         i1_file_signatures_ok=file_ok if verify else None,
         i1_file_signatures_failed=file_failed if verify else None,
+        ed521_ecpy_disagreements=(
+            verify.disagreements if isinstance(verify, Ed521Verifier) else None
+        ),
         cert_subject=_cn(certificate_.subject) if certificate_ is not None else None,
         cert_issuer=_cn(certificate_.issuer) if certificate_ is not None else None,
         cert_valid_at_election=valid,
+        **urn_pki.check_certificate(certificate_, election_date),
     )
     return row, verify
 
@@ -564,6 +644,8 @@ def check_section(item, blobs, published, pleito, election_date=None):
             sum(signed),
             len(signed) - sum(signed),
         )
+        if isinstance(verify, Ed521Verifier):
+            row["ed521_ecpy_disagreements"] = verify.disagreements
         if not all(signed):
             issues.append(
                 {
@@ -825,6 +907,8 @@ def run_sections(
             "rdv": RDV_SHA,
             "signature": SIGNATURE_SHA,
         },
+        "pki": urn_pki.manifest()["files"],
+        "ed521": {k: v for k, v in ed521_implementation().items() if k != "backend"},
         "ufs": sorted(ufs) if ufs else None,
         "limit": limit,
         "shard_sections": shard_sections,
@@ -932,9 +1016,11 @@ def merge(output, shard_count, binding, extras):
         "summary": summary,
         "files": files_,
         "restricted": "restricted/ holds attendance and vote totals for I5; read by check code only before the Phase 23 freeze",
-        "signature_math": "ECDSA P-521 (UE2013/UE2015) hardware signatures verified against the "
-        "urn certificate; Ed521 (UE2020/UE2022) not verified; CEPESC (software) is not public; "
-        "certificate chains to AC URNA / AC UE2022 not verified",
+        "signature_math": "hardware signatures verified against the urn certificate key: "
+        "ECDSA P-521 (UE2013/UE2015) and Ed521 per DOC-ICP-01.01 (UE2020/UE2022), both over "
+        "SHA-512 of the listed SHA-512 hash; CEPESC (software) is not public",
+        "pki": urn_pki.manifest(),
+        "ed521": ed521_implementation(),
     }
     atomic(temporary / "manifest.json", manifest)
     os.replace(temporary, release)
@@ -970,8 +1056,13 @@ def summarize(release):
         counter["i1_file_signatures"][
             f"ok={s['i1_file_signatures_ok']},failed={s['i1_file_signatures_failed']}"
         ] += 1
+        counter["ed521_ecpy_disagreements"][str(s["ed521_ecpy_disagreements"])] += 1
         counter["cert_issuer"][str(s["cert_issuer"])] += 1
         counter["cert_valid_at_election"][str(s["cert_valid_at_election"])] += 1
+        counter["pki"][
+            f"{s.get('cert_issuer')}: issuer_signature={s.get('pki_issuer_signature')},"
+            f"revoked={s.get('pki_revoked')},ca_valid={s.get('pki_ca_valid_at_election')}"
+        ] += 1
         counter["chain_signature"][
             f"ok={s.get('chain_signature_ok')},failed={s.get('chain_signature_failed')}"
         ] += 1

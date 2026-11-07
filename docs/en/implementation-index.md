@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 30 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 31 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -104,6 +104,26 @@ documents, every one matching its browser hash
 ([acquisition reference](acquisition-reference.md#integrity-test-documents-tre-sites)).
 See the [Phase 19 handoff](handoffs/task-19.md).
 
+**Phase 20b (integrity completion): in progress.** Ed521 is implemented
+(`election_audit/ed521.py`, confirmed with the verifier in TSE's 2026 format package)
+and runs nationally through [`ed521rs`](https://pypi.org/project/ed521rs/), whose
+verdicts equal the pure-Python ones in every row and ECPy's in every signature. BU,
+RDV and signature files are decoded with TSE's official 2026 specifications. Urn
+certificates are checked against the published CAs `AC URNA`, `AC UE2020` and
+`AC UE2022` and their revocation lists. The national rerun
+(`~/data/election-audit-stage/phase20/national-r{1,2}-sections-v3-20261106/`)
+verified every hardware self-signature, 1996828 file signatures per round and
+997114 and 539817 BU chain signatures, with no failure; every urn certificate is
+signed by its CA and none is revoked. In 14 and 3 sections another urn signed the
+files ([O13](observations.md#operations)). The section tables were rebuilt as
+version 3 (`table-2026-v3-20261107/`, `table-2022-v3-20261106/`): eleven Amazonas
+municipalities on Acre time are pinned with their sources
+([O12](observations.md#operations)) and no section is left without a close rule.
+Remaining: the I6 prefix re-read, the I2 municipal source, I8, the JWS, zerésima,
+GEDAI and hash-list checks, an Ed521 cross-check with DataUrnas-BR and the I3/I5
+reconciliation. See the
+[integrity checks guide](integrity-checks.md#phase-20b-signatures-and-certificates).
+
 **Phase 22 (section table v2): complete for 2026 and 2022.** Semantic pass
 `session-aggregates-v3` adds device model, software and clock evidence per session.
 It ran nationally for both years and rounds with no errors, and every column shared
@@ -115,9 +135,10 @@ Copies of one session in internal and external memory are counted once. Clocks a
 judged against legal closing times, with Amazonas resolved from the closing times
 the urns print. Every unit keeps the same principal section in both rounds.
 Results and operational measures are written only under `restricted/` and were not
-read. Open: eight 2026 round-1 sections whose log model differs from the BU signer,
-and Amazonas sections without a close rule (94 in 2026, 704 in 2022), both moved to
-Phase 20b. See the [section table guide](section-table.md#national-results), the
+read. Both items left open were settled in Phase 20b: six of the eight round-1
+model differences are signature files signed by another urn, and the Amazonas
+sections without a close rule now take it from the list of municipalities on Acre
+time (version 3 tables, below). See the [section table guide](section-table.md#national-results), the
 [observation register](observations.md) and the [Phase 22 handoff](handoffs/task-22.md).
 
 **Phase 21 (semantic pass): complete for both 2026 rounds and 2022.**
@@ -179,14 +200,14 @@ No national electoral result, national margin, fitted national model or fraud
 label exists.
 
 **Checks.** The full offline gate `just check` passes (lock, format, lint,
-contracts, docs, documented commands and all 381 tests).
+contracts, docs, documented commands and all 394 tests).
 
 ## Next step
 
-Phase 20b, which gates the Phase 23 freeze: Ed521 and certificate-chain
-verification and the national I1 rerun, the I6 prefix re-read, the missing I2 and
-I8 sources, the checks added from DataUrnas-BR and the Phase 22 items (eight model
-differences, Amazonas close rules). Its gaps that cannot be closed are written into
+Finish Phase 20b, which gates the Phase 23 freeze: the I6 prefix re-read, the
+missing I2 and I8 sources, the checks added from DataUrnas-BR and the I3/I5
+reconciliation (Ed521, the certificate checks, the national I1 rerun and the Phase
+22 items are done). Its gaps that cannot be closed are written into
 the protocol. TSE's reply to the root-certificate request (protocol
 83529705172533) is due by 25 November 2026. File the TCU consolidated integrity test
 report when it is published (due within 30 days of the second round). The
@@ -266,7 +287,7 @@ checks (177 tests).
 | 20 | Complete: I1–I9 for 2026, both rounds, all sections; ECDSA verified, BWEB, EA20 and correspondences agree | Ed521 signatures, certificate chains, I6 prefix re-read, I5/I6 open differences, I8, 2022 | [20](handoffs/task-20.md) |
 | 21 | Complete: 2026 both rounds (v1, reproduced by v2 on AC) and 2022 both rounds (v2); ledgers reconcile every section; SA logs attributed | Grouping multi-run sessions and clock rules move to Phase 22 | [21](handoffs/task-21.md) |
 | 22 | Complete: semantic pass v3 nationally (2026 and 2022, equal to earlier releases on shared columns); section tables for both years with crosswalk, clock rules and ledger | Results and operational values unread until the freeze; model differences and Amazonas close rules move to Phase 20b | [22](handoffs/task-22.md) |
-| 20b | In progress in a separate worktree: Ed521 implemented and confirmed from TSE's reference code; CA certificates and revocation lists frozen; national chains, I1 rerun, I6 prefix re-read, I2 municipal source, I8 and the added checks remain; gates the Phase 23 freeze | Roots requested from TSE | — |
+| 20b | In progress in a separate worktree: Ed521 verified nationally (`ed521rs`, equal to the pure-Python verifier), official TSE specifications, urn certificates checked against the published CAs and revocation lists, section tables v3 with the Amazonas list; the I6 prefix re-read, I2 municipal source, I8 and the added checks remain; gates the Phase 23 freeze | Roots requested from TSE | — |
 | 23–26 | Not started; defined in the [completion plan](../../research/completion-plan.md#revised-phases) | All | — |
 
 ## Where results are

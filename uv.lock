@@ -5,6 +5,9 @@ requires-python = ">=3.14"
 [options]
 exclude-newer = "2026-10-29T00:00:00Z"
 
+[options.exclude-newer-package]
+ed521rs = "2026-11-08T00:00:00Z"
+
 [manifest]
 build-constraints = [{ name = "pluggy", specifier = "==1.6.0" }]
 
@@ -276,6 +279,22 @@ wheels = [
 ]
 
 [[package]]
+name = "ed521rs"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/3c/e0961fb7e09ce17c4dbdf66aeec4d6a4b65b39a9105f14681a06abc67301/ed521rs-0.1.0.tar.gz", hash = "sha256:48fefd97d3d6e6c39caf2ff5999a689ebf4425f37be2ed112bcde0dcf1caeadf", size = 146809, upload-time = "2026-11-07T01:03:11.043Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ce/5c/db630cb5b9b71c2cdd7e38e9454417ab9d0ff81b47d29c1d2246016f259d/ed521rs-0.1.0-cp311-abi3-macosx_10_12_x86_64.whl", hash = "sha256:e2889a02252970ebee63ea5726a830e49edc64f233ea26e5a5d343cf42564976", size = 422327, upload-time = "2026-11-07T01:02:58.496Z" },
+    { url = "https://files.pythonhosted.org/packages/b7/af/1bfb6858c4861869f84235c87d3b2017bfd1d3a8ac1bdbbf0f7af203ebd3/ed521rs-0.1.0-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:75c5bd2fc60d1723d79ce8bae35257890e071b94d84ce988578118126985d8f4", size = 407123, upload-time = "2026-11-07T01:02:59.979Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/88/321c678f3fc7e2b467a8a5e4c1b8895e7d13780c79a09b5ca1c9fd4e63cb/ed521rs-0.1.0-cp311-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:810abc928a5cb6322e2c176e660392054e185db32d45ef1dbecc15e5de280fe4", size = 453086, upload-time = "2026-11-07T01:03:01.586Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/fa/9129ee71cfb0b4cf706ad6a76580bc0b9b871c662d46b72cebc2a7385316/ed521rs-0.1.0-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:f6264bd49ad1c1f6525ffef489c85521d241158a0039b04c03380a8904b5db4f", size = 442132, upload-time = "2026-11-07T01:03:03.267Z" },
+    { url = "https://files.pythonhosted.org/packages/24/32/47c1808380e5891e0e148d8bd0f9bcfd623ca24adf2cad062f6a787b113c/ed521rs-0.1.0-cp311-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:3990f5dbd0ac6d29dd02028027fea7001496c1b801e3cb874ee56d9650a3438f", size = 630568, upload-time = "2026-11-07T01:03:04.671Z" },
+    { url = "https://files.pythonhosted.org/packages/40/88/b73a93f208fd1be666704eecf3467ca79cdb9568580dd810408b2f07a689/ed521rs-0.1.0-cp311-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:87bf432600665b94c9f2bfd5cb48c905e9f753c70e58d469db0f726d03210960", size = 653545, upload-time = "2026-11-07T01:03:06.416Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/40/34799ff31556896e44fcd8440a42aa635d018b6f1ed43ff71e067e49510a/ed521rs-0.1.0-cp311-abi3-win_amd64.whl", hash = "sha256:f86ea28cb828e52a10e30e09a42bfd3c08ab0bba5841e0aadd103352abdc2d4f", size = 335650, upload-time = "2026-11-07T01:03:07.981Z" },
+    { url = "https://files.pythonhosted.org/packages/67/c5/dd1c115d85de8bfa0d45514c4d66e7ccf44bfa2634ee06bc719f855a4a1b/ed521rs-0.1.0-cp311-abi3-win_arm64.whl", hash = "sha256:b012bc0c3c38a4123ebe051eac6c1adf873c7292e6872919d071d428de5b84cc", size = 339543, upload-time = "2026-11-07T01:03:09.577Z" },
+]
+
+[[package]]
 name = "election-audit"
 version = "0.1.0"
 source = { editable = "." }
@@ -296,6 +315,7 @@ research = [
 verification = [
     { name = "asn1tools" },
     { name = "cryptography" },
+    { name = "ed521rs" },
 ]
 
 [package.dev-dependencies]
@@ -309,6 +329,7 @@ requires-dist = [
     { name = "asn1tools", marker = "extra == 'verification'", specifier = ">=0.169.0" },
     { name = "cryptography", marker = "extra == 'verification'", specifier = ">=50.0.2" },
     { name = "duckdb", specifier = "==1.5.3" },
+    { name = "ed521rs", marker = "extra == 'verification'", specifier = "==0.1.0" },
     { name = "marimo", marker = "extra == 'dashboard'", specifier = "==0.25.0" },
     { name = "pyarrow", specifier = "==24.0.0" },
     { name = "quantile-forest", marker = "extra == 'research'", specifier = "==1.4.2" },

@@ -112,10 +112,14 @@ class ClockTests(unittest.TestCase):
             {"uf": "sp", "municipality": "71072", "configured_close": []},
             {"uf": "zz", "municipality": "29564", "configured_close": []},
             {"uf": "pe", "municipality": "25810", "configured_close": []},
-            {"uf": "am", "municipality": "02550", "configured_close": ["15:00:00"]},
-            {"uf": "am", "municipality": "02550", "configured_close": ["15:00:00"]},
+            {"uf": "am", "municipality": "02917", "configured_close": ["15:00:00"]},
+            {"uf": "am", "municipality": "02917", "configured_close": ["15:00:00"]},
+            {"uf": "am", "municipality": "02550", "configured_close": ["16:00:00"]},
             {"uf": "am", "municipality": "02003", "configured_close": ["15:00:00", "16:00:00"]},
             {"uf": "am", "municipality": "02097", "configured_close": []},
+            {"uf": "am", "municipality": "02135", "configured_close": []},
+            {"uf": "am", "municipality": "02496", "configured_close": ["16:00:00"]},
+            {"uf": "am", "municipality": "02607", "configured_close": ["15:00:00"]},
         ]
         names = {("pe", "25810"): "FERNANDO DE NORONHA"}
         rules = close_rules(rows, names)
@@ -124,9 +128,14 @@ class ClockTests(unittest.TestCase):
         self.assertEqual(rules[("sp", "71072")], ("law_uf", "17:00:00"))
         self.assertEqual(rules[("zz", "29564")], ("abroad", "17:00:00"))
         self.assertEqual(rules[("pe", "25810")], ("law_noronha", "18:00:00"))
-        self.assertEqual(rules[("am", "02550")], ("am_configured", "15:00:00"))
+        self.assertEqual(rules[("am", "02917")], ("am_configured", "15:00:00"))  # Amaturá
+        self.assertEqual(rules[("am", "02550")], ("am_configured", "16:00:00"))
         self.assertEqual(rules[("am", "02003")], ("unresolved", None))
-        self.assertEqual(rules[("am", "02097")], ("unresolved", None))
+        self.assertEqual(rules[("am", "02097")], ("am_list", "16:00:00"))
+        self.assertEqual(rules[("am", "02135")], ("am_list", "15:00:00"))  # Benjamin Constant
+        # A printed close that contradicts TRE-AM's list is not used.
+        self.assertEqual(rules[("am", "02496")], ("unresolved", None))  # Jutaí
+        self.assertEqual(rules[("am", "02607")], ("unresolved", None))
 
     def test_clock_states(self):
         ops = section_operations([session()])

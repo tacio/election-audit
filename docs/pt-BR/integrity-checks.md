@@ -1,6 +1,6 @@
 # Verificações de integridade de nível 1 (Fase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 1 · Language: pt-BR
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 2 · Language: pt-BR
 
 [English](../en/integrity-checks.md) · [Índice de implementação](implementation-index.md)
 
@@ -28,7 +28,7 @@ discrepâncias. Nenhum modelo estatístico é usado.
 
 | Etapa | Verificações | Lê | Grava |
 | --- | --- | --- | --- |
-| `sections` | I1 (hashes, assinaturas ECDSA, cadeia de hash do BU), I3, I9 (arquivos, identidade) | arquivos em massa de BU/RDV/log | `sections`, `contests`, `restricted/attendance`, `archive_members.json` |
+| `sections` | I1 (hashes, assinaturas ECDSA e Ed521, certificados das urnas, cadeia de hash do BU), I3, I9 (arquivos, identidade) | arquivos em massa de BU/RDV/log | `sections`, `contests`, `restricted/attendance`, `archive_members.json` |
 | `bweb` | I2 | uma versão de `sections`, BWEB | `contests`, `sections` |
 | `hierarchy` | I4 | BWEB, EA20 | `nodes` |
 | `correspondence` | I9 (urna efetivada) | uma versão de `sections`, correspondências (CEFT) | `sections` |
@@ -75,16 +75,30 @@ registrados como não publicados, não como falhas.
   `AC URNA`) verifica a autoassinatura de hardware, a assinatura de cada arquivo
   publicado e a assinatura da cadeia de hash dos totais de cada BU. As assinaturas
   são DER e cobrem o hash SHA-512 de 64 bytes, de novo resumido com SHA-512.
-- Urnas UE2020 e UE2022 assinam com EdDSA sobre a E-521 (Ed521; certificados da
-  `AC UE2020` e da `AC UE2022`). Nem a `cryptography` nem fonte revisada dá os
-  parâmetros de verificação, então essas ficam `not_verified_ed521`.
+- Urnas UE2020 e UE2022 assinam com EdDSA sobre a E-521 (Ed521, DOC-ICP-01.01 da
+  ICP-Brasil; certificados PEM da `AC UE2020` e da `AC UE2022`), sobre o mesmo hash
+  duplo. Desde a Fase 20b (`integrity-sections-v3`) elas são verificadas com o
+  [`ed521rs`](https://pypi.org/project/ed521rs/) sob as regras de decodificação da RFC
+  8032, que dão os veredictos de `election_audit/ed521.py`. Cada assinatura também é
+  conferida como o ECPy, o verificador do pacote de formatos de 2026 do TSE, a
+  conferiria; `ed521_ecpy_disagreements` conta as assinaturas em que os dois
+  veredictos diferem.
+- O certificado de cada urna é conferido contra o certificado publicado da AC que o
+  emitiu (`urn-pki-v2`): a assinatura da AC (ECDSA P-521 com SHA-512, ou Ed521 sobre
+  o TBSCertificate cru, como no `mr_util.valida_certificado` do TSE), o número de série
+  contra a lista de revogados dessa AC e a validade do certificado da AC no dia da
+  eleição. Os certificados das ACs e as listas de revogados estão fixados em
+  `resources/pki/` com sua procedência. O elo seguinte (até a `AC RAIZ UE` e a
+  `AC URNA v2`) não é conferido: esses certificados não são públicos
+  ([T1](observations.md#transparência)).
 - O CEPESC não é público; assinaturas de software nunca são verificadas.
-- As cadeias de certificados até as autoridades do TSE não são verificadas: os
-  certificados delas não estão entre as entradas.
 
-O formato dos arquivos de assinatura de 2026 difere do `assinatura.asn1` espelhado
-(ordem dos campos, marcas de contexto, uma sequência final de equipamento) e está
-fixado como `resources/assinatura-2026-observed.asn1`.
+Desde a Fase 20b, BU, RDV e arquivos de assinatura são decodificados com as
+especificações oficiais do pacote de formatos de 2026 do TSE
+(`resources/*-2026-official.asn1`, procedência em
+`resources/tse-format-2026-official.json`), no lugar das espelhadas e observadas
+([T7](observations.md#transparência)). Os valores não mudam; os rótulos de enumeração
+mudam (o tipo de urna `reservaSecao` passa a `contingenciaSecao`).
 
 **I1, cadeia de hash do BU.** Cada eleição do BU traz uma cadeia SHA-512 sobre seus
 totais de votos. O cabeçalho é `pleito|eleição|município|zona|seção|código de carga`
@@ -228,10 +242,57 @@ levou 64 e 59 minutos com seis workers.
 - Logs SA, ausentes e protegidos: 627 e 626 seções ficam `protected_or_unavailable` para
   I5–I7.
 
+## Fase 20b: assinaturas e certificados
+
+Execuções de 6 de novembro de 2026 em
+`~/data/election-audit-stage/phase20/national-r{1,2}-sections-v3-20261106/`:
+
+```sh
+just integrity-check sections \
+  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot \
+  --round 1 --output ~/data/election-audit-stage/phase20/national-r1-sections-v3-20261106 \
+  --workers 6
+```
+
+| Verificação | 1º turno | 2º turno |
+| --- | --- | --- |
+| Autoassinatura de hardware verificada | 499207 de 499207 | 499207 de 499207 |
+| Seções ECDSA (UE2013/UE2015) | 99985 | 99957 |
+| Seções Ed521 (UE2020/UE2022) | 399222 | 399250 |
+| Assinaturas de arquivos verificadas | 1996828, 0 com falha | 1996828, 0 com falha |
+| Assinaturas da cadeia do BU verificadas | 997114, 0 com falha | 539817, 0 com falha |
+| Certificado da urna assinado pela sua AC | 499207 | 499207 |
+| Número de série do certificado revogado | 0 | 0 |
+| Veredictos Ed521 diferentes dos do ECPy | 0 | 0 |
+
+- Todo certificado de urna era válido no dia da eleição. O da `AC URNA` (99985 e
+  99957 seções) não era: o certificado publicado venceu em 2026-07-18
+  ([T2](observations.md#transparência)).
+- Em 14 e 3 seções o arquivo de assinatura foi assinado por outra urna que não a do
+  BU; toda assinatura nelas confere com o certificado válido e não revogado dessa urna
+  ([O13](observations.md#operação)). Elas respondem por seis das oito divergências de
+  modelo relatadas pelo I9 na Fase 20.
+- A mesma passada rodou antes com o verificador em Python puro
+  (`integrity-sections-v2`, em `national-r{1,2}-sections-v2-20261106`). As execuções
+  com o `ed521rs` são iguais a ela linha a linha nas tabelas de seções, disputas e
+  restrita dos dois turnos.
+
+| Execução | Verificador Ed521 | Tempo decorrido | Tempo de CPU | Memória máxima |
+| --- | --- | --- | --- | --- |
+| 1º turno, v2 | `election_audit/ed521.py` | 2:57:15 | 65017 s | 4.8 GB |
+| 2º turno, v2 | `election_audit/ed521.py` | 2:21:17 | 50280 s | 4.1 GB |
+| 1º turno, v3 | `ed521rs` 0.1.0 | 1:07:49 | 10210 s | 4.9 GB |
+| 2º turno, v3 | `ed521rs` 0.1.0 | 1:00:38 | 5411 s | 4.2 GB |
+
+Todas as execuções usaram seis processos. As execuções v3 usaram uma wheel local do
+`ed521rs` gerada do commit anterior à tag `v0.1.0`, com o mesmo código de verificação;
+as execuções do AC com a wheel do PyPI são iguais a elas linha a linha. O manifesto
+registra a versão, o backend SIMD e o SHA-256 do módulo nativo.
+
 ## Limites
 
-- As assinaturas Ed521 (UE2020/UE2022) e as cadeias de certificados não são
-  verificadas.
+- As cadeias de certificados são verificadas só até as ACs intermediárias; os
+  certificados raiz e da `AC URNA v2` não são públicos.
 - O I6 não verifica o último bloco aberto; uma comparação por prefixo exige reler os
   logs não protegidos.
 - O I8 não tem fonte.

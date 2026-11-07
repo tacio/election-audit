@@ -1,0 +1,12 @@
+{
+  "source": "TSE, formato-arquivos-de-bu-rdv-e-assinatura-digital.zip (2026 edition, members dated 2026-09-11)",
+  "official_url": "https://www.tse.jus.br/eleicoes/eleicoes-2026-content/arquivos/formato-arquivos-de-bu-rdv-e-assinatura-digital",
+  "package_sha256": "b5ac413e81121d53de2bb1657af611f84a45fdc84388e9d9821872994bbfbafd",
+  "acquired": "2026-11-05, downloaded by the project owner in a browser (non-browser clients get HTTP 403); frozen at ~/data/election-audit-stage/inputs/tse-format-docs-20261105/",
+  "files": {
+    "bu-2026-official.asn1": {"member": "spec/bu.asn1", "sha256": "ef64bf723f774403b423ed0b617f5a83a3f50c0023d0003e18cd29170404ab81"},
+    "rdv-2026-official.asn1": {"member": "spec/rdv.asn1", "sha256": "282dcde0c7ba1f1bb128fe27443ad8d18f7490416c9546d033910a7ec557a465"},
+    "assinatura-2026-official.asn1": {"member": "spec/assinatura.asn1", "sha256": "86a0edf579b91e0a6df9f0981521e0229f41cb6cab0ed8a66d8a56f68c1f396f"}
+  },
+  "differences_from_mirror": "rdv identical; bu differs in comments and enumeration labels only (value 5 of the replacement reason, reservaSecao/reservaEncerrandoSecao renamed contingenciaSecao/contingenciaEncerrandoSecao, envelope type 6 envelopeZeresimaImpressa added); assinatura is the official layout of what Phase 20 read with an observed schema"
+}

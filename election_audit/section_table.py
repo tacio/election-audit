@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -34,6 +35,8 @@ import shutil
 import sqlite3
 import zipfile
 from collections import Counter, defaultdict
+from functools import lru_cache
+from importlib.resources import files
 from pathlib import Path
 
 import pyarrow as pa
@@ -45,7 +48,7 @@ from election_audit.features import verified_member_sections
 from election_audit.national_migration import atomic, sha
 from election_audit.source_inventory import digest
 
-VERSION = "section-features-v2"
+VERSION = "section-features-v3"
 SESSIONS_VERSION = "session-aggregates-v3"
 BWEB_FILE = re.compile(r"files/bweb_([12])t_([A-Z]{2})_\d{12}\.zip")
 PROFILE_FILE = re.compile(r"files/perfil_eleitor_secao_(\d{4})_([A-Z]{2})\.zip")
@@ -55,8 +58,9 @@ KEY = ("uf", "municipality", "zone", "section")
 # Legal time zones (Decreto 2.784/1913, Art. 2, as amended by Lei 12.876/2013), as the
 # offset of local time from Brasília time in hours. Voting closes at 17:00 Brasília time
 # in Brazil (urn clocks run on local time) and at 17:00 local time abroad (ZZ).
-# Amazonas is split by a line, not by municipality: its closing hour comes from the
-# urns' own configured closing time, per municipality, when every observation agrees.
+# Amazonas is split by a line, not by municipality: TRE-AM lists the municipalities west of
+# it (resources/am-acre-time-municipalities.json). The urns' configured closing times must
+# agree with that list; where none was printed, the list alone sets the closing hour.
 UF_OFFSET = {**{uf: -1 for uf in ("mt", "ms", "ro", "rr")}, "ac": -2}
 NORONHA = ("pe", "fernando de noronha")
 CLOSE_RULES = {
@@ -64,8 +68,11 @@ CLOSE_RULES = {
     "law_noronha": "Fernando de Noronha, first zone: 18:00 local",
     "abroad": "abroad (ZZ): 17:00 local",
     "am_configured": "Amazonas: the configured closing time the municipality's urns printed, "
-    "when every observation in the year agrees",
-    "unresolved": "no rule applies; time-of-day measures unavailable",
+    "when every observation in the year agrees and matches TRE-AM's list",
+    "am_list": "Amazonas, no configured closing time printed: TRE-AM's list of municipalities on "
+    "Acre time (15:00 local), 16:00 local elsewhere",
+    "unresolved": "no rule applies (Amazonas closing times that disagree with each other or with "
+    "TRE-AM's list); time-of-day measures unavailable",
 }
 
 AGE_BANDS = (
@@ -568,6 +575,13 @@ def uf_operations(db, round_number, uf, municipalities):
 # --------------------------------------------------------------------------- clock rule
 
 
+@lru_cache(maxsize=1)
+def am_acre_time():
+    """TSE codes of the Amazonas municipalities on Acre time (UTC-5), per TRE-AM."""
+    raw = files("election_audit").joinpath("resources/am-acre-time-municipalities.json")
+    return frozenset(json.loads(raw.read_bytes())["municipalities"])
+
+
 def close_rules(sections, municipality_names):
     """Expected closing hour (local clock) per (uf, municipality), with the rule used."""
     observed = defaultdict(set)
@@ -584,9 +598,13 @@ def close_rules(sections, municipality_names):
             rules[key] = ("law_noronha", "18:00:00")
         elif uf == "am":
             values = observed.get(key, set())
-            rules[key] = (
-                ("am_configured", min(values)) if len(values) == 1 else ("unresolved", None)
-            )
+            listed = "15:00:00" if key[1] in am_acre_time() else "16:00:00"
+            if not values:
+                rules[key] = ("am_list", listed)
+            elif values == {listed}:
+                rules[key] = ("am_configured", listed)
+            else:
+                rules[key] = ("unresolved", None)
         else:
             rules[key] = ("law_uf", f"{17 + UF_OFFSET.get(uf, 0):02d}:00:00")
     return rules
@@ -744,6 +762,8 @@ def build(
 
     protected = set()
     binding = {"version": VERSION, "year": year, "ufs": sorted(ufs) if ufs else None}
+    am_list = files("election_audit").joinpath("resources/am-acre-time-municipalities.json")
+    binding["am_acre_time_sha256"] = hashlib.sha256(am_list.read_bytes()).hexdigest()
     if exclusions_path:
         keys = json.loads(Path(exclusions_path).read_bytes())["section_keys"]
         protected = {tuple(k) for k in keys}

@@ -1,0 +1,24 @@
+{
+  "version": "am-acre-time-v1",
+  "rule": "Amazonas municipalities that keep Acre time (UTC-5, two hours behind Brasilia; Decreto 2.784/1913 as amended by Lei 12.876/2013, the Tabatinga-Porto Acre line); every other Amazonas municipality keeps UTC-4. Voting closes at 15:00 local in these and 16:00 local elsewhere in Amazonas.",
+  "municipalities": {
+    "02917": "AMATURÁ",
+    "02054": "ATALAIA DO NORTE",
+    "02135": "BENJAMIN CONSTANT",
+    "02291": "EIRUNEPÉ",
+    "02313": "ENVIRA",
+    "02020": "GUAJARÁ",
+    "02399": "IPIXUNA",
+    "98370": "ITAMARATI",
+    "02496": "JUTAÍ",
+    "02755": "SÃO PAULO DE OLIVENÇA",
+    "98477": "TABATINGA"
+  },
+  "codes": "TSE municipality codes; names and zones checked against TSE eleitorado_local_votacao 2022 and 2026 (AM)",
+  "sources": [
+    {"kind": "official", "title": "TRE-AM, Eleitorado do Amazonas deve ficar atento aos horários de votação nas Eleições 2026", "published": "2026-09-25", "url": "https://www.tre-am.jus.br/comunicacao/noticias/2026/Setembro/eleitorado-do-amazonas-deve-ficar-atento-aos-horarios-de-votacao-nas-eleicoes-2026", "read": "2026-11-06, in a browser (non-browser clients get HTTP 403)"},
+    {"kind": "official", "title": "TRE-AM, Onze municípios terão horário diferenciado nas eleições (Art. 231, Resolução TSE 23.736/2024; lists each municipality's zone)", "published": "2024-08-26", "url": "https://www.tre-am.jus.br/comunicacao/noticias/2024/Agosto/onze-municipios-terao-horario-diferenciado-nas-eleicoes", "read": "2026-11-06, in a browser"},
+    {"kind": "independent", "title": "DataUrnas-BR, src/dataurnas/analyzer/timezones.py (_AM_UTC5)", "git_blob": "81971d6d25122ee42218febad911b40b73aae878", "sha256": "ae4635cb391e03ae35ae42c51ac9a32f9e58727e1fdf9317c8f5cd459c63ea18", "read": "2026-11-06"}
+  ],
+  "urn_evidence": "Configured closing times printed by the urns (semantic pass v3): every Amazonas municipality that printed 15:00 is on the list and none on the list printed 16:00, in 2022 and 2026; 10 of the 11 printed in 2026 and 9 in 2022."
+}
