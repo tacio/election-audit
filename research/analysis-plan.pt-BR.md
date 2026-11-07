@@ -1,6 +1,6 @@
 # Auditoria estatística da eleição presidencial de 2026: protocolo do estudo
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 4 · Language: pt-BR
+Document-ID: EA-ANALYSIS-PLAN · Revision: 5 · Language: pt-BR
 
 [English](analysis-plan.md) · [Plano de conclusão](completion-plan.pt-BR.md) · [Trabalhos relacionados](related-work.pt-BR.md)
 
@@ -77,6 +77,13 @@ escrevê-lo. Nesta revisão:
   verificações (`restricted/` e resumos por disputa) e não são relatados nem
   consultados antes do congelamento. Os logs das 596 seções protegidas/de estresse
   passam por SHA-512 para o I1 e nunca são interpretados.
+- **Conciliação da integridade (Fase 20b):** a releitura por prefixo do I6 (conteúdo
+  linha a linha dos 113 pares divergentes de blocos do 1º turno, como modelos com
+  dígitos mascarados); para as 121 seções que falharam no I5, seu comparecimento no
+  BU, as sessões dos seus logs e as linhas brutas do dia da eleição desses logs,
+  comparados caso a caso com o DataUrnas-BR; os blocos do RDV das duas seções de MG
+  que falharam no I3. Contagens nacionais de sessões iniciadas antes do dia da
+  eleição, sem suas medidas.
 - **Não visto:** resultados eleitorais ou medidas operacionais por seção fora do AC,
   além das contagens e das linhas discordantes acima; o conteúdo dos 596 logs
   protegidos/de estresse do segundo turno.
@@ -162,6 +169,19 @@ Cópias impressas independentes (I8) vêm de coleções de terceiros cuja seleç
 aleatória. A concordância delas corrobora as seções que cobrem; não se estende a
 outras seções.
 
+**Lacuna conhecida: I2 das eleições municipais realizadas com o segundo turno.** Dez
+eleições municipais ocorreram com o segundo turno de 2026 (eleições 6282–6293:
+eleições suplementares para prefeito e três consultas locais, 871 disputas em 13
+municípios de MT, PR, RJ, RS, SP e TO). Suas disputas estão nos BUs assinados (I1) e
+são recontadas a partir do RDV (I3), mas o BWEB nacional traz só o segundo turno
+presidencial, então elas não têm contraparte no I2. Elas ficam sem verificação contra
+uma tabela publicada por seção até que o TSE publique uma ou outra fonte seja
+acrescentada; a lacuna deve ser fechada em uma revisão posterior, não antes do
+congelamento. O impacto é baixo: nenhuma afirmação deste estudo depende dessas
+disputas. O segundo turno presidencial, objeto de C1–C6 e da sensibilidade do
+resultado, é coberto pelo I2 em toda seção com BU, e as disputas municipais são uma
+pequena fração das disputas do turno (871 de 539819).
+
 Concordância entre artefatos produzidos pela mesma cadeia de software (I1–I4) mostra
 consistência, não a intenção do eleitor. Os testes de integridade do TSE e as cópias
 impressas são a única evidência fora da cadeia, e são divulgados com essa ressalva.
@@ -187,6 +207,12 @@ impressas são a única evidência fora da cadeia, e são divulgados com essa re
   confiança. Não infira fuso a partir de um primeiro voto cedo ou tarde. Relógios não
   resolvidos bloqueiam afirmações de horário absoluto, mas não verificações de
   contagem.
+- Uma sessão de votação pertence ao turno quando roda no contexto oficial desse turno.
+  Uma urna ligada antes do dia da eleição e mantida ligada abre a sessão nesse momento;
+  a sessão passa a oficial no primeiro evento de votação do dia da eleição e é
+  marcada. Uma linha de reinício que nomeia o turno vigente mantém o contexto desse
+  turno, porque a urna não repete o marcador de turno oficial depois de um reinício
+  durante o dia (regras de sessão `sessions-v2`).
 - Elimine históricos copiados por linhagem verificada de blocos, nunca por texto de
   mensagem idêntico e horário com resolução de segundos, que se repetem
   legitimamente.

@@ -1,6 +1,6 @@
 # Statistical audit of the 2026 presidential election: study protocol
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 4 · Language: en
+Document-ID: EA-ANALYSIS-PLAN · Revision: 5 · Language: en
 
 [Português](analysis-plan.pt-BR.md) · [Completion plan](completion-plan.md) · [Related work](related-work.md)
 
@@ -71,6 +71,12 @@ writing it. As of this revision:
   (`restricted/` and per-contest digests) and are neither reported nor queried before
   the freeze. The logs of the 596 protected/stress sections are hashed with SHA-512
   for I1 and never parsed.
+- **Integrity reconciliation (Phase 20b):** the I6 prefix re-read (line-by-line
+  content of the 113 differing round-1 block pairs, as digit-masked templates); for
+  the 121 sections that failed I5, their BU attendance, their log sessions and the
+  raw election-day lines of their logs, compared case by case with DataUrnas-BR; the
+  RDV blocks of the two MG sections that failed I3. National counts of sessions
+  started before election day, without their measures.
 - **Not seen:** section-level electoral results or operational measures outside AC,
   beyond the counts and disagreeing rows above; the contents of the 596
   protected/stress runoff logs.
@@ -153,6 +159,18 @@ Independent printed copies (I8) come from third-party collections whose selectio
 is not random. Their agreement corroborates the sections they cover; it does not
 extend to other sections.
 
+**Known gap: I2 for the municipal elections held with the runoff.** Ten municipal
+elections ran with the 2026 runoff (elections 6282–6293: supplementary mayoral
+elections and three local consultations, 871 contests in 13 municipalities of MT,
+PR, RJ, RS, SP and TO). Their contests are in the signed BUs (I1) and are recounted
+from the RDV (I3), but the national BWEB carries only the presidential runoff, so
+they have no I2 counterpart. They stay unverified against a published section-level
+table until TSE publishes one or another source is added; the gap is to be closed in
+a later revision, not before the freeze. The impact is low: no claim of this study
+rests on these contests. The presidential runoff, the subject of C1–C6 and of the
+outcome sensitivity, is covered by I2 in every section with a BU, and the municipal
+contests are a small fraction of the round's contests (871 of 539819).
+
 Agreement among artifacts produced by the same software chain (I1–I4) shows
 consistency, not voter intent. The TSE integrity tests and printed copies are the
 only out-of-band evidence, and they are reported with that caveat.
@@ -175,6 +193,12 @@ only out-of-band evidence, and they are reported with that caveat.
   assigned offset, adjustments, the conversion rule and its confidence. Do not
   infer a timezone from an early or late first vote. Unresolved clocks block
   absolute-time claims but not count checks.
+- A voting session belongs to the round when it runs in that round's official
+  context. An urn switched on before election day and left running opens its session
+  then; the session becomes official at its first voting event on election day and
+  is flagged. A restart line that names the round in effect keeps that round's
+  context, because the urn does not repeat the official-round marker after a
+  mid-day restart (session rules `sessions-v2`).
 - Deduplicate copied histories by verified block lineage, never by identical
   message text and second-resolution time, which repeat legitimately.
 - The RDV is shuffled by design

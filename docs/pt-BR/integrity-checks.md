@@ -1,6 +1,6 @@
 # Verificações de integridade de nível 1 (Fase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 3 · Language: pt-BR
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 4 · Language: pt-BR
 
 [English](../en/integrity-checks.md) · [Índice de implementação](implementation-index.md)
 
@@ -197,10 +197,10 @@ levou 64 e 59 minutos com seis workers.
 - I3: as 10 diferenças do primeiro turno são todas as disputas de duas seções de MG
   apuradas com o sistema SA (41238/0039/0168 e 50075/0047/0041). Nas duas, o BU de
   cada disputa tem exatamente 20 eleitores a mais que o RDV (40 votos para o Senado).
-  São os únicos dois pacotes SA fora do ZZ; os outros 29 recontam exatamente. Cédulas
-  de papel digitadas no SA, que nunca passam pelo RDV, explicariam a diferença; isso
-  não está confirmado, porque essas seções não têm log de urna e o I5 fica
-  indisponível para elas.
+  São os únicos dois pacotes SA fora do ZZ; os outros 29 recontam exatamente. A Fase
+  20b achou a causa: os RDVs deles têm dois blocos por disputa (20 cédulas, depois 261
+  e 258), e o `integrity-sections-v3` ficou só com o último. O
+  `integrity-sections-v4` soma os blocos ([O5](observations.md#operação)).
 - I2: nenhuma disputa presente nos dois lados difere. O restante são diferenças de
   presença ou de campos com causa conhecida:
   - Segundo turno, 871 disputas `bu_only`: dez eleições municipais realizadas junto

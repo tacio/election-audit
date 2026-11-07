@@ -1,6 +1,6 @@
 # Observações de transparência e de operação
 
-Document-ID: EA-OBSERVATIONS · Revision: 4 · Language: pt-BR
+Document-ID: EA-OBSERVATIONS · Revision: 5 · Language: pt-BR
 
 [English](../en/observations.md) · [Índice de implementação](implementation-index.md)
 
@@ -43,7 +43,7 @@ acrescentada como resolução, com sua data.
 | O2 | O log do segundo turno contém toda a história da urna: preparação em setembro, 1º turno e 2º turno | Fase 21 | As sessões são selecionadas pelo turno, nunca pelo arquivo |
 | O3 | Os relógios das urnas marcam a hora local; a votação termina às 17:00 de Brasília, então a leitura configurada de encerramento é 15:00 no AC; as urnas a imprimem quando alguém tenta encerrar antes da hora | Fase 22, AC 2026 e 2022 | O horário de encerramento é uma regra por município, não uma hora nacional |
 | O4 | Operadores ajustam o relógio das urnas com o aplicativo ADH; as urnas registram ajustes de fuso na carga, e uma mensagem de ajuste de horário de verão aparece 7313 vezes no vocabulário do 2º turno de 2026, embora o Brasil não tenha horário de verão | Vocabulário da Fase 21; colunas v3 da Fase 22 | A evidência de relógio é registrada por sessão; medidas de horário exigem relógio resolvido |
-| O5 | Na apuração de contingência (SA), o RDV é produzido pelo sistema de apuração, não pela urna; duas seções de SA de MG mostram 20 eleitores a menos no RDV que no BU (40 para senador) no 1º turno | I3 da Fase 20; DataUrnas-BR | A recontagem pelo RDV não é independente nas seções de SA; a conciliar com o DataUrnas-BR |
+| O5 | Na apuração de contingência (SA), o RDV é produzido pelo sistema de apuração, não pela urna, e pode ter vários blocos para uma disputa, um por urna ou mídia: as duas seções de SA de MG do 1º turno 41238/0039/0168 e 50075/0047/0041 têm um bloco de 20 cédulas e um de 261 e 258 em toda disputa. Somados, igualam o BU. A Fase 20 ficou só com o último bloco e relatou 20 eleitores a menos; foi um erro de leitura, corrigido em `integrity-sections-v4` | I3 da Fase 20; decodificação do RDV na Fase 20b; DataUrnas-BR | A recontagem pelo RDV não é independente nas seções de SA; blocos do RDV de uma disputa são somados |
 | O6 | A urna prevista difere da efetivamente usada em 3060 (1º turno) e 2721 (2º turno) seções; em todos os casos a urna efetiva confere com o BU | I9 da Fase 20 | Substituição de urna é comum e documentada pelos arquivos de correspondência |
 | O7 | Dez eleições municipais realizadas com o 2º turno (871 disputas em 13 municípios) aparecem nos BUs mas não no BWEB | I2 da Fase 20 | Sua verificação I2 precisa de outra fonte (Fase 20b) |
 | O8 | Os resultados EA20 do 1º turno do ZZ (186 cidades e o total do ZZ) foram regerados em 2026-10-24, depois da geração do 1º turno em 2026-10-05 | [Handoff da Fase 19](handoffs/task-19.md) | As verificações de hierarquia usam a regeração final |

@@ -235,7 +235,7 @@ certificados raiz (protocolo 83529705172533) é devida até 25 de novembro de 20
 Arquivar o relatório
 consolidado do TCU sobre o teste de integridade quando for publicado (previsto até
 30 dias após o segundo turno). O
-[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 4) define as
+[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 5) define as
 afirmações, o mapa de ameaças e observáveis, as verificações de integridade I1–I9, os
 testes confirmatórios C1–C6, o estudo de poder e a política de dados; o
 [plano de conclusão](../../research/completion-plan.pt-BR.md) (Revisão 14) define as

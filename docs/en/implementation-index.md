@@ -220,7 +220,7 @@ items are done). Its gaps that cannot be closed are written into
 the protocol. TSE's reply to the root-certificate request (protocol
 83529705172533) is due by 25 November 2026. File the TCU consolidated integrity test
 report when it is published (due within 30 days of the second round). The
-[study protocol](../../research/analysis-plan.md) (Revision 4) defines the claims,
+[study protocol](../../research/analysis-plan.md) (Revision 5) defines the claims,
 the threat-to-observable map, the integrity checks I1–I9, the confirmatory tests
 C1–C6, the power study and the data policy; the
 [completion plan](../../research/completion-plan.md) (Revision 14) defines

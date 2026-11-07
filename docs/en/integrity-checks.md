@@ -1,6 +1,6 @@
 # Tier 1 integrity checks (Phase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 3 · Language: en
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 4 · Language: en
 
 [Português](../pt-BR/integrity-checks.md) · [Implementation index](implementation-index.md)
 
@@ -184,9 +184,10 @@ Runs of 5 November 2026, both rounds, 499207 sections each, into
 - I3: the 10 round-1 differences are every contest of two MG sections counted with
   the SA system (41238/0039/0168 and 50075/0047/0041). In both, each contest's BU has
   exactly 20 more voters than the RDV (40 senate votes). These are the only two SA
-  packages outside ZZ; the other 29 recount exactly. Paper ballots typed into the SA,
-  which never pass through the RDV, would explain it; this is not confirmed, because
-  these sections have no urn log and I5 is unavailable for them.
+  packages outside ZZ; the other 29 recount exactly. Phase 20b found the cause: their
+  RDVs hold two blocks per contest (20 ballots, then 261 and 258), and
+  `integrity-sections-v3` kept only the last. `integrity-sections-v4` sums the blocks
+  ([O5](observations.md#operations)).
 - I2: no contest present on both sides differs. The rest are presence or field
   differences with a known cause:
   - Round 2, 871 `bu_only` contests: ten municipal elections held with the runoff

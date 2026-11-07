@@ -1,6 +1,6 @@
 # Transparency and operational observations
 
-Document-ID: EA-OBSERVATIONS · Revision: 4 · Language: en
+Document-ID: EA-OBSERVATIONS · Revision: 5 · Language: en
 
 [Português](../pt-BR/observations.md) · [Implementation index](implementation-index.md)
 
@@ -42,7 +42,7 @@ its date.
 | O2 | A runoff log contains the urn's whole history: setup in September, round 1 and the runoff | Phase 21 | Sessions are selected by round, never by file |
 | O3 | Urn clocks run on local time; voting closes at 17:00 Brasília time, so the configured closing reading is 15:00 in AC; urns print it when someone tries to close early | Phase 22, AC 2026 and 2022 | The closing time is a per-municipality rule, not one national hour |
 | O4 | Operators set urn clocks with the ADH application; urns log time-zone adjustments when loaded, and a daylight-saving adjustment message appears 7313 times in the 2026 runoff vocabulary although Brazil has no daylight saving | Phase 21 vocabulary; Phase 22 v3 columns | Clock evidence is recorded per session; time-of-day measures need a resolved clock |
-| O5 | In contingency counting (SA) the RDV is produced by the counting system, not by the urn; two MG SA sections show 20 fewer voters in the RDV than in the BU (40 for senate) in round 1 | Phase 20 I3; DataUrnas-BR | The RDV recount is not independent in SA sections; to be reconciled with DataUrnas-BR |
+| O5 | In contingency counting (SA) the RDV is produced by the counting system, not by the urn, and it can hold several blocks for one contest, one per urn or medium: the two round-1 MG SA sections 41238/0039/0168 and 50075/0047/0041 hold a block of 20 ballots and one of 261 and 258 for every contest. Summed, they equal the BU. Phase 20 kept only the last block and reported 20 voters fewer; this was a reading error, corrected in `integrity-sections-v4` | Phase 20 I3; Phase 20b RDV decoding; DataUrnas-BR | The RDV recount is not independent in SA sections; RDV blocks of one contest are summed |
 | O6 | The expected urn differs from the urn effectively used in 3060 (round 1) and 2721 (round 2) sections; in every case the effective urn matches the BU | Phase 20 I9 | Urn replacement is common and documented by the correspondence files |
 | O7 | Ten municipal elections held with the runoff (871 contests in 13 municipalities) appear in the BUs but not in BWEB | Phase 20 I2 | Their I2 check needs another source (Phase 20b) |
 | O8 | The EA20 round-1 results for ZZ (186 cities and the ZZ total) were regenerated on 2026-10-24, after the round-1 generation on 2026-10-05 | [Phase 19 handoff](handoffs/task-19.md) | Hierarchy checks use the final regeneration |
