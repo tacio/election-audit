@@ -2431,7 +2431,20 @@ def integrity_check_main(argv=None):
     prefix.add_argument("--workers", type=int, default=4, help="Worker processes.")
     prefix.add_argument("--uf", action="append", help="Restrict to UF (repeatable; lower case).")
     prefix.add_argument("--resume", action="store_true", help="Resume the same pass.")
+    printed = sub.add_parser("printed", help="I8: printed BU copies (QR codes) against the BUs.")
+    printed.add_argument(
+        "--bulk-root", required=True, help="Verified bulk archive root (bulk-download)."
+    )
+    printed.add_argument("--cmind", help="CMInd Totalização Paralela input root (raw/*.json).")
+    printed.add_argument("--arvor", help="Arvor Totalização paralela input root.")
+    printed.add_argument("--output", required=True, help="New output directory.")
     args = parser.parse_args(argv)
+    if args.command == "printed":
+        from election_audit.printed_bu import run_printed
+
+        result = run_printed(args.bulk_root, args.output, cmind=args.cmind, arvor=args.arvor)
+        print(json.dumps(result["summary"]))
+        return 0
     if args.command == "prefix":
         from election_audit.round1_prefix import run_prefix
 

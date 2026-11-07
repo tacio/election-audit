@@ -1,6 +1,6 @@
 # Auditoria estatística da eleição presidencial de 2026: protocolo do estudo
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 5 · Language: pt-BR
+Document-ID: EA-ANALYSIS-PLAN · Revision: 6 · Language: pt-BR
 
 [English](analysis-plan.md) · [Plano de conclusão](completion-plan.pt-BR.md) · [Trabalhos relacionados](related-work.pt-BR.md)
 
@@ -120,7 +120,7 @@ benigna declarada e um controle (seção 7.6).
 | Perfil do eleitorado por seção (idade, sexo, escolaridade) e locais de votação | Covariáveis, chaves de local | A coletar |
 | BWEB, BUs e logs presidenciais de 2022, os dois turnos, com perfil do eleitorado | Controle negativo (seção 7.6) | A coletar |
 | Relatórios do teste de integridade do TSE no dia da eleição, os dois turnos | Evidência externa sobre o software da urna | A reunir |
-| Cópias impressas independentes do BU (QR codes) | I8 | A reunir; a seleção não é aleatória |
+| Cópias impressas independentes do BU (QR codes) | I8 | Reunidas na Fase 20b (CMInd e Arvor, 518 seções); a seleção não é aleatória |
 
 Regras que valem para toda tabela:
 

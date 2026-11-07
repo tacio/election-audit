@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 32 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 33 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -136,11 +136,19 @@ porque linhas de reinício escritas antes do registro na MI e na ME faltam em al
 cópias ([O14](observations.md#operação)); um, rj/60011/0008/0061, é uma divergência
 real entre três cópias do dia de eleição de uma urna, e o log publicado do 1º turno é
 o que concorda com o BU ([O15](observations.md#operação)).
-Faltam: a fonte municipal do I2, o I8, as verificações de JWS, zerésima, GEDAI e
-listas de hash, uma comparação do Ed521 com o DataUrnas-BR e a conciliação de I3/I5.
-Veja o
-[guia das verificações de integridade](integrity-checks.md#fase-20b-assinaturas-e-certificados)
-e sua [seção do prefixo do I6](integrity-checks.md#fase-20b-releitura-por-prefixo-do-i6).
+O I8 (`integrity-check printed`, 7 de novembro,
+`~/data/election-audit-stage/phase20b-i8/v1-20261107/`) conferiu as 528 cópias
+impressas de BU lidas de QR codes pela Totalização Paralela do CMInd e pela
+Totalização paralela da Arvor (518 seções, 49 no 1º turno, 469 no segundo turno):
+toda cadeia de hashes está íntegra, toda assinatura e todo certificado de urna
+verificam, cada certificado é igual ao do arquivo de assinatura da seção, e todo campo
+impresso é igual ao BU publicado. As coleções não são amostras. A lacuna municipal do
+I2 está registrada na revisão 5 do protocolo.
+Faltam: as verificações de JWS, zerésima, GEDAI e listas de hash, uma comparação do
+Ed521 com o DataUrnas-BR e a conciliação de I3/I5. Veja o
+[guia das verificações de integridade](integrity-checks.md#fase-20b-assinaturas-e-certificados),
+sua [seção do prefixo do I6](integrity-checks.md#fase-20b-releitura-por-prefixo-do-i6) e
+sua [seção do I8](integrity-checks.md#fase-20b-bus-impressos-do-i8).
 
 **Fase 22 (tabela por seção v2): concluída para 2026 e 2022.** A passada semântica
 `session-aggregates-v3` acrescenta modelo da urna, software e evidência de relógio
@@ -222,20 +230,20 @@ Não existe resultado eleitoral nacional, margem nacional, modelo nacional ajust
 nem rótulo de fraude.
 
 **Verificações.** A verificação offline completa `just check` passa (lock, formato,
-lint, contratos, documentos, comandos documentados e todos os 397 testes).
+lint, contratos, documentos, comandos documentados e todos os 403 testes).
 
 ## Próximo passo
 
-Concluir a Fase 20b, condição para o congelamento da Fase 23: as fontes ausentes do
-I2 e do I8, as verificações trazidas do DataUrnas-BR e a conciliação de I3/I5
-(Ed521, as verificações de certificados, a nova execução nacional do I1, a releitura
-por prefixo do I6 e os itens da Fase 22 estão feitos). As lacunas que
+Concluir a Fase 20b, condição para o congelamento da Fase 23: as verificações
+trazidas do DataUrnas-BR e a conciliação de I3/I5 (Ed521, as verificações de
+certificados, a nova execução nacional do I1, a releitura por prefixo do I6, o I8, o
+registro da lacuna do I2 e os itens da Fase 22 estão feitos). As lacunas que
 não puderem ser fechadas são escritas no protocolo. A resposta do TSE ao pedido dos
 certificados raiz (protocolo 83529705172533) é devida até 25 de novembro de 2026.
 Arquivar o relatório
 consolidado do TCU sobre o teste de integridade quando for publicado (previsto até
 30 dias após o segundo turno). O
-[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 5) define as
+[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 6) define as
 afirmações, o mapa de ameaças e observáveis, as verificações de integridade I1–I9, os
 testes confirmatórios C1–C6, o estudo de poder e a política de dados; o
 [plano de conclusão](../../research/completion-plan.pt-BR.md) (Revisão 14) define as
@@ -312,7 +320,7 @@ com verificações aritméticas reais do AC (177 testes).
 | 20 | Concluída: I1–I9 para 2026, nos dois turnos, todas as seções; ECDSA verificada, BWEB, EA20 e correspondências concordam | Assinaturas Ed521, cadeias de certificados, releitura por prefixo do I6, diferenças em aberto do I5/I6, I8, 2022 | [20](handoffs/task-20.md) |
 | 21 | Concluída: 2026 nos dois turnos (v1, reproduzida pela v2 no AC) e 2022 nos dois turnos (v2); os registros conciliam todas as seções; logs SA atribuídos | Agrupar sessões com várias execuções e regras de relógio passam para a Fase 22 | [21](handoffs/task-21.md) |
 | 22 | Concluída: passada semântica v3 no país todo (2026 e 2022, igual às versões anteriores nas colunas em comum); tabelas por seção dos dois anos com mapeamento entre turnos, regras de relógio e registro | Resultados e valores operacionais sem leitura até o congelamento; diferenças de modelo e regras de encerramento do Amazonas passam para a Fase 20b | [22](handoffs/task-22.md) |
-| 20b | Em andamento: Ed521 verificado no país todo (`ed521rs`, igual ao verificador em Python puro), especificações oficiais do TSE, certificados das urnas conferidos contra as ACs publicadas e listas de revogados, tabelas por seção v3 com a lista do Amazonas, releitura por prefixo do I6 (todo bloco aberto é prefixo verificado; 112 de 113 pares divergentes explicados, O14/O15); faltam a fonte municipal do I2, o I8 e as verificações acrescentadas; condição para o congelamento da Fase 23 | Raízes pedidas ao TSE | — |
+| 20b | Em andamento: Ed521 verificado no país todo (`ed521rs`, igual ao verificador em Python puro), especificações oficiais do TSE, certificados das urnas conferidos contra as ACs publicadas e listas de revogados, tabelas por seção v3 com a lista do Amazonas, releitura por prefixo do I6 (todo bloco aberto é prefixo verificado; 112 de 113 pares divergentes explicados, O14/O15), I8 (528 cópias impressas, todas iguais), lacuna municipal do I2 registrada; faltam as verificações acrescentadas e a conciliação de I3/I5; condição para o congelamento da Fase 23 | Raízes pedidas ao TSE | — |
 | 23–26 | Não iniciadas; definidas no [plano de conclusão](../../research/completion-plan.pt-BR.md#fases-revisadas) | Todas | — |
 
 ## Onde estão os resultados
@@ -331,6 +339,7 @@ absolutos ficam no volume de saída da máquina de referência
 | Arquivos em massa de BU/RDV/log da Fase 19, 2026 e 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` no volume de saída |
 | Versões do `integrity-check` da Fase 20 (seções, BWEB, hierarquia, correspondências, logs), execuções de desenvolvimento do AC/ZZ | `~/data/election-audit-stage/phase20/` |
 | Releitura por prefixo do I6 da Fase 20b (versão nacional, execução de desenvolvimento do AC) | `~/data/election-audit-stage/phase20b-i6/` |
+| BUs impressos do I8 da Fase 20b; suas entradas congeladas (CMInd, Arvor, manual de QR do TSE) | `~/data/election-audit-stage/phase20b-i8/`; `~/data/election-audit-stage/inputs/i8-cmind-20261107/`, `i8-arvor-20261107/`, `i8-tse-qrbu-20261107/` |
 | Relatórios de equivalência, passada de desenvolvimento do AC, reprodução v2 do AC e passadas nacionais (2026 e 2022) da Fase 21 | `~/data/election-audit-stage/phase21/` |
 | Passadas semânticas v3, tabelas por seção (2026, 2022), execuções de desenvolvimento do AC e seleção das raízes da Fase 20, da Fase 22 | `~/data/election-audit-stage/phase22/` |
 | Pacote de formatos de 2026 do TSE (especificações, verificador de referência, certificados das ACs) e as cinco listas de revogados, congelados | `~/data/election-audit-stage/inputs/tse-format-docs-20261105/`, `~/data/election-audit-stage/inputs/tse-crls-20261105-complete/` |
@@ -362,7 +371,7 @@ absolutos ficam no volume de saída da máquina de referência
 | Reconstrução operacional | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Fase 13), `semantic_pass` (`session-aggregates-v3`, Fases 21–22; regras `real-log-rules.json` e `real-log-rules-2022.json`), `sa_logs` (`sa-log-summary-v1`); [reconstrução](reconstruction.md), [passada semântica](semantic-pass.md) |
 | Releases operacionais | `publication`, `operational_marts`, `release_tools`; [publicação](publication.md) |
 | Processamento estrutural nacional | Caminho de resumos: `national_parallel`, `national_summary`, `national_summary_release`, `national_summary_tools`, `national_summary_tuning`, `national_resources`; [processamento orientado a features](feature-oriented-processing.md). Caminho em nível de evento: `national_benchmark`, `national_tuning`, `national_workload`, `national`, `national_storage`, `national_relocation`, `national_migration`, `national_overnight`; [processamento nacional](national-processing.md) |
-| Verificações de integridade | `integrity_checks` (`integrity-sections-v1`, `integrity-logs-v1`; formato de assinatura `resources/assinatura-2026-observed.asn1`), `round1_prefix` (`integrity-round1-prefix-v1`, `integrity-check prefix`); [verificações de integridade](integrity-checks.md) |
+| Verificações de integridade | `integrity_checks` (`integrity-sections-v1`, `integrity-logs-v1`; formato de assinatura `resources/assinatura-2026-observed.asn1`), `round1_prefix` (`integrity-round1-prefix-v1`, `integrity-check prefix`), `printed_bu` (`printed-bu-v1`, `integrity-check printed`); [verificações de integridade](integrity-checks.md) |
 | Importação e verificação eleitoral | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` e `electoral_verification` (Fase 12); [resultados eleitorais](electoral-results.md). `electoral_references` é um protótipo sem integração na CLI e sem testes para conjuntos de referência oficiais |
 | Fundação analítica | `analysis`, `analysis_partitions`, `analysis_ledgers`, `analysis_reports`; [análise](analysis.md) |
 | Tabela por seção | `section_table` (`section-features-v2`, Fase 22); [tabela por seção](section-table.md), [registro de observações](observations.md) |

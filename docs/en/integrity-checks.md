@@ -1,6 +1,6 @@
 # Tier 1 integrity checks (Phase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 4 · Language: en
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 5 · Language: en
 
 [Português](../pt-BR/integrity-checks.md) · [Implementation index](implementation-index.md)
 
@@ -134,8 +134,9 @@ session of the round; R2 the last one has a closing reading; R3 no backward cloc
 step inside official sessions; R4 no completion outside a cycle; R5 every official
 session starts on the election date; R6 official sessions do not overlap.
 
-**I8, printed BUs.** Not run: no independent collection of printed BU copies has been
-acquired.
+**I8, printed BUs** (`printed-bu-v1`): BU copies read from the QR codes of the paper
+printed at the polling station, collected by third parties, against the published BU
+of the same section. See [Phase 20b: I8 printed BUs](#phase-20b-i8-printed-bus).
 
 **I9, population and identity.** File presence per section, file names against BU and
 RDV contents, pleito and phase, BWEB identity, unexpected archive members, and each
@@ -347,6 +348,71 @@ different urn and 2 no round-1 log, as before.
 Six workers; the peak is the planning process, which holds the block pairs in
 DuckDB and Python. The release is 36 MB, the per-chunk shards 198 MB.
 
+## Phase 20b: I8 printed BUs
+
+`integrity-check printed` (`printed-bu-v1`, module `printed_bu`) follows TSE's 2026
+manual for the BU QR codes (format VRQR 6.0). Each `QRBU` code holds a slice of the
+BU content and `HASH`, the SHA-512 of everything before it; the last code adds
+`ASSI`, the urn's signature over the SHA-512 of the final hash (Ed521 on
+UE2020/UE2022, ECDSA P-521 on UE2013/UE2015), and two `QRCE` codes carry the urn
+certificate. For every collected copy the pass recomputes the hash chain, verifies
+the signature and the certificate's TSE issuing authority (as in Phase 20b above),
+then compares every printed field with the binary BU published for that section:
+header (urn number, load code and history, software version, polling place, voters,
+attendance, enablement counts, opening and closing times) and, per election and
+office, every candidate, party, blank and null count and the eligible voters. It also
+compares the QR certificate with the hardware certificate of the section's signature
+file and checks the printed totals against the counts they sum. Printed fields that
+have no BU field (`AGRE`, `ORLC`, `PROC`, `DTPL`, `VERC`) are not compared; any
+unparsed token is recorded.
+
+Inputs, frozen on 7 November 2026 in `~/data/election-audit-stage/inputs/`:
+
+- `i8-cmind-20261107`: the 120 BUs of CMInd's Totalização Paralela, from its public
+  API (`/api/public-bu`, the endpoint its site calls without login), with the raw QR
+  text, fetched one at a time with a 3-second pause, with `SHA256SUMS`.
+- `i8-arvor-20261107`: Arvor's Totalização paralela as published in
+  `ArvorCo/PNAD` at commit `570e7a2`, checked against its own manifest: 408 runoff
+  BUs with the reassembled content, final hash, signature and certificate. The
+  per-code slices are not published; the pass recovers them by finding the cut points
+  whose chain gives the final hash (every copy fitted one code).
+- `i8-tse-qrbu-20261107`: TSE's QR manual (SHA-256 `ffded730…`) and example BUs
+  (`8b1e28fd…`). TSE refuses scripted requests, so the hashes were computed in a
+  browser on TSE's site and the bytes taken from Arvor's copies, which match.
+
+Arvor declares a political side; CMInd presents itself as citizen oversight. Neither
+selection is random, and both depend on who chose to scan.
+
+```sh
+just integrity-check printed \
+  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot \
+  --cmind ~/data/election-audit-stage/inputs/i8-cmind-20261107 \
+  --arvor ~/data/election-audit-stage/inputs/i8-arvor-20261107 \
+  --output ~/data/election-audit-stage/phase20b-i8/v1-20261107
+```
+
+| Collection | Round | Copies | Equal |
+| --- | --- | --- | --- |
+| CMInd | 1 | 49 | 49 |
+| CMInd | 2 | 71 | 71 |
+| Arvor | 2 | 408 | 408 |
+
+All 528 copies have an intact chain, a verified urn signature (Ed521 on 382, ECDSA
+P-521 on 146) and a certificate signed by its TSE authority, not revoked; each
+certificate equals the one in the section's published signature file. Every printed
+field equals the published BU (739 contests), and no printed total disagrees with its
+counts. The copies cover 518 sections: 49 in round 1 (4 UFs, 7 municipalities) and
+469 in the runoff (21 UFs and abroad, 78 municipalities); 10 sections have a copy in
+both collections, with the same final hash. None of the remaining I5 sections has a
+copy.
+
+| Run | Copies | Wall time | Peak memory |
+| --- | --- | --- | --- |
+| I8 v1 | 528 | 0:22 | 0.56 GB |
+
+One process; reading the bulk archives' central directories dominates (one archive
+open at a time). The release (`printed.parquet` and its manifest) is 140 kB.
+
 ## Limits
 
 - Certificate chains are verified only up to the intermediate CAs; the root and
@@ -354,7 +420,8 @@ DuckDB and Python. The release is 36 MB, the per-chunk shards 198 MB.
 - I6 covers only the non-protected logs; the 596 protected/stress logs are read
   after the Phase 23 freeze. One round-1 block present only in the runoff log is
   unexplained.
-- I8 has no source.
+- I8 covers 518 sections chosen by whoever scanned them, not a sample; it says
+  nothing about other sections.
 - The ten municipal elections held with the runoff are not in the national BWEB, so
   I2 does not cover them.
 - I5 has open differences (85/36 sections); one round-1 difference is the broken

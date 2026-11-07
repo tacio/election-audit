@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 32 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 33 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -128,10 +128,18 @@ written before logging to MI and ME are missing from some copies
 ([O14](observations.md#operations)); one, rj/60011/0008/0061, is a real disagreement
 among three copies of an urn's election day, and the published round-1 log is the
 one that matches the BU ([O15](observations.md#operations)).
-Remaining: the I2 municipal source, I8, the JWS, zerésima, GEDAI and hash-list
-checks, an Ed521 cross-check with DataUrnas-BR and the I3/I5 reconciliation. See the
-[integrity checks guide](integrity-checks.md#phase-20b-signatures-and-certificates)
-and its [I6 prefix section](integrity-checks.md#phase-20b-i6-prefix-re-read).
+I8 (`integrity-check printed`, 7 November,
+`~/data/election-audit-stage/phase20b-i8/v1-20261107/`) checked the 528 printed BU
+copies read from QR codes by CMInd's Totalização Paralela and Arvor's Totalização
+paralela (518 sections, 49 in round 1, 469 in the runoff): every hash chain is intact,
+every urn signature and certificate verifies, each certificate equals the one in the
+section's signature file, and every printed field equals the published BU. The
+collections are not samples. The I2 municipal gap is recorded in protocol revision 5.
+Remaining: the JWS, zerésima, GEDAI and hash-list checks, an Ed521 cross-check with
+DataUrnas-BR and the I3/I5 reconciliation. See the
+[integrity checks guide](integrity-checks.md#phase-20b-signatures-and-certificates),
+its [I6 prefix section](integrity-checks.md#phase-20b-i6-prefix-re-read) and its
+[I8 section](integrity-checks.md#phase-20b-i8-printed-bus).
 
 **Phase 22 (section table v2): complete for 2026 and 2022.** Semantic pass
 `session-aggregates-v3` adds device model, software and clock evidence per session.
@@ -209,18 +217,18 @@ No national electoral result, national margin, fitted national model or fraud
 label exists.
 
 **Checks.** The full offline gate `just check` passes (lock, format, lint,
-contracts, docs, documented commands and all 397 tests).
+contracts, docs, documented commands and all 403 tests).
 
 ## Next step
 
-Finish Phase 20b, which gates the Phase 23 freeze: the missing I2 and I8 sources,
-the checks added from DataUrnas-BR and the I3/I5 reconciliation (Ed521, the
-certificate checks, the national I1 rerun, the I6 prefix re-read and the Phase 22
+Finish Phase 20b, which gates the Phase 23 freeze: the checks added from
+DataUrnas-BR and the I3/I5 reconciliation (Ed521, the certificate checks, the
+national I1 rerun, the I6 prefix re-read, I8, the I2 gap record and the Phase 22
 items are done). Its gaps that cannot be closed are written into
 the protocol. TSE's reply to the root-certificate request (protocol
 83529705172533) is due by 25 November 2026. File the TCU consolidated integrity test
 report when it is published (due within 30 days of the second round). The
-[study protocol](../../research/analysis-plan.md) (Revision 5) defines the claims,
+[study protocol](../../research/analysis-plan.md) (Revision 6) defines the claims,
 the threat-to-observable map, the integrity checks I1–I9, the confirmatory tests
 C1–C6, the power study and the data policy; the
 [completion plan](../../research/completion-plan.md) (Revision 14) defines
@@ -296,7 +304,7 @@ checks (177 tests).
 | 20 | Complete: I1–I9 for 2026, both rounds, all sections; ECDSA verified, BWEB, EA20 and correspondences agree | Ed521 signatures, certificate chains, I6 prefix re-read, I5/I6 open differences, I8, 2022 | [20](handoffs/task-20.md) |
 | 21 | Complete: 2026 both rounds (v1, reproduced by v2 on AC) and 2022 both rounds (v2); ledgers reconcile every section; SA logs attributed | Grouping multi-run sessions and clock rules move to Phase 22 | [21](handoffs/task-21.md) |
 | 22 | Complete: semantic pass v3 nationally (2026 and 2022, equal to earlier releases on shared columns); section tables for both years with crosswalk, clock rules and ledger | Results and operational values unread until the freeze; model differences and Amazonas close rules move to Phase 20b | [22](handoffs/task-22.md) |
-| 20b | In progress: Ed521 verified nationally (`ed521rs`, equal to the pure-Python verifier), official TSE specifications, urn certificates checked against the published CAs and revocation lists, section tables v3 with the Amazonas list, I6 prefix re-read (every open block a verified prefix; 112 of 113 differing pairs explained, O14/O15); I2 municipal source, I8 and the added checks remain; gates the Phase 23 freeze | Roots requested from TSE | — |
+| 20b | In progress: Ed521 verified nationally (`ed521rs`, equal to the pure-Python verifier), official TSE specifications, urn certificates checked against the published CAs and revocation lists, section tables v3 with the Amazonas list, I6 prefix re-read (every open block a verified prefix; 112 of 113 differing pairs explained, O14/O15), I8 (528 printed copies, all equal), I2 municipal gap recorded; the added checks and the I3/I5 reconciliation remain; gates the Phase 23 freeze | Roots requested from TSE | — |
 | 23–26 | Not started; defined in the [completion plan](../../research/completion-plan.md#revised-phases) | All | — |
 
 ## Where results are
@@ -315,6 +323,7 @@ paths are on the reference machine's output volume
 | Phase 19 bulk BU/RDV/log archives, 2026 and 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` on the output volume |
 | Phase 20 integrity-check releases (sections, BWEB, hierarchy, correspondences, logs), AC/ZZ development runs | `~/data/election-audit-stage/phase20/` |
 | Phase 20b I6 prefix re-read (national release, AC development run) | `~/data/election-audit-stage/phase20b-i6/` |
+| Phase 20b I8 printed BUs; its frozen inputs (CMInd, Arvor, TSE QR manual) | `~/data/election-audit-stage/phase20b-i8/`; `~/data/election-audit-stage/inputs/i8-cmind-20261107/`, `i8-arvor-20261107/`, `i8-tse-qrbu-20261107/` |
 | Phase 21 equivalence reports, AC development pass, AC v2 reproduction, national passes (2026 and 2022) | `~/data/election-audit-stage/phase21/` |
 | Phase 22 v3 semantic passes, section tables (2026, 2022), AC development runs, Phase 20 root selections | `~/data/election-audit-stage/phase22/` |
 | TSE 2026 format package (specifications, reference verifier, CA certificates) and the five revocation lists, frozen | `~/data/election-audit-stage/inputs/tse-format-docs-20261105/`, `~/data/election-audit-stage/inputs/tse-crls-20261105-complete/` |
@@ -346,7 +355,7 @@ paths are on the reference machine's output volume
 | Operational reconstruction | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Phase 13), `semantic_pass` (`session-aggregates-v3`, Phases 21–22; rules `real-log-rules.json` and `real-log-rules-2022.json`), `sa_logs` (`sa-log-summary-v1`); [reconstruction](reconstruction.md), [semantic pass](semantic-pass.md) |
 | Operational releases | `publication`, `operational_marts`, `release_tools`; [publication](publication.md) |
 | National structural processing | Summary path: `national_parallel`, `national_summary`, `national_summary_release`, `national_summary_tools`, `national_summary_tuning`, `national_resources`; [feature-oriented processing](feature-oriented-processing.md). Event-level path: `national_benchmark`, `national_tuning`, `national_workload`, `national`, `national_storage`, `national_relocation`, `national_migration`, `national_overnight`; [national processing](national-processing.md) |
-| Integrity checks | `integrity_checks` (`integrity-sections-v1`, `integrity-logs-v1`; signature layout `resources/assinatura-2026-observed.asn1`), `round1_prefix` (`integrity-round1-prefix-v1`, `integrity-check prefix`); [integrity checks](integrity-checks.md) |
+| Integrity checks | `integrity_checks` (`integrity-sections-v1`, `integrity-logs-v1`; signature layout `resources/assinatura-2026-observed.asn1`), `round1_prefix` (`integrity-round1-prefix-v1`, `integrity-check prefix`), `printed_bu` (`printed-bu-v1`, `integrity-check printed`); [integrity checks](integrity-checks.md) |
 | Electoral imports and verification | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` and `electoral_verification` (Phase 12); [electoral results](electoral-results.md). `electoral_references` is an unwired, untested prototype for official reference sets |
 | Analysis foundation | `analysis`, `analysis_partitions`, `analysis_ledgers`, `analysis_reports`; [analysis](analysis.md) |
 | Section table | `section_table` (`section-features-v2`, Phase 22); [section table](section-table.md), [observation register](observations.md) |

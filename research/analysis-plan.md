@@ -1,6 +1,6 @@
 # Statistical audit of the 2026 presidential election: study protocol
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 5 · Language: en
+Document-ID: EA-ANALYSIS-PLAN · Revision: 6 · Language: en
 
 [Português](analysis-plan.pt-BR.md) · [Completion plan](completion-plan.md) · [Related work](related-work.md)
 
@@ -113,7 +113,7 @@ benign alternative and a control (section 7.6).
 | Voter profile by section (age, sex, schooling) and polling places | Covariates, location keys | To acquire |
 | 2022 presidential BWEB, BUs and logs, both rounds, with voter profile | Negative control (section 7.6) | To acquire |
 | TSE election-day integrity test reports, both rounds | External evidence about in-urn software | To collect |
-| Independent printed BU copies (QR codes) | I8 | To collect; selection is not random |
+| Independent printed BU copies (QR codes) | I8 | Collected in Phase 20b (CMInd and Arvor, 518 sections); selection is not random |
 
 Rules that apply to every table:
 

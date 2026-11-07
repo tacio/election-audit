@@ -1,6 +1,6 @@
 # Verificações de integridade de nível 1 (Fase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 4 · Language: pt-BR
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 5 · Language: pt-BR
 
 [English](../en/integrity-checks.md) · [Índice de implementação](implementation-index.md)
 
@@ -142,8 +142,9 @@ oficial do turno; R2 a última tem leitura de encerramento; R3 nenhum recuo do r
 dentro das sessões oficiais; R4 nenhuma conclusão fora de um ciclo; R5 toda sessão
 oficial começa na data da eleição; R6 as sessões oficiais não se sobrepõem.
 
-**I8, BUs impressos.** Não executado: nenhuma coleção independente de cópias
-impressas de BU foi obtida.
+**I8, BUs impressos** (`printed-bu-v1`): cópias do BU lidas dos QR codes do papel
+impresso na seção, reunidas por terceiros, contra o BU publicado da mesma seção. Ver
+[Fase 20b: BUs impressos do I8](#fase-20b-bus-impressos-do-i8).
 
 **I9, população e identidade.** Presença de arquivos por seção, nomes de arquivo
 contra o conteúdo do BU e do RDV, pleito e fase, identidade do BWEB, membros
@@ -364,6 +365,71 @@ segundo turno, 162 têm outra urna e 2 não têm log do 1º turno, como antes.
 Seis processos; o pico é o processo de planejamento, que mantém os pares de blocos no
 DuckDB e no Python. A versão tem 36 MB e os fragmentos por lote 198 MB.
 
+## Fase 20b: BUs impressos do I8
+
+`integrity-check printed` (`printed-bu-v1`, módulo `printed_bu`) segue o manual de
+2026 do TSE sobre os QR codes do BU (formato VRQR 6.0). Cada código `QRBU` traz uma
+fatia do conteúdo do BU e `HASH`, o SHA-512 de tudo o que vem antes; o último código
+acrescenta `ASSI`, a assinatura da urna sobre o SHA-512 do hash final (Ed521 nas
+UE2020/UE2022, ECDSA P-521 nas UE2013/UE2015), e dois códigos `QRCE` trazem o
+certificado da urna. Para cada cópia reunida, a passada recalcula a cadeia de hashes,
+verifica a assinatura e a autoridade emissora do TSE do certificado (como na Fase 20b
+acima) e compara cada campo impresso com o BU binário publicado para a seção:
+cabeçalho (número da urna, código e histórico de carga, versão do software, local de
+votação, eleitores, comparecimento, contagens de habilitação, horários de abertura e
+encerramento) e, por eleição e cargo, cada contagem de candidato, partido, brancos e
+nulos e os eleitores aptos. Também compara o certificado do QR com o certificado de
+hardware do arquivo de assinatura da seção e confere os totais impressos contra as
+contagens que somam. Campos impressos sem campo no BU (`AGRE`, `ORLC`, `PROC`, `DTPL`,
+`VERC`) não são comparados; qualquer item não reconhecido é registrado.
+
+Entradas, congeladas em 7 de novembro de 2026 em `~/data/election-audit-stage/inputs/`:
+
+- `i8-cmind-20261107`: os 120 BUs da Totalização Paralela do CMInd, da sua API
+  pública (`/api/public-bu`, o endpoint que o site chama sem login), com o texto bruto
+  dos QR codes, baixados um a um com pausa de 3 segundos, com `SHA256SUMS`.
+- `i8-arvor-20261107`: a Totalização paralela da Arvor como publicada em
+  `ArvorCo/PNAD` no commit `570e7a2`, conferida contra o próprio manifesto: 408 BUs do
+  segundo turno com o conteúdo remontado, hash final, assinatura e certificado. As
+  fatias por código não são publicadas; a passada as recupera achando os pontos de
+  corte cuja cadeia dá o hash final (toda cópia coube em um código).
+- `i8-tse-qrbu-20261107`: o manual de QR do TSE (SHA-256 `ffded730…`) e os BUs de
+  exemplo (`8b1e28fd…`). O TSE recusa requisições automatizadas, então os hashes foram
+  calculados num navegador no site do TSE e os bytes tirados das cópias da Arvor, que
+  coincidem.
+
+A Arvor declara um lado político; o CMInd se apresenta como fiscalização cidadã.
+Nenhuma das seleções é aleatória, e ambas dependem de quem decidiu escanear.
+
+```sh
+just integrity-check printed \
+  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot \
+  --cmind ~/data/election-audit-stage/inputs/i8-cmind-20261107 \
+  --arvor ~/data/election-audit-stage/inputs/i8-arvor-20261107 \
+  --output ~/data/election-audit-stage/phase20b-i8/v1-20261107
+```
+
+| Coleção | Turno | Cópias | Iguais |
+| --- | --- | --- | --- |
+| CMInd | 1 | 49 | 49 |
+| CMInd | 2 | 71 | 71 |
+| Arvor | 2 | 408 | 408 |
+
+As 528 cópias têm cadeia íntegra, assinatura da urna verificada (Ed521 em 382, ECDSA
+P-521 em 146) e certificado assinado pela autoridade do TSE, não revogado; cada
+certificado é igual ao do arquivo de assinatura publicado da seção. Todo campo
+impresso é igual ao BU publicado (739 disputas), e nenhum total impresso discorda das
+suas contagens. As cópias cobrem 518 seções: 49 no 1º turno (4 UFs, 7 municípios) e
+469 no segundo turno (21 UFs e exterior, 78 municípios); 10 seções têm cópia nas duas
+coleções, com o mesmo hash final. Nenhuma das seções restantes do I5 tem cópia.
+
+| Execução | Cópias | Tempo de relógio | Memória de pico |
+| --- | --- | --- | --- |
+| I8 v1 | 528 | 0:22 | 0,56 GB |
+
+Um processo; a leitura dos diretórios centrais dos arquivos em lote domina (um
+arquivo aberto por vez). O release (`printed.parquet` e seu manifesto) tem 140 kB.
+
 ## Limites
 
 - As cadeias de certificados são verificadas só até as ACs intermediárias; os
@@ -371,7 +437,8 @@ DuckDB e no Python. A versão tem 36 MB e os fragmentos por lote 198 MB.
 - O I6 cobre só os logs não protegidos; os 596 logs protegidos/de estresse são lidos
   depois do congelamento da Fase 23. Um bloco do 1º turno presente só no log do
   segundo turno não tem explicação.
-- O I8 não tem fonte.
+- O I8 cobre 518 seções escolhidas por quem as escaneou, não uma amostra; não diz
+  nada sobre outras seções.
 - As dez eleições municipais realizadas com o segundo turno não estão no BWEB nacional,
   então o I2 não as cobre.
 - O I5 tem diferenças em aberto (85/36 seções); uma diferença do 1º turno é o fluxo
