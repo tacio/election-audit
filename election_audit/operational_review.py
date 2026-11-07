@@ -94,6 +94,40 @@ class Rows:
         self.writer.close()
 
 
+# Session rules shared by the event-level adapter and the streaming semantic pass.
+# sessions-v2 (Phase 20b, 7 November 2026):
+# - a GAP restart line that names the round already in effect ("Iniciando aplicação -
+#   1º turno" in 2026) keeps that round's context: after a mid-day restart the urn does
+#   not repeat the official-round marker, so a reset there dropped every later vote;
+# - a session of the round's context that started before election day (an urn switched
+#   on the day before and left running) becomes official at its first voting event on
+#   election day, and is flagged ``started_before_election_day``.
+SESSION_RULES = "sessions-v2"
+PROMOTING_KINDS = frozenset(
+    {
+        "manual_request",
+        "method_biometric",
+        "authorization",
+        "completion",
+        "suspension_full",
+        "suspension_partial",
+        "resumption",
+        "authorization_failed",
+        "session_closing",
+    }
+)
+
+
+def keeps_round(application, message, phase, rules=RULES):
+    """True when a GAP restart line names the round whose context is in effect."""
+    if application != "GAP" or phase is None:
+        return False
+    markers = _MARKERS.get(rules["version"])
+    if markers is None:
+        markers = _MARKERS[rules["version"]] = _markers(rules)
+    return markers[1].get(message) == phase
+
+
 def classify(application, message, rules=RULES):
     """Full matches only; variable fields are never retained in returned semantics."""
     markers = _MARKERS.get(rules["version"])
@@ -354,6 +388,7 @@ def review_object(
             nonlocal session, software
             finish_cycle("unresolved")
             if session:
+                session.pop("_early", None)
                 session["end_reason"] = reason
                 session["count_readiness"] = (
                     "observed_official_cycles_not_attendance_reconciled"
@@ -395,14 +430,16 @@ def review_object(
             kind, value = classify(app, message, rules)
             reading = datetime.strptime(timestamp, "%d/%m/%Y %H:%M:%S")
             normalized = _clock(clock, reading, row["event_id"])
-            if kind in ("official_round", "context_reset"):
+            if kind == "official_round" or (
+                kind == "context_reset" and not keeps_round(app, message, phase, rules)
+            ):
                 finish_session("context_transition")
                 phase, phase_anchor = value, row["event_id"] if kind == "official_round" else None
+            on_day = reading.date().isoformat() == e.election_date
             if kind == "session_start":
                 finish_session("application_restart")
-                official = (
-                    phase == value == round_number and reading.date().isoformat() == e.election_date
-                )
+                in_round = phase == value == round_number
+                official = in_round and on_day
                 session = {
                     "session_id": digest([key, row["event_id"]]),
                     "round": round_number,
@@ -414,7 +451,19 @@ def review_object(
                     "software_supported": False,
                     "witnesses": list(witnesses),
                     "clock_readiness": "reviewed_rule" if normalized else "unavailable",
+                    "started_before_election_day": False,
+                    "_early": in_round and reading.date().isoformat() < e.election_date,
                 }
+            if (
+                session
+                and session["_early"]
+                and session["session_kind"] == "unresolved"
+                and on_day
+                and app == "VOTA"
+                and kind in PROMOTING_KINDS
+            ):
+                session["session_kind"] = "official_vota"
+                session["started_before_election_day"] = True
             if kind == "supported_software" and session:
                 software, session["software_supported"] = True, True
             active = (

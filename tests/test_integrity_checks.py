@@ -680,6 +680,42 @@ class SectionPassTests(unittest.TestCase):
         )
 
 
+class RdvBlockTests(unittest.TestCase):
+    def test_repeated_contest_blocks_are_summed(self):
+        from election_audit.integrity_checks import rdv_contests
+
+        def block(votes, choices=1):
+            return {
+                "idCargo": ("cargoConstitucional", "presidente"),
+                "quantidadeEscolhas": choices,
+                "votos": [{"tipoVoto": t, "digitacao": d} for t, d in votes],
+            }
+
+        rdv = {
+            "eleicoes": (
+                "eleicaoVota",
+                [
+                    {
+                        "idEleicao": 6257,
+                        "votosCargos": [
+                            block([("nominal", "13"), ("branco", None)]),
+                            block([("nominal", "13"), ("nominal", "22"), ("nulo", None)]),
+                        ],
+                    }
+                ],
+            )
+        }
+        contests, _ = rdv_contests(rdv)
+        (contest,) = contests.values()
+        self.assertEqual(contest["ballots"], 5)
+        self.assertEqual(
+            dict(contest["entries"]), {("N", 13): 2, ("N", 22): 1, ("B", 0): 1, ("X", 0): 1}
+        )
+        rdv["eleicoes"][1][0]["votosCargos"][1]["quantidadeEscolhas"] = 2
+        with self.assertRaisesRegex(ValueError, "choices"):
+            rdv_contests(rdv)
+
+
 class LogRuleTests(unittest.TestCase):
     def session(self, **values):
         base = {

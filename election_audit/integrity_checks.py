@@ -44,7 +44,7 @@ from election_audit.elections import election_for_round
 from election_audit.national_migration import atomic, sha
 from election_audit.semantic_pass import verified_bulk_archives
 
-VERSION = "integrity-sections-v3"
+VERSION = "integrity-sections-v4"  # v4: RDV contest blocks are summed
 SHARD_SECTIONS = 250
 MAX_SMALL = 8 * 1024**2  # BU, RDV and signature files are far smaller
 # TSE's official 2026 specifications (resources/tse-format-2026-official.json).
@@ -505,11 +505,16 @@ def rdv_contests(rdv):
                 # candidate number); the party is its first two digits.
                 number = int(typed) if cls == "N" else int(typed[:2]) if cls == "L" else 0
                 entries[(cls, number)] += 1
-            contests[(election["idEleicao"], _cargo(cargo["idCargo"]))] = {
-                "entries": entries,
-                "ballots": len(cargo["votos"]),
-                "choices": cargo["quantidadeEscolhas"],
-            }
+            key = (election["idEleicao"], _cargo(cargo["idCargo"]))
+            # An RDV can hold several blocks for one contest, one per urn or medium
+            # (seen in contingency counting); the section's record is their sum.
+            found = contests.setdefault(
+                key, {"entries": Counter(), "ballots": 0, "choices": cargo["quantidadeEscolhas"]}
+            )
+            if found["choices"] != cargo["quantidadeEscolhas"]:
+                raise ValueError(f"RDV blocks of contest {key} differ in choices per ballot")
+            found["entries"] += entries
+            found["ballots"] += len(cargo["votos"])
     return contests, kind
 
 

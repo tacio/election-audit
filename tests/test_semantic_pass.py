@@ -75,6 +75,43 @@ CYCLES = [
 ]
 
 
+def timed_body(records, device="12345678"):
+    """Log lines from (date, seconds after 08:00, application, message) records."""
+    return "".join(
+        f"{date} {8 + t // 3600:02d}:{t // 60 % 60:02d}:{t % 60:02d}"
+        f"\tINFO\t{device}\t{app}\t{message}\t{TOKEN}\n"
+        for date, t, app, message in records
+    ).encode("latin-1")
+
+
+OFFICIAL_2 = "Iniciando aplicação - ELEIÇÃO OFICIAL SEGUNDO TURNO - 2º turno"
+SOFTWARE = "Versão da aplicação: 10.23.0.0 - Praia da Barra do Cahy"
+# An urn switched on the day before and left running into election day.
+DAY_BEFORE = timed_body(
+    [
+        ("24/10/2026", 3600, "GAP", "Iniciando aplicação - 2º turno"),
+        ("24/10/2026", 3601, "GAP", OFFICIAL_2),
+        ("24/10/2026", 3602, "VOTA", "Iniciando aplicação - 2º turno"),
+        ("24/10/2026", 3603, "VOTA", SOFTWARE),
+        ("24/10/2026", 3604, "VOTA", "Urna ligada conectada na rede CA"),
+        *[("25/10/2026", 10 + i, "VOTA", m) for i, m in enumerate(CYCLES)],
+    ]
+)
+# A mid-day restart: the GAP restart line is not followed by the official marker.
+RESTART = timed_body(
+    [
+        ("25/10/2026", 0, "GAP", OFFICIAL_2),
+        ("25/10/2026", 1, "VOTA", "Iniciando aplicação - 2º turno"),
+        ("25/10/2026", 2, "VOTA", SOFTWARE),
+        *[("25/10/2026", 10 + i, "VOTA", m) for i, m in enumerate(CYCLES[:4])],
+        ("25/10/2026", 3600, "GAP", "Iniciando aplicação - 2º turno"),
+        ("25/10/2026", 3601, "VOTA", "Iniciando aplicação - 2º turno"),
+        ("25/10/2026", 3602, "VOTA", SOFTWARE),
+        *[("25/10/2026", 3610 + i, "VOTA", m) for i, m in enumerate(CYCLES[4:])],
+    ]
+)
+
+
 class SessionMachineTests(unittest.TestCase):
     def test_matches_the_event_level_adapter_on_edge_cases(self):
         cases = {
@@ -83,6 +120,8 @@ class SessionMachineTests(unittest.TestCase):
             "wrong_day": jez(log_body(CYCLES, date="24/10/2026")),
             "wrong_round": jez(log_body(CYCLES, round_number=1)),
             "two_devices": jez(log_body(CYCLES[:6]) + log_body(CYCLES, device="87654321")),
+            "day_before": jez(DAY_BEFORE),
+            "midday_restart": jez(RESTART),
         }
         with tempfile.TemporaryDirectory() as d:
             for name, body in cases.items():
@@ -126,6 +165,26 @@ class SessionMachineTests(unittest.TestCase):
         templates = {t for _, t in summary.vocabulary}
         self.assertIn("Mesário # habilitou o eleitor", templates)
         self.assertFalse(any(VOTER in t or TOKEN in t for t in templates))
+
+    def test_sessions_started_the_day_before_and_restarts_keep_their_votes(self):
+        with tempfile.TemporaryDirectory() as d:
+            original = Path(d) / "x.jez"
+            original.write_bytes(jez(DAY_BEFORE))
+            early = sp.summarize_object(original, "x", 2)
+            original.write_bytes(jez(RESTART))
+            restart = sp.summarize_object(original, "x", 2)
+        (session,) = early.sessions
+        self.assertEqual(session["session_kind"], "official_vota")
+        self.assertTrue(session["started_before_election_day"])
+        self.assertEqual(session["start_reading"], "2026-10-24T09:00:02")
+        completed = sum(session[f"cycles_completed_{m}"] for m in sp.METHODS)
+        self.assertEqual(completed, 3)
+        sessions = restart.sessions
+        self.assertEqual([s["session_kind"] for s in sessions], ["official_vota"] * 2)
+        self.assertFalse(any(s["started_before_election_day"] for s in sessions))
+        self.assertEqual(sum(s[f"cycles_completed_{m}"] for s in sessions for m in sp.METHODS), 3)
+        # The restart line stays in the official block.
+        self.assertEqual([g["context"] for g in restart.segments], ["initial", "official_round_2"])
 
     def test_readings_are_validated_exactly(self):
         self.assertIsNone(sp.reading_seconds("31/02/2026 10:00:00"))

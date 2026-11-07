@@ -46,9 +46,17 @@ import pyarrow.parquet as pq
 from election_audit import sevenzip
 from election_audit.elections import election_for_round
 from election_audit.national_migration import atomic, sha
-from election_audit.operational_review import classify, rules_for
+from election_audit.operational_review import (
+    PROMOTING_KINDS,
+    SESSION_RULES,
+    classify,
+    keeps_round,
+    rules_for,
+)
 
-VERSION = "session-aggregates-v3"  # v2: int64 seconds; v3: device and clock columns
+VERSION = (
+    "session-aggregates-v4"  # v2: int64 seconds; v3: device and clock columns; v4: sessions-v2
+)
 ADAPTER_VERSION = "real-operational-v1"
 SHARD_OBJECTS = 500
 VOCABULARY_LIMIT = 4000
@@ -115,6 +123,7 @@ SESSION_SCHEMA = pa.schema(
         ("clock_dst_before", pa.int32()),
         ("configured_close", pa.string()),
         ("segment_ordinal", pa.int32()),
+        ("started_before_election_day", pa.bool_()),
     ]
 )
 SEGMENT_SCHEMA = pa.schema(
@@ -350,6 +359,7 @@ class ObjectSummary:
         session = self.session
         if session is not None:
             session["end_reason"] = reason
+            session.pop("_early")
             completions = session.pop("_completions")
             gaps, backsteps = [], []
             for earlier, later in zip(completions, completions[1:]):
@@ -441,7 +451,10 @@ class ObjectSummary:
             self.vocabulary[template] += 1
         else:
             self.vocabulary_overflow += 1
-        if kind in ("official_round", "context_reset"):
+        if kind == "official_round" or (
+            kind == "context_reset"
+            and not keeps_round(application, message, self.phase, self.rules)
+        ):
             self._finish_session("context_transition")
             self.phase = value
             self._open_segment(
@@ -461,7 +474,8 @@ class ObjectSummary:
         on_day = self.election_seconds <= reading < self.election_seconds + 86400
         if kind == "session_start":
             self._finish_session("application_restart")
-            official = self.phase == value == self.round and on_day
+            in_round = self.phase == value == self.round
+            official = in_round and on_day
             self.session = {
                 "object_sha256": self.sha,
                 "session_ordinal": len(self.sessions),
@@ -498,6 +512,8 @@ class ObjectSummary:
                 "clock_dst_before": self.clock["dst"],
                 "configured_close": None,
                 "segment_ordinal": self.segment["segment_ordinal"],
+                "started_before_election_day": False,
+                "_early": in_round and reading < self.election_seconds,
                 "_completions": [],
             }
             self._last_reading = None
@@ -527,6 +543,16 @@ class ObjectSummary:
             and (found := CLOSE_FLOOR.fullmatch(message))
         ):
             session["configured_close"] = found[1]
+        if (
+            session is not None
+            and session["_early"]
+            and session["session_kind"] == "unresolved"
+            and on_day
+            and application == "VOTA"
+            and kind in PROMOTING_KINDS
+        ):
+            session["session_kind"] = "official_vota"
+            session["started_before_election_day"] = True
         if kind == "supported_software" and session is not None:
             self.software, session["software_supported"] = True, True
         active = (
@@ -850,6 +876,7 @@ def run_pass(
             "version": VERSION,
             "adapter_version": ADAPTER_VERSION,
             "rules_sha256": _rules_sha(year),
+            "session_rules": SESSION_RULES,
             "round": round_number,
             "staged_root": str(staged_root),
             "staging_certificate_sha256": sha(staged_root / "staging-certificate.json"),
@@ -868,6 +895,7 @@ def run_pass(
             "version": VERSION,
             "adapter_version": ADAPTER_VERSION,
             "rules_sha256": _rules_sha(year),
+            "session_rules": SESSION_RULES,
             "rules_version": rules_for(year)["version"],
             "year": year,
             "round": round_number,
