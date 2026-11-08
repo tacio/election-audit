@@ -28,12 +28,18 @@ import re
 import shutil
 import zipfile
 from collections import Counter
+from collections.abc import Iterable, Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
 from election_audit.national_migration import atomic, sha
+from election_audit.types import JSON, Row
+
+if TYPE_CHECKING:
+    from cryptography import x509
 
 VERSION = "printed-bu-v1"
 PLEITO_ROUND = {3220: 1, 3221: 2}
@@ -87,7 +93,7 @@ RECORD_SCHEMA = pa.schema(
 # --------------------------------------------------------------------------- QR text
 
 
-def chain(chunks):
+def chain(chunks: Iterable[str]) -> list[str]:
     """Cumulative hashes of content slices, as the urn computes them (manual 1.6.1)."""
     accumulated, hashes = "", []
     for data in chunks:
@@ -98,13 +104,13 @@ def chain(chunks):
     return hashes
 
 
-def split_search(content, final, max_parts=MAX_SPLIT):
+def split_search(content: str, final: str, max_parts: int = MAX_SPLIT) -> list[str] | None:
     """Content slices (cut at spaces) whose chain ends in ``final``, or None."""
     if chain([content])[-1] == final:
         return [content]
     spaces = [m.start() for m in re.finditer(" ", content)]
 
-    def search(start, parts_left, chunks):
+    def search(start: int, parts_left: int, chunks: list[str]) -> list[str] | None:
         if parts_left == 1:
             candidate = [*chunks, content[start:]]
             return candidate if chain(candidate)[-1] == final else None
@@ -123,7 +129,7 @@ def split_search(content, final, max_parts=MAX_SPLIT):
     return None
 
 
-def parse_codes(text):
+def parse_codes(text: str) -> JSON:
     """Printed codes of one BU from raw QR text: content slices, hashes, signature, cert."""
     text = " ".join(text.split())
     pieces = re.split(r"(?=\bQR(?:BU|CE):\d+:\d+\b)", text)
@@ -181,7 +187,7 @@ def parse_codes(text):
     }
 
 
-def load_certificate(raw):
+def load_certificate(raw: bytes) -> x509.Certificate | None:
     """Urn certificate from QRCE bytes: DER on UE2013/UE2015 (maybe padded), PEM otherwise."""
     from cryptography import x509
 
@@ -196,7 +202,9 @@ def load_certificate(raw):
         return None
 
 
-def verify_signature(certificate, final_hash, signature):
+def verify_signature(
+    certificate: x509.Certificate | None, final_hash: str, signature: str
+) -> tuple[str | None, str]:
     """(algorithm, verdict) for the urn's signature over SHA-512 of the final hash."""
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives import hashes
@@ -225,10 +233,15 @@ def verify_signature(certificate, final_hash, signature):
 # --------------------------------------------------------------------------- content
 
 
-def parse_content(content):
+def parse_content(content: str) -> JSON:
     """Printed content as header fields and per (election, office) contests."""
-    header, elections, unknown = {}, {}, []
-    election = contest = party = number = None
+    header: dict[str, Any] = {}
+    elections: dict[int, Any] = {}
+    unknown: list[str] = []
+    election: dict[str, Any] | None = None
+    contest: dict[str, Any] | None = None
+    party: dict[str, Any] | None = None
+    number: int | None = None
     for token in content.split(" "):
         if ":" not in token:
             unknown.append(token)
@@ -272,7 +285,7 @@ def parse_content(content):
     return {"header": header, "elections": elections, "unknown": unknown}
 
 
-def internal_inconsistencies(parsed):
+def internal_inconsistencies(parsed: JSON) -> list[JSON]:
     """Printed totals that disagree with the printed counts they summarize."""
     issues = []
     for idel, election in parsed["elections"].items():
@@ -294,7 +307,7 @@ def internal_inconsistencies(parsed):
     return issues
 
 
-def bu_header(bu, uf):
+def bu_header(bu: JSON, uf: str) -> dict[str, Any]:
     """Header fields of a decoded binary BU, in the printed representation."""
     section = bu["identificacaoSecao"]
     load = bu["urna"]["correspondenciaResultado"]["carga"]
@@ -337,12 +350,12 @@ def bu_header(bu, uf):
     return fields
 
 
-def _number(value):
+def _number(value: Any) -> Any:
     """Printed numbers drop leading zeros; codes such as IDCA keep them (compare as text)."""
     return str(int(value)) if isinstance(value, str) and value.isdigit() else value
 
 
-def compare(parsed, bu, uf):
+def compare(parsed: JSON, bu: JSON, uf: str) -> tuple[list[JSON], list[JSON]]:
     """Header and contest differences between printed content and the binary BU."""
     from election_audit.integrity_checks import bu_contests
 
@@ -402,7 +415,7 @@ def compare(parsed, bu, uf):
 # --------------------------------------------------------------------------- sources
 
 
-def read_cmind(root):
+def read_cmind(root: str | Path) -> tuple[list[Row], dict[str, str]]:
     """CMInd records (``raw/bu_*.json`` from the public API) and the files read."""
     root = Path(root)
     records, files = [], {}
@@ -422,7 +435,7 @@ def read_cmind(root):
     return records, files
 
 
-def read_arvor(root):
+def read_arvor(root: str | Path) -> tuple[list[Row], dict[str, str]]:
     """Arvor records (``totalizacao_dados/bus.csv``, checked against its manifest)."""
     root = Path(root) / "totalizacao_dados"
     manifest = json.loads((root / "manifest.json").read_text())
@@ -465,11 +478,11 @@ def read_arvor(root):
 class Published:
     """Binary BUs and signature files of the bulk archives, opened per (round, UF)."""
 
-    def __init__(self, bulk_root) -> None:
+    def __init__(self, bulk_root: str | Path) -> None:
         self.root = Path(bulk_root)
         self.archives, self.handles = {}, {}
 
-    def archive(self, round_number, uf):
+    def archive(self, round_number: int, uf: str) -> zipfile.ZipFile:
         from election_audit.semantic_pass import verified_bulk_archives
 
         key = (round_number, uf)
@@ -480,7 +493,9 @@ class Published:
             self.handles = {key: zipfile.ZipFile(self.root / found[0]["path"])}
         return self.handles[key]
 
-    def section(self, round_number, uf, municipality, zone, section):
+    def section(
+        self, round_number: int, uf: str, municipality: str, zone: str, section: str
+    ) -> tuple[bytes, bytes | None, str] | None:
         """(BU bytes, signature-file bytes, package) or None when not published."""
         pleito = 3220 if round_number == 1 else 3221
         prefix = f"o{pleito:05d}{uf}{municipality}{zone}{section}-"
@@ -497,14 +512,14 @@ class Published:
             handle.close()
         self.handles = {}
 
-    def bindings(self):
+    def bindings(self) -> JSON:
         return {
             f"{r}:{uf}": {"path": a["path"], "sha256": a["sha256"], "bytes": a["bytes"]}
             for (r, uf), a in sorted(self.archives.items())
         }
 
 
-def hardware_certificate(raw):
+def hardware_certificate(raw: bytes | None) -> str | None:
     """DER SHA-256 of the urn hardware certificate in a signature file, or None."""
     from cryptography.hazmat.primitives.serialization import Encoding
 
@@ -522,7 +537,7 @@ def hardware_certificate(raw):
 # --------------------------------------------------------------------------- pass
 
 
-def check_record(record, published):
+def check_record(record: Row, published: Published) -> Row:
     """One output row for a collected printed BU."""
     from cryptography.hazmat.primitives.serialization import Encoding
 
@@ -535,7 +550,7 @@ def check_record(record, published):
     detail = {"errors": list(record["errors"])}
     pleito = int(h["PLEI"]) if h.get("PLEI", "").isdigit() else None
     round_number = PLEITO_ROUND.get(pleito)
-    key = {
+    key: dict[str, Any] = {
         "uf": (h.get("UNFE") or "").lower() or None,
         "municipality": h.get("MUNI", "").zfill(5) or None,
         "zone": h.get("ZONA", "").zfill(4) or None,
@@ -593,7 +608,8 @@ def check_record(record, published):
     elif not all(key.values()):
         row["status"] = "unreadable"
     else:
-        found = published.section(round_number, key["uf"], *list(key.values())[1:])
+        uf, municipality, zone, section = (str(value) for value in key.values())  # all set
+        found = published.section(round_number, uf, municipality, zone, section)
         if found is None:
             row["published_bu"] = "absent"
             row["status"] = "no_published_bu" if authentic else "not_authentic"
@@ -603,7 +619,7 @@ def check_record(record, published):
             parser = bu_codec()
             envelope = parser.decode("EntidadeEnvelopeGenerico", raw)
             bu = parser.decode("EntidadeBoletimUrna", envelope["conteudo"])
-            header, contests = compare(parsed, bu, key["uf"])
+            header, contests = compare(parsed, bu, uf)
             bu_cert = hardware_certificate(vsc)
             row["certificate_matches_bu"] = None if bu_cert is None else bu_cert == cert_sha
             row["header_differences"], row["contest_differences"] = len(header), len(contests)
@@ -621,7 +637,13 @@ def check_record(record, published):
     return row
 
 
-def run_printed(bulk_root, output, *, cmind=None, arvor=None):
+def run_printed(
+    bulk_root: str | Path,
+    output: str | Path,
+    *,
+    cmind: str | Path | None = None,
+    arvor: str | Path | None = None,
+) -> JSON:
     """I8 over the given collections; writes ``release/printed.parquet`` and its manifest."""
     output = Path(output)
     if output.exists():
@@ -635,7 +657,7 @@ def run_printed(bulk_root, output, *, cmind=None, arvor=None):
             records += found
             inputs[name] = {"root": str(Path(root).resolve()), "files": files}
 
-    def archive_order(record):
+    def archive_order(record: Row) -> tuple[str, ...]:
         head = record["chunks"][0] if record["chunks"] else ""
         found = [re.search(rf"\b{k}:(\S+)", head) for k in ("PLEI", "UNFE")]
         return tuple(m[1] if m else "" for m in found)
@@ -664,7 +686,7 @@ def run_printed(bulk_root, output, *, cmind=None, arvor=None):
     return result
 
 
-def summarize(rows):
+def summarize(rows: Sequence[Row]) -> JSON:
     in_scope = [r for r in rows if r["status"] not in ("out_of_scope",)]
     sections = {}
     for r in in_scope:
