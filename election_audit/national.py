@@ -17,13 +17,21 @@ import sqlite3
 import tempfile
 import time
 from collections import Counter
+from collections.abc import Generator, Iterator
 from contextlib import closing, contextmanager
 from pathlib import Path
+from typing import IO, Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from election_audit.archive_parsing import PARSER_VERSION, ParseConfig, _Parser
+from election_audit.archive_parsing import (
+    PARSER_VERSION,
+    ParseConfig,
+    Segments,
+    _json_line,
+    _Parser,
+)
 from election_audit.elections import election_for_round
 from election_audit.source_inventory import (
     ALL_UFS,
@@ -33,6 +41,7 @@ from election_audit.source_inventory import (
     safe_source,
     utc_now,
 )
+from election_audit.types import JSON, Argv, Row
 
 VERSION = "national-structural-v1"
 DIAGNOSTIC_POLICY = "streamed-errors-event-addressable-info-v2"
@@ -40,7 +49,7 @@ DIAGNOSTIC_POLICY = "streamed-errors-event-addressable-info-v2"
 DEFAULT_STORE = None
 
 
-def _store(store):
+def _store(store: str | Path | None) -> Path:
     if store is None:
         raise ValueError("An explicit --store is required")
     return Path(store)
@@ -58,7 +67,7 @@ LIMITS = {
 }
 
 
-def read_config(path):
+def read_config(path: str | Path) -> JSON:
     doc = json.loads(Path(path).read_text())
     if set(doc) != {"version", "sources"} or doc["version"] != VERSION:
         raise ValueError("Expected national-structural-v1 sources configuration")
@@ -109,7 +118,7 @@ def read_config(path):
     return {"version": VERSION, "sources": sorted(normalized, key=lambda x: x["round"])}
 
 
-def source_connection(spec):
+def source_connection(spec: JSON) -> sqlite3.Connection:
     db = sqlite3.connect(Path(spec["manifest"]).as_uri() + "?mode=ro", uri=True)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA query_only=ON")
@@ -117,7 +126,7 @@ def source_connection(spec):
     return db
 
 
-def selected_rows(db, spec):
+def selected_rows(db: sqlite3.Connection, spec: JSON) -> Iterator[tuple[str, Row]]:
     """Use indexed lexical URL ranges; never fetch a national table into Python."""
     e = election_for_round(spec["round"])
     base = "https://resultados.tse.jus.br/oficial/ele2026/arquivo-urna/"
@@ -151,7 +160,9 @@ def selected_rows(db, spec):
                 raise ValueError("Selected section has no source mapping")
 
 
-def guard(store, scratch, extra=0, *, reserve_bytes=None) -> None:
+def guard(
+    store: str | Path, scratch: str | Path, extra: int = 0, *, reserve_bytes: int | None = None
+) -> None:
     if reserve_bytes is None:
         reserve_bytes = LIMITS["reserve_bytes"]
     existing = []
@@ -178,8 +189,12 @@ def guard(store, scratch, extra=0, *, reserve_bytes=None) -> None:
 
 
 def preflight(
-    config, store=DEFAULT_STORE, scratch=DEFAULT_SCRATCH, *, reserve_bytes=LIMITS["reserve_bytes"]
-):
+    config: JSON,
+    store: str | Path | None = DEFAULT_STORE,
+    scratch: str | Path = DEFAULT_SCRATCH,
+    *,
+    reserve_bytes: int = LIMITS["reserve_bytes"],
+) -> JSON:
     store = _store(store)
     result = {
         "version": VERSION,
@@ -218,7 +233,7 @@ def preflight(
     return result
 
 
-def _sync_dir(path) -> None:
+def _sync_dir(path: str | Path) -> None:
     fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
     try:
         os.fsync(fd)
@@ -227,7 +242,7 @@ def _sync_dir(path) -> None:
 
 
 @contextmanager
-def _lock(store, name):
+def _lock(store: str | Path, name: str) -> Generator[None]:
     directory = Path(store) / ".locks"
     directory.mkdir(parents=True, exist_ok=True)
     with (directory / name).open("a") as handle:
@@ -235,7 +250,7 @@ def _lock(store, name):
         yield
 
 
-def _validate_row(row) -> None:
+def _validate_row(row: Row) -> None:
     if (
         not isinstance(row.get("sha256"), str)
         or not re.fullmatch(r"[0-9a-f]{64}", row["sha256"])
@@ -245,14 +260,14 @@ def _validate_row(row) -> None:
         raise ValueError("Invalid file metadata")
 
 
-def _destinations(config, store, scratch) -> None:
+def _destinations(config: JSON, store: Path, scratch: Path) -> None:
     for source in config["sources"]:
         raw = Path(source["root"]).resolve()
         if any(p == raw or p.is_relative_to(raw) for p in (store, scratch)):
             raise ValueError("Derived paths must be outside raw roots")
 
 
-def _write_json(path, document) -> None:
+def _write_json(path: Path, document: Any) -> None:
     encoded = canonical(document) + b"\n"
     with Path(path).open("xb") as f:
         f.write(encoded)
@@ -265,14 +280,14 @@ def _write_json(path, document) -> None:
     _sync_dir(Path(path).parent)
 
 
-def _read_json(path):
+def _read_json(path: str | Path) -> Any:
     body = Path(path).read_bytes()
     if hashlib.sha256(body).hexdigest() != Path(str(path) + ".sha256").read_text().strip():
         raise ValueError("Artifact metadata checksum mismatch")
     return json.loads(body)
 
 
-def _verify_files(directory, document) -> None:
+def _verify_files(directory: Path, document: JSON) -> None:
     for name, expected in document["files"].items():
         if Path(name).is_absolute() or ".." in Path(name).parts:
             raise ValueError("Unsafe artifact path")
@@ -283,14 +298,26 @@ def _verify_files(directory, document) -> None:
             raise ValueError("Completed artifact is corrupt; refusing to reuse")
 
 
-def freeze_census(config, store, scratch, *, reserve_bytes=LIMITS["reserve_bytes"]):
+def freeze_census(
+    config: JSON,
+    store: str | Path,
+    scratch: str | Path,
+    *,
+    reserve_bytes: int = LIMITS["reserve_bytes"],
+) -> Path:
     store, scratch = Path(store).resolve(), Path(scratch).resolve()
     _destinations(config, store, scratch)
     with _lock(store, "census-" + digest(config)):
         return _freeze_census(config, store, scratch, reserve_bytes=reserve_bytes)
 
 
-def _freeze_census(config, store, scratch, *, reserve_bytes=LIMITS["reserve_bytes"]):
+def _freeze_census(
+    config: JSON,
+    store: str | Path,
+    scratch: str | Path,
+    *,
+    reserve_bytes: int = LIMITS["reserve_bytes"],
+) -> Path:
     """Atomic frozen SQLite metadata; original manifest connections always query-only."""
     store, scratch = Path(store).resolve(), Path(scratch).resolve()
     for source in config["sources"]:
@@ -432,13 +459,13 @@ def _freeze_census(config, store, scratch, *, reserve_bytes=LIMITS["reserve_byte
     return target
 
 
-def _frozen_object(row, store, scratch, reserve_bytes):
+def _frozen_object(row: Row, store: Path, scratch: Path, reserve_bytes: int) -> Path:
     _validate_row(row)
     with _lock(store, "original-" + row["sha256"]):
         return _copy_frozen_object(row, store, scratch, reserve_bytes)
 
 
-def _copy_frozen_object(row, store, scratch, reserve_bytes):
+def _copy_frozen_object(row: Row, store: Path, scratch: Path, reserve_bytes: int) -> Path:
     target = store / "objects" / row["sha256"][:2] / row["sha256"]
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists():
@@ -464,7 +491,7 @@ def _copy_frozen_object(row, store, scratch, reserve_bytes):
     return target
 
 
-def _compact_jsonl(source, output, batch_rows):
+def _compact_jsonl(source: Path, output: Path, batch_rows: int) -> int:
     schema = pa.schema([("payload", pa.string())])
     count, batch, batch_bytes = 0, [], 0
     with pq.ParquetWriter(output, schema, compression="zstd") as writer, source.open() as rows:
@@ -484,10 +511,10 @@ def _compact_jsonl(source, output, batch_rows):
 
 
 class _BudgetWriter:
-    def __init__(self, stream, budget) -> None:
+    def __init__(self, stream: IO[bytes], budget: list[int]) -> None:
         self.stream, self.budget = stream, budget
 
-    def write(self, body):
+    def write(self, body: bytes) -> int:
         if len(body) > self.budget[0]:
             raise OSError("Per-object scratch budget exceeded")
         self.budget[0] -= len(body)
@@ -497,38 +524,44 @@ class _BudgetWriter:
 class _StreamingParser(_Parser):
     """Exact diagnostic counts; unknown-message info is addressable in event rows."""
 
-    def __init__(self, *args) -> None:
+    def __init__(self, *args: Any) -> None:
         super().__init__(*args)
         self.diagnostics = Counter()
 
-    def issue(self, code, segments, *, line=None, severity="error", **details) -> None:
+    def issue(
+        self,
+        code: str,
+        segments: Segments,
+        *,
+        line: int | None = None,
+        severity: str = "error",
+        **details: Any,
+    ) -> None:
         self.counts["issues_seen"] += 1
         self.diagnostics[(code, severity)] += 1
         self.incomplete |= severity == "error"
         if code == "unsupported_message_class" and severity == "info":
             self.counts["issues_aggregated"] += 1
             return
-        self.issues.write(
-            canonical(
-                {
-                    "issue_code": code,
-                    "severity": severity,
-                    "record_locator": {
-                        "archive_segments": segments,
-                        "line_start": line,
-                        "line_end": line,
-                        "byte_start": None,
-                        "byte_end": None,
-                    },
-                    "details": details,
-                }
-            )
-            + b"\n"
+        _json_line(
+            self.issues,
+            {
+                "issue_code": code,
+                "severity": severity,
+                "record_locator": {
+                    "archive_segments": segments,
+                    "line_start": line,
+                    "line_end": line,
+                    "byte_start": None,
+                    "byte_end": None,
+                },
+                "details": details,
+            },
         )
         self.counts["issues_written"] += 1
 
 
-def _parse_bounded(frozen, work, sha):
+def _parse_bounded(frozen: Path, work: Path, sha: str) -> JSON:
     config = ParseConfig()
     json_budget = max(
         0, LIMITS["spill_bytes"] - config.max_total_bytes - config.max_directory_bytes
@@ -571,14 +604,14 @@ def _parse_bounded(frozen, work, sha):
 
 
 def resume(
-    config,
-    store=DEFAULT_STORE,
-    scratch=DEFAULT_SCRATCH,
+    config: JSON,
+    store: str | Path | None = DEFAULT_STORE,
+    scratch: str | Path = DEFAULT_SCRATCH,
     *,
-    max_objects=None,
-    reserve_bytes=LIMITS["reserve_bytes"],
-    output_budget_bytes=None,
-):
+    max_objects: int | None = None,
+    reserve_bytes: int = LIMITS["reserve_bytes"],
+    output_budget_bytes: int | None = None,
+) -> JSON:
     """Freeze metadata once, then process unique content with immutable checkpoints."""
     store = _store(store)
     if max_objects is not None and (type(max_objects) is not int or max_objects < 1):
@@ -624,8 +657,13 @@ def resume(
 
 
 def process_object(
-    row, store, scratch, *, reserve_bytes=LIMITS["reserve_bytes"], output_budget_bytes=None
-):
+    row: Row,
+    store: str | Path,
+    scratch: str | Path,
+    *,
+    reserve_bytes: int = LIMITS["reserve_bytes"],
+    output_budget_bytes: int | None = None,
+) -> Path:
     store, scratch = Path(store).resolve(), Path(scratch).resolve()
     _validate_row(row)
     _destinations({"sources": [{"root": row["source_root"]}]}, store, scratch)
@@ -640,7 +678,9 @@ def process_object(
         )
 
 
-def _process_object(row, store, scratch, *, reserve_bytes, output_budget_bytes):
+def _process_object(
+    row: Row, store: Path, scratch: Path, *, reserve_bytes: int, output_budget_bytes: int | None
+) -> Path:
     store, scratch = Path(store), Path(scratch)
     key = digest([row["sha256"], VERSION, ParseConfig().__dict__, DIAGNOSTIC_POLICY])
     target = store / "structural" / key[:2] / key
@@ -674,7 +714,7 @@ def _process_object(row, store, scratch, *, reserve_bytes, output_budget_bytes):
             counts[name] = _compact_jsonl(
                 parsed / (name + ".jsonl"), staging / (name + ".parquet"), LIMITS["batch_rows"]
             )
-        files = {
+        files: dict[str, dict[str, Any]] = {
             name: dict(zip(("sha256", "bytes"), hash_file(staging / name), strict=True))
             for name in ("events.parquet", "issues.parquet")
         }
@@ -724,7 +764,7 @@ def _process_object(row, store, scratch, *, reserve_bytes, output_budget_bytes):
     return target
 
 
-def status(store=DEFAULT_STORE, *, config_id=None):
+def status(store: str | Path | None = DEFAULT_STORE, *, config_id: str | None = None) -> JSON:
     store = _store(store)
     result = {
         "version": VERSION,
@@ -800,7 +840,7 @@ def status(store=DEFAULT_STORE, *, config_id=None):
     return result
 
 
-def national_main(argv=None) -> int:
+def national_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("preflight", "resume", "status"))
     parser.add_argument("--config", type=Path)

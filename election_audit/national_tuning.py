@@ -19,11 +19,13 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Sequence
 from contextlib import closing
 from pathlib import Path
 
 from election_audit.national import LIMITS, _lock, _read_json, _sync_dir, _write_json
 from election_audit.source_inventory import canonical, digest, hash_file, utc_now
+from election_audit.types import JSON, Argv
 
 VERSION = "structural-batch-tuning-v1"
 CODE_FILES = (
@@ -38,7 +40,7 @@ CODE_FILES = (
 )
 
 
-def save_state(path, value) -> None:
+def save_state(path: Path, value: JSON) -> None:
     """One atomic file contains both mutable state and its intrinsic digest."""
     path = Path(path)
     envelope = {**value, "state_sha256": digest(value)}
@@ -51,7 +53,7 @@ def save_state(path, value) -> None:
     _sync_dir(path.parent)
 
 
-def load_state(path):
+def load_state(path: Path) -> JSON:
     value = json.loads(Path(path).read_bytes())
     expected = value.pop("state_sha256")
     if digest(value) != expected:
@@ -59,11 +61,11 @@ def load_state(path):
     return value
 
 
-def code_pins():
+def code_pins() -> dict[str, str]:
     return {name: hash_file(Path(__file__).with_name(name))[0] for name in CODE_FILES}
 
 
-def rss_bytes(pid):
+def rss_bytes(pid: int) -> int:
     try:
         lines = Path(f"/proc/{pid}/status").read_text().splitlines()
         for line in lines:
@@ -76,7 +78,7 @@ def rss_bytes(pid):
     raise OSError("Cannot observe process RSS")
 
 
-def tree_rss(pid):
+def tree_rss(pid: int) -> int:
     total, pending, seen = 0, [pid], set()
     while pending:
         child = pending.pop()
@@ -93,7 +95,7 @@ def tree_rss(pid):
     return total
 
 
-def host_pressure():
+def host_pressure() -> JSON:
     memory = {
         line.split(":", 1)[0]: int(line.split()[1]) * 1024
         for line in Path("/proc/meminfo").read_text().splitlines()
@@ -113,13 +115,13 @@ def host_pressure():
 
 
 def limits(
-    memory_bytes=4 * 1024**3,
-    output_bytes=256 * 1024**2,
-    seconds=900,
-    hdd_reserve_bytes=20 * 1024**3,
-    ssd_reserve_bytes=10 * 1024**3,
-    scratch_bytes=8 * 1024**3,
-):
+    memory_bytes: int = 4 * 1024**3,
+    output_bytes: int = 256 * 1024**2,
+    seconds: int = 900,
+    hdd_reserve_bytes: int = 20 * 1024**3,
+    ssd_reserve_bytes: int = 10 * 1024**3,
+    scratch_bytes: int = 8 * 1024**3,
+) -> JSON:
     if type(memory_bytes) is not int or memory_bytes < 1024**3:
         raise ValueError(
             "Tuning requires at least 1 GiB aggregate RAM; use manual batching below this"
@@ -150,7 +152,7 @@ def limits(
     }
 
 
-def tuning_guard(spec, extra) -> None:
+def tuning_guard(spec: JSON, extra: int) -> None:
     policy = spec["policy"]
     existing = []
     for location in (spec["store"], spec["scratch"]):
@@ -177,7 +179,9 @@ def tuning_guard(spec, extra) -> None:
             raise OSError("Tuning disk reserve failed")
 
 
-def resource_reason(policy, pressure, aggregate_rss, supervisor_rss) -> str | None:
+def resource_reason(
+    policy: JSON, pressure: JSON, aggregate_rss: int, supervisor_rss: int
+) -> str | None:
     if supervisor_rss > policy["supervisor_rss_limit_bytes"]:
         return "supervisor_memory_limit"
     if aggregate_rss > policy["aggregate_memory_bytes"] - policy["memory_headroom_bytes"]:
@@ -189,7 +193,7 @@ def resource_reason(policy, pressure, aggregate_rss, supervisor_rss) -> str | No
     return None
 
 
-def winner(trials, *, minimum_gain=0.03, repeats=2):
+def winner(trials: Sequence[JSON], *, minimum_gain: float = 0.03, repeats: int = 2) -> JSON | None:
     """Prefer the smaller batch when observed gains do not exceed repeat noise."""
     groups = {}
     for trial in trials:
@@ -227,15 +231,15 @@ def winner(trials, *, minimum_gain=0.03, repeats=2):
 
 
 def prepare(
-    sample_dir,
-    comparison_report,
-    directory,
-    store,
-    scratch,
+    sample_dir: str | Path,
+    comparison_report: str | Path,
+    directory: str | Path,
+    store: str | Path,
+    scratch: str | Path,
     *,
-    policy=None,
-    candidates=(2048, 8192, 32768),
-):
+    policy: JSON | None = None,
+    candidates: Sequence[int] = (2048, 8192, 32768),
+) -> JSON:
     sample_dir, directory = Path(sample_dir).resolve(), Path(directory).resolve()
     if directory.exists():
         raise ValueError("Tuning directory must be new; resume it with run")
@@ -258,7 +262,7 @@ def prepare(
         raise ValueError("Comparison report uses another source sample")
     from election_audit.national_benchmark import REGIONS
 
-    selected = {}
+    selected: dict[str, JSON] = {}
     for unit in sorted(sample["units"], key=lambda u: u["sha256"]):
         selected.setdefault(REGIONS[unit["uf"]], unit)
     records = {r["source_sha256"]: r for r in comparison["records"]}
@@ -333,7 +337,7 @@ def prepare(
     return spec
 
 
-def validate_state(spec, state) -> None:
+def validate_state(spec: JSON, state: JSON) -> None:
     if spec["code"] != code_pins() or state["spec_id"] != spec["spec_id"]:
         raise ValueError("Tuning code/source identity changed; create a new pinned study")
     unsigned = {k: v for k, v in spec.items() if k != "spec_id"}
@@ -341,7 +345,7 @@ def validate_state(spec, state) -> None:
         raise ValueError("Tuning specification identity mismatch")
 
 
-def configure_production(policy) -> None:
+def configure_production(policy: JSON) -> None:
     """Apply real single-process bounds, including a hard worker address-space limit."""
     LIMITS.update(
         memory_bytes=policy["aggregate_memory_bytes"],
@@ -368,7 +372,7 @@ def configure_production(policy) -> None:
     pa.set_io_thread_count(1)
 
 
-def recommendation(path):
+def recommendation(path: str | Path) -> JSON:
     path = Path(path)
     doc = _read_json(path) if Path(str(path) + ".sha256").exists() else load_state(path)
     if doc["version"] != VERSION or doc["code"] != code_pins() or doc["workers"] != 1:
@@ -380,7 +384,7 @@ def recommendation(path):
     return doc
 
 
-def publish_recommendation(directory, spec, state) -> None:
+def publish_recommendation(directory: Path, spec: JSON, state: JSON) -> None:
     if state.get("winner") is None or state["state"] != "complete":
         return
     value = {
@@ -401,7 +405,7 @@ def publish_recommendation(directory, spec, state) -> None:
     save_state(path, value)
 
 
-def worker(directory, trial_id, batch_rows, output_budget_bytes):
+def worker(directory: str | Path, trial_id: str, batch_rows: int, output_budget_bytes: int) -> JSON:
     spec = _read_json(Path(directory) / "spec.json")
     validate_state(spec, {"spec_id": spec["spec_id"]})
     policy = spec["policy"]
@@ -468,7 +472,7 @@ def worker(directory, trial_id, batch_rows, output_budget_bytes):
     return result
 
 
-def run(directory):
+def run(directory: str | Path) -> JSON:
     directory = Path(directory).resolve()
     spec, state = _read_json(directory / "spec.json"), load_state(directory / "state.json")
     validate_state(spec, state)
@@ -666,7 +670,7 @@ def run(directory):
     return state
 
 
-def main(argv=None) -> None:
+def main(argv: Argv = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     setup = sub.add_parser("prepare")

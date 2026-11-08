@@ -12,32 +12,42 @@ import shutil
 import signal
 import sqlite3
 import time
+from collections.abc import Iterable
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from contextlib import closing
 from pathlib import Path
+from typing import Any
 
 from election_audit.national_migration import atomic, sha
 from election_audit.national_relocation import configure
 from election_audit.national_resources import apply, metrics, policy, validate
 from election_audit.national_summary import VERSION, summarize
+from election_audit.types import JSON, Argv, Row
 
 FORMAT = "grouped-source-summary-shards-v3"
-_POLICY = None
+_POLICY: JSON | None = None  # set in each worker process by worker_init
 _STOP = False
 
 
-def encoded(value):
+def encoded(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
-def checked(path):
+def checked(path: Path) -> JSON:
     path = Path(path)
     if sha(path) != Path(str(path) + ".sha256").read_text().strip():
         raise ValueError("Pinned metadata checksum mismatch")
     return json.loads(path.read_text())
 
 
-def prepare(old_workload, output, store, *, resources=None, selection=None):
+def prepare(
+    old_workload: str | Path,
+    output: str | Path,
+    store: str | Path,
+    *,
+    resources: JSON | None = None,
+    selection: Iterable[str] | None = None,
+) -> JSON:
     """Freeze metadata scope; optional selection only restricts already eligible SHAs."""
     old_workload, output, store = (Path(x).absolute() for x in (old_workload, output, store))
     if output.exists() or store.exists():
@@ -146,7 +156,7 @@ if __name__=='__main__': main([sys.argv[1] if len(sys.argv)>1 else 'status',str(
     return spec
 
 
-def load(directory):
+def load(directory: str | Path) -> JSON:
     spec = checked(Path(directory) / "config.json")
     validate(spec["resources"])
     if (
@@ -162,7 +172,7 @@ def load(directory):
     return spec
 
 
-def connection(path):
+def connection(path: str | Path) -> sqlite3.Connection:
     db = sqlite3.connect(path, uri=True)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA journal_mode=WAL")
@@ -171,7 +181,7 @@ def connection(path):
     return db
 
 
-def capacity(spec, used=0) -> None:
+def capacity(spec: JSON, used: int = 0) -> None:
     anchor = Path(spec["volume_anchor"])
     store = Path(spec["store"])
     parent = store
@@ -189,7 +199,7 @@ def capacity(spec, used=0) -> None:
         raise OSError("SSD reserve/spill allowance unavailable")
 
 
-def initialise(spec):
+def initialise(spec: JSON) -> sqlite3.Connection:
     store = Path(spec["store"])
     store.mkdir(parents=True, exist_ok=True)
     owner = store / "owner.json"
@@ -242,7 +252,7 @@ def initialise(spec):
     return db
 
 
-def shard_database(path):
+def shard_database(path: Path) -> sqlite3.Connection:
     db = sqlite3.connect(path)
     db.execute("PRAGMA journal_mode=DELETE")
     db.execute("PRAGMA synchronous=FULL")
@@ -254,7 +264,7 @@ def shard_database(path):
     return db
 
 
-def insert_document(db, doc, object_id) -> None:
+def insert_document(db: sqlite3.Connection, doc: JSON, object_id: int) -> None:
     object_sha = doc["object_sha256"]
     metadata = {k: v for k, v in doc.items() if k not in ("members", "blocks", "anchors", "errors")}
     db.execute("INSERT INTO objects VALUES(?,?,?)", (object_id, object_sha, encoded(metadata)))
@@ -276,7 +286,7 @@ def insert_document(db, doc, object_id) -> None:
     )
 
 
-def worker_init(resources, registry, scratch) -> None:
+def worker_init(resources: JSON, registry: JSON, scratch: str | Path) -> None:
     global _POLICY
     _POLICY = resources
     apply(resources, worker=True)
@@ -289,13 +299,17 @@ def worker_init(resources, registry, scratch) -> None:
     )
 
 
-def worker(row, scratch):
+def worker(row: Row, scratch: str | Path) -> tuple[JSON, JSON]:
     started = time.monotonic()
+    if _POLICY is None:
+        raise RuntimeError("Worker started without worker_init")
     result = summarize(row, scratch, output_limit=_POLICY["worker_output_limit_bytes"])
     return result, {"elapsed_seconds": time.monotonic() - started, "pid": os.getpid()}
 
 
-def publish(spec, temporary, group_id, objects, events):
+def publish(
+    spec: JSON, temporary: Path, group_id: str, objects: Iterable[str], events: int
+) -> tuple[Path, JSON]:
     database = temporary / "summary.sqlite"
     with database.open("rb") as stream:
         os.fsync(stream.fileno())
@@ -320,7 +334,7 @@ def publish(spec, temporary, group_id, objects, events):
     return destination, marker
 
 
-def reconcile(spec, db) -> None:
+def reconcile(spec: JSON, db: sqlite3.Connection) -> None:
     for marker_path in (Path(spec["store"]) / "shards").glob("*/*/shard.json"):
         group_id = marker_path.parent.name
         if db.execute("SELECT 1 FROM groups WHERE id=?", (group_id,)).fetchone():
@@ -355,7 +369,7 @@ def reconcile(spec, db) -> None:
         db.commit()
 
 
-def increment(db, objects, events, size) -> None:
+def increment(db: sqlite3.Connection, objects: int, events: int, size: int) -> None:
     db.executemany(
         "UPDATE metadata SET value=CAST(value AS INTEGER)+? WHERE key=?",
         [(objects, "completed"), (events, "events"), (size, "bytes")],
@@ -363,7 +377,7 @@ def increment(db, objects, events, size) -> None:
     db.execute("UPDATE metadata SET value=CAST(value AS INTEGER)+1 WHERE key='group_count'")
 
 
-def status(directory):
+def status(directory: str | Path) -> JSON:
     spec = load(directory)
     path = Path(spec["store"]) / "work.sqlite"
     if not path.exists():
@@ -392,7 +406,7 @@ def status(directory):
     }
 
 
-def run(directory, *, max_objects=None):
+def run(directory: str | Path, *, max_objects: int | None = None) -> JSON:
     global _STOP
     _STOP = False
     directory = Path(directory).absolute()
@@ -632,7 +646,7 @@ def run(directory, *, max_objects=None):
         signal.signal(signal.SIGTERM, old_handler)
 
 
-def main(argv=None) -> None:
+def main(argv: Argv = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     setup = sub.add_parser(

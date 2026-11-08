@@ -13,6 +13,7 @@ import shutil
 import sqlite3
 import tempfile
 import time
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import closing
 from pathlib import Path
 
@@ -40,6 +41,7 @@ from election_audit.national_tuning import (
     save_state,
 )
 from election_audit.source_inventory import ALL_UFS, digest, hash_file, utc_now
+from election_audit.types import JSON, Argv, Row
 
 VERSION = "national-compact-workload-v1"
 
@@ -67,7 +69,7 @@ main([action,str(directory),*sys.argv[2:]])
 """
 
 
-def _connection(path, *, readonly=False):
+def _connection(path: str | Path, *, readonly: bool = False) -> sqlite3.Connection:
     db = sqlite3.connect(
         Path(path).resolve().as_uri() + ("?mode=ro" if readonly else "?mode=rwc"), uri=True
     )
@@ -80,14 +82,14 @@ def _connection(path, *, readonly=False):
     return db
 
 
-def _mount(path):
+def _mount(path: Path) -> Path:
     path = Path(path).resolve()
     while not path.is_mount():
         path = path.parent
     return path
 
 
-def _exclusions(path, round_number):
+def _exclusions(path: Path, round_number: int) -> JSON:
     path = Path(path)
     if path.stat().st_size > 16 * 1024**2:
         raise ValueError("Exclusions exceed bounded metadata allowance")
@@ -108,7 +110,7 @@ def _exclusions(path, round_number):
     return doc
 
 
-def _attach_scope(db, profile, exclusions) -> None:
+def _attach_scope(db: sqlite3.Connection, profile: Path, exclusions: JSON) -> None:
     db.execute(
         "ATTACH DATABASE ? AS profile", ((Path(profile) / "profile.sqlite").as_uri() + "?mode=ro",)
     )
@@ -123,20 +125,20 @@ def _attach_scope(db, profile, exclusions) -> None:
 
 
 def prepare(
-    profile,
-    exclusions,
-    tuning_config,
-    output,
-    store,
-    scratch,
+    profile: str | Path,
+    exclusions: str | Path,
+    tuning_config: str | Path,
+    output: str | Path,
+    store: str | Path,
+    scratch: str | Path,
     *,
-    output_budget_bytes=256 * 1024**3,
-    future_budget_bytes=256 * 1024**3,
-    source_growth_budget_bytes=0,
-    volume_anchor=None,
-    reuse_stores=(),
-    relocation_registry=None,
-):
+    output_budget_bytes: int = 256 * 1024**3,
+    future_budget_bytes: int = 256 * 1024**3,
+    source_growth_budget_bytes: int = 0,
+    volume_anchor: str | Path | None = None,
+    reuse_stores: Iterable[str | Path] = (),
+    relocation_registry: str | Path | None = None,
+) -> JSON:
     profile, exclusions, tuning_config, output, store, scratch = (
         Path(p).resolve() for p in (profile, exclusions, tuning_config, output, store, scratch)
     )
@@ -264,7 +266,7 @@ def prepare(
     return spec
 
 
-def _load(directory):
+def _load(directory: str | Path) -> JSON:
     spec = _read_json(Path(directory) / "workload.json")
     if (
         spec["version"] != VERSION
@@ -286,7 +288,7 @@ def _load(directory):
     return spec
 
 
-def _requirements(spec, spent, devices):
+def _requirements(spec: JSON, spent: int, devices: Mapping[str, int]) -> dict[str, int]:
     policy = spec["resources"]
     roles = {
         "store": (
@@ -304,7 +306,7 @@ def _requirements(spec, spent, devices):
     return {role: sum(groups[device]) for role, device in devices.items()}
 
 
-def _capacity(spec, spent):
+def _capacity(spec: JSON, spent: int) -> JSON:
     volume = Path(spec["volume_anchor"])
     if not volume.is_mount():
         raise OSError("Declared output volume is not mounted; refusing fallback writes")
@@ -354,7 +356,7 @@ def _capacity(spec, spent):
     }
 
 
-def preflight(directory):
+def preflight(directory: str | Path) -> JSON:
     spec = _load(directory)
     spent = 0
     work = Path(spec["store"]) / "work.sqlite"
@@ -368,14 +370,14 @@ def preflight(directory):
     return _capacity(spec, spent)
 
 
-def _allocated(directory):
+def _allocated(directory: Path) -> int:
     directory = Path(directory)
     return directory.stat().st_blocks * 512 + sum(
         p.stat().st_blocks * 512 for p in directory.rglob("*")
     )
 
 
-def initialise(directory):
+def initialise(directory: str | Path) -> Path:
     directory = Path(directory).resolve()
     spec = _load(directory)
     preflight(directory)
@@ -460,7 +462,7 @@ def initialise(directory):
     return target
 
 
-def _ledger(store, scope):
+def _ledger(store: Path, scope: Path) -> sqlite3.Connection:
     path = Path(store) / "work.sqlite"
     db = _connection(path)
     db.execute(
@@ -493,7 +495,7 @@ def _ledger(store, scope):
     return db
 
 
-def _reuse(row, roots):
+def _reuse(row: Row, roots: Iterable[str | Path]) -> Path | None:
     key = digest([row["sha256"], FORMAT, DIAGNOSTIC_POLICY, ParseConfig().__dict__])
     for root in roots:
         root = Path(root).resolve()
@@ -518,7 +520,7 @@ def _reuse(row, roots):
     return None
 
 
-def status(directory):
+def status(directory: str | Path) -> JSON:
     spec = _load(directory)
     store = Path(spec["store"])
     if not (store / "work.sqlite").exists():
@@ -558,7 +560,7 @@ def status(directory):
     }
 
 
-def iter_observations(directory):
+def iter_observations(directory: str | Path) -> Iterator[Row]:
     """Stream every source witness, including excluded/pending/failed unknowns.
 
     This reads metadata only. Counts are null until an artifact is complete; a
@@ -585,7 +587,9 @@ def iter_observations(directory):
             }
 
 
-def run(directory, *, max_objects=None, retry_failed=False):
+def run(
+    directory: str | Path, *, max_objects: int | None = None, retry_failed: bool = False
+) -> JSON:
     directory = Path(directory).resolve()
     spec = _load(directory)
     if max_objects is not None and (type(max_objects) is not int or max_objects < 1):
@@ -712,7 +716,7 @@ def run(directory, *, max_objects=None, retry_failed=False):
                     raise
                 processed += 1
                 if processed % 25 == 0:
-                    progress = {
+                    progress: JSON = {
                         **status(directory),
                         "at": utc_now(),
                         "pid": os.getpid(),
@@ -743,7 +747,7 @@ def run(directory, *, max_objects=None, retry_failed=False):
             return result
 
 
-def main(argv=None) -> None:
+def main(argv: Argv = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     setup = sub.add_parser("prepare")
