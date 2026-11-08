@@ -69,7 +69,7 @@ def inspect_member(lines):
     }
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, default=Path("data/tse/2026/turno-2"))
     parser.add_argument("--per-uf", type=int, default=2)

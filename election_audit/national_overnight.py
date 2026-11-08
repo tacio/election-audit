@@ -101,7 +101,7 @@ def verify_checkpoint(path, row):
     return doc
 
 
-def execute(config_path):
+def execute(config_path) -> None:
     config_path = Path(config_path).resolve()
     config = json.loads(config_path.read_text())
     # Trial subprocesses use -m: bind their import search/cwd to this reviewed
@@ -128,7 +128,7 @@ def execute(config_path):
     budget = 256 * 1024**3
     workspace.mkdir(parents=True, exist_ok=True)
 
-    def report(stage, **extra):
+    def report(stage, **extra) -> None:
         value = {
             "stage": stage,
             "pid": os.getpid(),
@@ -140,7 +140,7 @@ def execute(config_path):
         atomic(workspace / "continuation-status.json", value)
         print(json.dumps(value, sort_keys=True), flush=True)
 
-    def capacity():
+    def capacity() -> None:
         if (
             not anchor.is_mount()
             or Path(config["cache_store"]).parent.stat().st_dev != anchor.stat().st_dev

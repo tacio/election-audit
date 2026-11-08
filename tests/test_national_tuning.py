@@ -29,7 +29,7 @@ from election_audit.source_inventory import digest
 
 
 class TuningTests(unittest.TestCase):
-    def test_resource_headroom_host_pressure_and_small_hardware(self):
+    def test_resource_headroom_host_pressure_and_small_hardware(self) -> None:
         policy = limits(1024**3, 8 * 1024**2, 30, 1024, 1024, 1024**3)
         pressure = {"memory_available_bytes": 4 * 1024**3, "memory_pressure_full_avg10": 0}
         self.assertIsNone(resource_reason(policy, pressure, 200 * 1024**2, 100 * 1024**2))
@@ -47,7 +47,7 @@ class TuningTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "at least 1 GiB"):
             limits(512 * 1024**2)
 
-    def test_repeat_noise_plateau_and_rejected_trials_not_winners(self):
+    def test_repeat_noise_plateau_and_rejected_trials_not_winners(self) -> None:
         def trials(batch, values):
             return [
                 {"state": "accepted", "batch_rows": batch, "events_per_second": v} for v in values
@@ -60,7 +60,7 @@ class TuningTests(unittest.TestCase):
         self.assertEqual(winner(values)["batch_rows"], 32768)
         self.assertIsNone(winner(trials(2048, [100])))
 
-    def test_resume_identity_and_completed_run_do_not_reprocess(self):
+    def test_resume_identity_and_completed_run_do_not_reprocess(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             from election_audit.national import _write_json
 
@@ -79,7 +79,7 @@ class TuningTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "identity changed"):
                 validate_state(bad, state)
 
-    def test_guard_honors_custom_disk_reserves(self):
+    def test_guard_honors_custom_disk_reserves(self) -> None:
         spec = {"policy": limits(), "store": "/tmp", "scratch": "/tmp"}
         with patch("election_audit.national_tuning.shutil.disk_usage") as usage:
             usage.return_value.free = 19 * 1024**3
@@ -89,14 +89,14 @@ class TuningTests(unittest.TestCase):
             with self.assertRaisesRegex(OSError, "reserve"):
                 tuning_guard(spec, 1)
 
-    def test_exit_race_zombie_has_zero_resident_memory(self):
+    def test_exit_race_zombie_has_zero_resident_memory(self) -> None:
         with patch("pathlib.Path.read_text", return_value="Name:\tpython\nState:\tZ (zombie)\n"):
             self.assertEqual(rss_bytes(1234), 0)
         with patch("pathlib.Path.read_text", return_value="Name:\tpython\nState:\tR (running)\n"):
             with self.assertRaisesRegex(OSError, "observe"):
                 rss_bytes(1234)
 
-    def test_pressure_backoff_is_persisted_without_starting_work(self):
+    def test_pressure_backoff_is_persisted_without_starting_work(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             from election_audit.national import _write_json
 
@@ -135,7 +135,7 @@ class TuningTests(unittest.TestCase):
             )
             spawn.assert_not_called()
 
-    def test_interrupted_output_is_charged_and_not_a_timing_observation(self):
+    def test_interrupted_output_is_charged_and_not_a_timing_observation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             from election_audit.national import _write_json
 
@@ -176,7 +176,7 @@ class TuningTests(unittest.TestCase):
             self.assertIsNone(result["winner"])
             spawn.assert_not_called()
 
-    def test_completed_state_recovers_missing_recommendation_atomically(self):
+    def test_completed_state_recovers_missing_recommendation_atomically(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             from election_audit.national import _write_json
 
@@ -198,7 +198,7 @@ class TuningTests(unittest.TestCase):
                 spawn.assert_not_called()
             self.assertEqual(recommendation(root / "recommended.json")["event_batch_rows"], 8192)
 
-    def test_real_batch_knob_changes_row_groups_preserves_full_events(self):
+    def test_real_batch_knob_changes_row_groups_preserves_full_events(self) -> None:
         import pyarrow.parquet as pq
 
         with tempfile.TemporaryDirectory() as tmp:

@@ -25,7 +25,7 @@ HEADER = (
 
 
 class ChainTests(unittest.TestCase):
-    def test_slices_are_recovered_from_the_final_hash(self):
+    def test_slices_are_recovered_from_the_final_hash(self) -> None:
         content = " ".join(f"{90000 + i}:{i}" for i in range(250))  # over one code's limit
         cut = content.rfind(" ", 0, 1000)
         chunks = [content[:cut], content[cut + 1 :]]
@@ -33,7 +33,7 @@ class ChainTests(unittest.TestCase):
         self.assertEqual(pb.split_search(content, final), chunks)
         self.assertIsNone(pb.split_search(content, "0" * 128))
 
-    def test_codes_are_reassembled_in_order_and_gaps_named(self):
+    def test_codes_are_reassembled_in_order_and_gaps_named(self) -> None:
         chunks = ["ORIG:VOTA PLEI:3221", "IDEL:6258 CARG:1 13:1"]
         hashes = pb.chain(chunks)
         codes = [
@@ -49,7 +49,7 @@ class ChainTests(unittest.TestCase):
 
 @unittest.skipUnless(importlib.util.find_spec("asn1tools"), "verification extra is not installed")
 class PrintedPassTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         from cryptography import x509
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.asymmetric import ec
@@ -133,7 +133,7 @@ class PrintedPassTests(unittest.TestCase):
         codes += [f"QRCE:2:2 IDUE:{self.urn} MDUE:2015 CERT:{cert[half:]}"]
         return "\n".join(codes)
 
-    def write(self, number, qr):
+    def write(self, number, qr) -> None:
         record = {"data": {"id": str(number), "is_simulated": "0", "qr_raw": qr}}
         (self.cmind / "raw" / f"bu_{number:06d}.json").write_text(json.dumps(record))
 
@@ -142,7 +142,7 @@ class PrintedPassTests(unittest.TestCase):
         table = pq.read_table(Path(self.temp.name) / name / "release" / "printed.parquet")
         return result, {r["source_id"]: r for r in table.to_pylist()}
 
-    def test_copies_are_verified_and_compared(self):
+    def test_copies_are_verified_and_compared(self) -> None:
         changed = self.content.replace(" 13:", " 13:1", 1)
         self.assertNotEqual(changed, self.content)
         self.write(1, self.qr(self.content))
@@ -175,7 +175,7 @@ class PrintedPassTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             self.run_pass()
 
-    def test_arvor_input_must_match_its_manifest(self):
+    def test_arvor_input_must_match_its_manifest(self) -> None:
         root = Path(self.temp.name) / "arvor" / "totalizacao_dados"
         root.mkdir(parents=True)
         (root / "bus.csv").write_text("id\n")

@@ -38,7 +38,7 @@ CODE_FILES = (
 )
 
 
-def save_state(path, value):
+def save_state(path, value) -> None:
     """One atomic file contains both mutable state and its intrinsic digest."""
     path = Path(path)
     envelope = {**value, "state_sha256": digest(value)}
@@ -150,7 +150,7 @@ def limits(
     }
 
 
-def tuning_guard(spec, extra):
+def tuning_guard(spec, extra) -> None:
     policy = spec["policy"]
     existing = []
     for location in (spec["store"], spec["scratch"]):
@@ -177,7 +177,7 @@ def tuning_guard(spec, extra):
             raise OSError("Tuning disk reserve failed")
 
 
-def resource_reason(policy, pressure, aggregate_rss, supervisor_rss):
+def resource_reason(policy, pressure, aggregate_rss, supervisor_rss) -> str | None:
     if supervisor_rss > policy["supervisor_rss_limit_bytes"]:
         return "supervisor_memory_limit"
     if aggregate_rss > policy["aggregate_memory_bytes"] - policy["memory_headroom_bytes"]:
@@ -333,7 +333,7 @@ def prepare(
     return spec
 
 
-def validate_state(spec, state):
+def validate_state(spec, state) -> None:
     if spec["code"] != code_pins() or state["spec_id"] != spec["spec_id"]:
         raise ValueError("Tuning code/source identity changed; create a new pinned study")
     unsigned = {k: v for k, v in spec.items() if k != "spec_id"}
@@ -341,7 +341,7 @@ def validate_state(spec, state):
         raise ValueError("Tuning specification identity mismatch")
 
 
-def configure_production(policy):
+def configure_production(policy) -> None:
     """Apply real single-process bounds, including a hard worker address-space limit."""
     LIMITS.update(
         memory_bytes=policy["aggregate_memory_bytes"],
@@ -380,7 +380,7 @@ def recommendation(path):
     return doc
 
 
-def publish_recommendation(directory, spec, state):
+def publish_recommendation(directory, spec, state) -> None:
     if state.get("winner") is None or state["state"] != "complete":
         return
     value = {
@@ -666,7 +666,7 @@ def run(directory):
     return state
 
 
-def main(argv=None):
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     setup = sub.add_parser("prepare")

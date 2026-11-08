@@ -64,7 +64,7 @@ class OperationalReviewTests(unittest.TestCase):
             json.loads(r) for r in pq.read_table(path / (name + ".parquet")).column(0).to_pylist()
         ]
 
-    def test_official_biometric_manual_partial_and_full_cycles(self):
+    def test_official_biometric_manual_partial_and_full_cycles(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             source, structural = self.fixture(
@@ -135,7 +135,7 @@ class OperationalReviewTests(unittest.TestCase):
                 "".join(pq.read_table(result / "events.parquet").column(0).to_pylist()),
             )
 
-    def test_request_failure_not_manual_vote_unknown_clock_stays_null(self):
+    def test_request_failure_not_manual_vote_unknown_clock_stays_null(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             source, structural = self.fixture(
@@ -153,7 +153,7 @@ class OperationalReviewTests(unittest.TestCase):
             self.assertEqual(cycles[1]["authorization_method"], "unknown")
             self.assertIsNone(cycles[1]["duration_seconds"])
 
-    def test_simulated_or_other_round_never_official(self):
+    def test_simulated_or_other_round_never_official(self) -> None:
         for official, date, round_number in [(False, "25/10/2026", 2), (True, "04/10/2026", 1)]:
             with (
                 self.subTest(official=official, round_number=round_number),
@@ -170,7 +170,7 @@ class OperationalReviewTests(unittest.TestCase):
                 result = review_object(structural, source, root / "out", round_number=2)
                 self.assertEqual(self.rows(result, "cycles"), [])
 
-    def test_first_round_is_supported_with_its_own_anchors(self):
+    def test_first_round_is_supported_with_its_own_anchors(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             source, structural = self.fixture(
@@ -182,7 +182,7 @@ class OperationalReviewTests(unittest.TestCase):
             result = review_object(structural, source, root / "out", round_number=1)
             self.assertEqual(len(self.rows(result, "cycles")), 1)
 
-    def test_exact_rules_unknown_templates_and_corruption(self):
+    def test_exact_rules_unknown_templates_and_corruption(self) -> None:
         self.assertEqual(classify("VOTA", "prefix Eleitor foi habilitado"), ("unknown", None))
         self.assertEqual(classify("OTHER", "Eleitor foi habilitado"), ("other_application", None))
         with tempfile.TemporaryDirectory() as d:

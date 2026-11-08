@@ -145,7 +145,7 @@ def runoff(config):
     return presidential_election(config, 2)
 
 
-def validate_manifest_round(connection, pleito):
+def validate_manifest_round(connection, pleito) -> None:
     """Reject mixed/wrong-round stores before resume can reuse section keys."""
     prefix = f"{BASE}/ele2026/arquivo-urna/"
     expected = prefix + pleito + "/"
@@ -208,7 +208,7 @@ def bounded_parallel_map(function, items, workers, stop):
     with ThreadPoolExecutor(max_workers=workers) as pool:
         pending = set()
 
-        def refill():
+        def refill() -> None:
             while len(pending) < 2 * workers and not stop.is_set():
                 try:
                     item = next(iterator)
@@ -231,7 +231,7 @@ def bounded_parallel_map(function, items, workers, stop):
 
 
 class Collector:
-    def __init__(self, root, rps, reserve_gib, timeout):
+    def __init__(self, root, rps, reserve_gib, timeout) -> None:
         self.root = root
         self.root.mkdir(parents=True, exist_ok=True)
         (root / "objects").mkdir(exist_ok=True)
@@ -299,17 +299,17 @@ class Collector:
                 self._database.execute("BEGIN IMMEDIATE")
                 yield self._database
 
-    def close(self):
+    def close(self) -> None:
         with self.db_lock:
             self._database.close()
 
-    def abort(self, reason):
+    def abort(self, reason) -> None:
         with self.lock:
             if self.stop_reason is None:
                 self.stop_reason = reason
             self.stop.set()
 
-    def add_stats(self, **values):
+    def add_stats(self, **values) -> None:
         with self.stats_lock:
             self.stats.update(values)
 
@@ -443,7 +443,7 @@ class Collector:
                 return body
         return None
 
-    def reuse_section(self, item, run):
+    def reuse_section(self, item, run) -> bool:
         """Reuse verified logs only when the current section metadata is unchanged."""
         uf, mun, zone, sec, metadata = item
         previous = self.query(
@@ -690,7 +690,7 @@ def main():
         parser.error(str(exc))
 
 
-def run_collection(args, collector):
+def run_collection(args, collector) -> int:
     from election_audit.elections import election_for_round
 
     round_number = getattr(args, "round", 2)

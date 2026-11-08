@@ -124,7 +124,7 @@ def _get(url, timeout=60, attempts=3):
     raise AssertionError("unreachable")
 
 
-def check_jez(body):
+def check_jez(body) -> None:
     """A JEZ is a ZIP whose CRCs verify and which holds ``logd.dat``."""
     with zipfile.ZipFile(io.BytesIO(body)) as archive:
         if archive.testzip() is not None or "logd.dat" not in archive.namelist():
@@ -449,7 +449,7 @@ def summarize(inputs, output, exclusions_path):
 # --------------------------------------------------------------------------- CLI
 
 
-def sa_logs_main(argv=None):
+def sa_logs_main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit sa-logs",
         description="Fetch and summarize contingency-counting (SA) logs of certified rounds.",

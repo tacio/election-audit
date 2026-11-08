@@ -3,13 +3,14 @@
 import sys
 import unittest
 from types import SimpleNamespace
+from typing import Never
 from unittest.mock import patch
 
 from election_audit.cli import main
 
 
 class CliTests(unittest.TestCase):
-    def test_delegation_preserves_options_and_restores_process_arguments(self):
+    def test_delegation_preserves_options_and_restores_process_arguments(self) -> None:
         original = sys.argv
         for command, module, options, expected in (
             (
@@ -35,10 +36,10 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(seen, [[f"election-audit {command}", *expected]])
                 self.assertIs(sys.argv, original)
 
-    def test_arguments_restored_when_delegate_exits(self):
+    def test_arguments_restored_when_delegate_exits(self) -> None:
         original = sys.argv
 
-        def fail():
+        def fail() -> Never:
             raise SystemExit(2)
 
         with patch("election_audit.cli.import_module", return_value=SimpleNamespace(main=fail)):

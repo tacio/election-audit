@@ -28,7 +28,7 @@ def allocated(path):
     return sum(p.stat().st_blocks * 512 for p in [Path(path), *Path(path).rglob("*")])
 
 
-def settle_budget(live_path, output):
+def settle_budget(live_path, output) -> None:
     actual = allocated(output)
     with closing(sqlite3.connect(live_path)) as budget:
         budget.execute("PRAGMA synchronous=FULL")
@@ -241,7 +241,7 @@ def publish_release(directory, output, *, target_bytes=128 * 1024**2):
             raise OSError("Audit snapshot exceeds analytical output allowance")
 
         class Writer:
-            def __init__(self, name):
+            def __init__(self, name) -> None:
                 self.name = name
                 self.schema = schemas[name]
                 self.rows = []
@@ -252,7 +252,7 @@ def publish_release(directory, output, *, target_bytes=128 * 1024**2):
                 self.sink = None
                 self.paths = []
 
-            def open(self):
+            def open(self) -> None:
                 path = temporary / self.name / f"part-{self.part:05d}.parquet"
                 path.parent.mkdir(exist_ok=True)
                 self.path = path
@@ -261,7 +261,7 @@ def publish_release(directory, output, *, target_bytes=128 * 1024**2):
                     self.sink, self.schema, compression="zstd", use_dictionary=True
                 )
 
-            def put(self, row):
+            def put(self, row) -> None:
                 size = sum(len(v) if isinstance(v, (str, bytes)) else 16 for v in row.values())
                 if size > 32 * 1024**2:
                     raise MemoryError("Analytical row exceeds bounded payload")
@@ -271,7 +271,7 @@ def publish_release(directory, output, *, target_bytes=128 * 1024**2):
                 self.buffer_bytes += size
                 self.count += 1
 
-            def flush(self):
+            def flush(self) -> None:
                 if not self.rows:
                     return
                 if self.writer is None:
@@ -282,7 +282,7 @@ def publish_release(directory, output, *, target_bytes=128 * 1024**2):
                 if self.sink.tell() >= target_bytes:
                     self.close_part()
 
-            def close_part(self):
+            def close_part(self) -> None:
                 nonlocal spent
                 if self.writer is None:
                     return
@@ -302,7 +302,7 @@ def publish_release(directory, output, *, target_bytes=128 * 1024**2):
                 if spent > allowance:
                     raise OSError("Bounded analytical output allowance exceeded")
 
-            def finish(self):
+            def finish(self) -> None:
                 self.flush()
                 self.close_part()
                 if not self.paths:

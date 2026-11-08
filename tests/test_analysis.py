@@ -36,7 +36,7 @@ class AnalysisTests(test_snapshots.SourceFixture):
         config.write_text(json.dumps(spec))
         return base, electoral, config
 
-    def test_registry_covers_all_contracts_and_roles(self):
+    def test_registry_covers_all_contracts_and_roles(self) -> None:
         definitions = registry()
         self.assertEqual(len(definitions), 21)
         device = next(r for r in definitions if r["feature_id"] == "device_logistics")
@@ -50,7 +50,7 @@ class AnalysisTests(test_snapshots.SourceFixture):
             all(r["source_tables"] and r["components"] and r["requires"] for r in definitions)
         )
 
-    def test_features_child_values_unknowns_validation_and_parent_preservation(self):
+    def test_features_child_values_unknowns_validation_and_parent_preservation(self) -> None:
         base, parent, config = self.analysis_fixture()
         before = inspect_release(parent)
         child = publish_analysis(parent, config, base / "warehouse")
@@ -86,7 +86,7 @@ class AnalysisTests(test_snapshots.SourceFixture):
             query_release(child, "SELECT count(*) FROM anonymous_cycle")["rows"], [(1,)]
         )
 
-    def test_partition_persisted_unknown_identity_and_bilingual_report(self):
+    def test_partition_persisted_unknown_identity_and_bilingual_report(self) -> None:
         base, parent, config = self.analysis_fixture(
             {
                 "partition": {
@@ -115,7 +115,7 @@ class AnalysisTests(test_snapshots.SourceFixture):
         self.assertIn("partitions", findings["calculations"])
         self.assertEqual(len(findings["parent_chain"]), 3)
 
-    def test_append_only_ledger_child_atomic_conflict_and_restart(self):
+    def test_append_only_ledger_child_atomic_conflict_and_restart(self) -> None:
         base, parent, config = self.analysis_fixture(
             {
                 "partition": {
@@ -155,7 +155,7 @@ class AnalysisTests(test_snapshots.SourceFixture):
         self.assertEqual(resolve_release(base / "warehouse"), second)
         self.assertFalse(list((base / "warehouse" / "releases").glob(".building-*")))
 
-    def test_publication_rejects_unresolved_identity_evidence(self):
+    def test_publication_rejects_unresolved_identity_evidence(self) -> None:
         base, parent, config = self.analysis_fixture(
             {
                 "partition": {
@@ -180,7 +180,7 @@ class AnalysisTests(test_snapshots.SourceFixture):
         with self.assertRaisesRegex(PublicationError, "frozen source object"):
             publish_analysis(parent, config, base / "warehouse")
 
-    def test_real_derivative_holdout_gate_and_immutable_access_child(self):
+    def test_real_derivative_holdout_gate_and_immutable_access_child(self) -> None:
         from election_audit.analysis_partitions import partition_tables
         from election_audit.source_inventory import hash_file
 

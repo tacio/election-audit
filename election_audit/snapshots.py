@@ -104,7 +104,7 @@ def snapshot_tables(document):
     }
 
 
-def _validate_document(document):
+def _validate_document(document) -> None:
     if document.get("format_version") != SNAPSHOT_FORMAT:
         raise SnapshotError("Unsupported snapshot format")
     snapshot = document["snapshot"]
@@ -139,7 +139,7 @@ def _validate_document(document):
         raise SnapshotError("; ".join(errors[:10]))
 
 
-def _fsync_directory(path):
+def _fsync_directory(path) -> None:
     descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
     try:
         os.fsync(descriptor)
@@ -147,7 +147,7 @@ def _fsync_directory(path):
         os.close(descriptor)
 
 
-def _copy_verified(source, target, expected_digest, expected_bytes):
+def _copy_verified(source, target, expected_digest, expected_bytes) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     hasher, length = hashlib.sha256(), 0
     # Copy bytes rather than hard-linking: later raw replacement/corruption cannot
@@ -303,7 +303,7 @@ def inspect_snapshot(path: Path, *, verify_objects=False) -> dict:
         raise SnapshotError(f"Incomplete or invalid snapshot: {exc}") from exc
 
 
-def snapshot_main(argv=None):
+def snapshot_main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         description="Freeze selected local inputs without modifying acquisition"
     )
@@ -347,7 +347,7 @@ def snapshot_main(argv=None):
     return 0
 
 
-def inspect_main(argv=None):
+def inspect_main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         description="Inspect a frozen snapshot, independently of live acquisition"
     )

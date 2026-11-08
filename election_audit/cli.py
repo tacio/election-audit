@@ -8,7 +8,7 @@ import sys
 from importlib import import_module, metadata
 
 
-def doctor():
+def doctor() -> int:
     """Report local runtime readiness without opening acquisition data."""
     print(f"Python: {platform.python_version()}")
     print(f"SQLite: {sqlite3.sqlite_version}")

@@ -80,7 +80,7 @@ def official_bundle(root, *, rows=None, header=None, dictionary=None):
     return path
 
 
-def repin(bundle, role):
+def repin(bundle, role) -> None:
     document = json.loads(bundle.read_text())
     spec = document[role]
     spec["sha256"] = hashlib.sha256((bundle.parent / spec["path"]).read_bytes()).hexdigest()
@@ -88,12 +88,12 @@ def repin(bundle, role):
 
 
 class OfficialBUTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
 
-    def test_real_subset_office_filter_composition_originals_and_unknowns(self):
+    def test_real_subset_office_filter_composition_originals_and_unknowns(self) -> None:
         imported = read_import(official_bundle(self.root))
         tables = imported["tables"]
         summary = imported["source_discovery"]["real_validation"]
@@ -128,7 +128,7 @@ class OfficialBUTests(unittest.TestCase):
             all(json.loads(r["record_locator"])["records"] for r in tables["record_lineage"])
         )
 
-    def test_retransmission_deduplication_preserves_all_witnesses(self):
+    def test_retransmission_deduplication_preserves_all_witnesses(self) -> None:
         rows = sample_rows()
         rows.insert(1, copy.deepcopy(rows[0]))
         imported = read_import(official_bundle(self.root, rows=rows))
@@ -150,7 +150,7 @@ class OfficialBUTests(unittest.TestCase):
             0,
         )
 
-    def test_conflicting_counts_and_repeated_totals_fail(self):
+    def test_conflicting_counts_and_repeated_totals_fail(self) -> None:
         for field in ("QT_VOTOS", "QT_APTOS", "DT_EMISSAO_BU", "DS_SECOES_AGREGADAS"):
             rows = sample_rows()
             rows.insert(1, copy.deepcopy(rows[0]))
@@ -158,7 +158,7 @@ class OfficialBUTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaisesRegex(PublicationError, "Conflicting"):
                 read_import(official_bundle(self.root, rows=rows))
 
-    def test_unknown_codes_missing_counts_election_and_geography_fail(self):
+    def test_unknown_codes_missing_counts_election_and_geography_fail(self) -> None:
         for field, value in (
             ("CD_TIPO_VOTAVEL", "99"),
             ("NR_VOTAVEL", "96"),
@@ -175,7 +175,7 @@ class OfficialBUTests(unittest.TestCase):
             with self.subTest(field=field, value=value), self.assertRaises(PublicationError):
                 read_import(official_bundle(self.root, rows=rows))
 
-    def test_missing_electorate_is_explicit_and_arithmetic_mismatch_is_retained(self):
+    def test_missing_electorate_is_explicit_and_arithmetic_mismatch_is_retained(self) -> None:
         rows = sample_rows()
         first = rows[0]
         key = [first[k] for k in ("CD_MUNICIPIO", "NR_ZONA", "NR_SECAO")]
@@ -198,7 +198,7 @@ class OfficialBUTests(unittest.TestCase):
             summary["published_choice_arithmetic"]["electorate_difference"]["unknown"], 1
         )
 
-    def test_hash_checksum_metadata_dictionary_header_and_resource_bounds(self):
+    def test_hash_checksum_metadata_dictionary_header_and_resource_bounds(self) -> None:
         bundle = official_bundle(self.root)
         (self.root / FILENAME).write_bytes(b"tampered")
         with self.assertRaisesRegex(PublicationError, "hash"):

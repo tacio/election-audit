@@ -34,7 +34,7 @@ def database(path):
 
 
 class NationalTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.base = Path(self.tmp.name)
@@ -98,13 +98,13 @@ class NationalTests(unittest.TestCase):
             "source_root": str(self.raw),
         }
 
-    def test_round_mismatch_rejected_before_freezing(self):
+    def test_round_mismatch_rejected_before_freezing(self) -> None:
         self.spec["round"] = 1
         with self.assertRaisesRegex(ValueError, "another round"):
             preflight(self.config, self.store, self.scratch, reserve_bytes=0)
         self.assertFalse(self.store.exists())
 
-    def test_config_has_explicit_sources_and_known_ufs(self):
+    def test_config_has_explicit_sources_and_known_ufs(self) -> None:
         path = self.base / "config.json"
         path.write_text(json.dumps(self.config))
         self.assertEqual(read_config(path)["sources"][0]["round"], 2)
@@ -113,7 +113,7 @@ class NationalTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             read_config(path)
 
-    def test_resume_content_dedup_and_no_source_writes(self):
+    def test_resume_content_dedup_and_no_source_writes(self) -> None:
         self.save(
             self.prefix + "dados/ac/01007/0001/0002/pkg/b-log.jez",
             (self.raw / self.log["path"]).read_bytes(),
@@ -133,14 +133,14 @@ class NationalTests(unittest.TestCase):
         self.assertNotIn("token", json.dumps(event))
         self.assertIn("record_locator", event)
 
-    def test_changed_original_never_publishes_structural_success(self):
+    def test_changed_original_never_publishes_structural_success(self) -> None:
         (self.raw / self.log["path"]).write_bytes(b"corrupt")
         with patch("election_audit.national.guard"):
             with self.assertRaisesRegex(ValueError, "Original changed"):
                 resume(self.config, self.store, self.scratch, reserve_bytes=0, max_objects=3)
         self.assertEqual(list((self.store / "structural").glob("*/*/artifact.json")), [])
 
-    def test_metadata_tampering_and_unsafe_output_rejected(self):
+    def test_metadata_tampering_and_unsafe_output_rejected(self) -> None:
         with patch("election_audit.national.guard"):
             p = freeze_census(self.config, self.store, self.scratch, reserve_bytes=0)
         (p / "census.json").write_text("{}")
@@ -149,13 +149,13 @@ class NationalTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "outside raw"):
             freeze_census(self.config, self.raw / "derived", self.scratch, reserve_bytes=0)
 
-    def test_capacity_failure_no_complete_artifacts(self):
+    def test_capacity_failure_no_complete_artifacts(self) -> None:
         with patch("election_audit.national.guard", side_effect=OSError("Capacity reserve")):
             with self.assertRaises(OSError):
                 resume(self.config, self.store, self.scratch, reserve_bytes=0, max_objects=3)
         self.assertEqual(list(self.store.glob("censuses/*/census.json")), [])
 
-    def test_census_streams_above_old_row_limit_and_retains_history(self):
+    def test_census_streams_above_old_row_limit_and_retains_history(self) -> None:
         with database(self.manifest) as db:
             db.executemany(
                 "INSERT INTO sections VALUES (?,?,?,?,?,?,?,?)",
@@ -171,32 +171,32 @@ class NationalTests(unittest.TestCase):
                 db.execute("SELECT count(*) FROM section_observation").fetchone()[0], 100_001
             )
 
-    def test_unbounded_run_requires_explicit_reviewed_output_budget(self):
+    def test_unbounded_run_requires_explicit_reviewed_output_budget(self) -> None:
         with self.assertRaisesRegex(ValueError, "explicit output budget"):
             resume(self.config, self.store, self.scratch)
         self.assertFalse(self.store.exists())
 
-    def test_output_budget_exhaustion_never_publishes_success(self):
+    def test_output_budget_exhaustion_never_publishes_success(self) -> None:
         with patch("election_audit.national.guard"):
             with self.assertRaisesRegex(OSError, "output budget exhausted"):
                 resume(self.config, self.store, self.scratch, output_budget_bytes=1)
         self.assertEqual(list((self.store / "structural").glob("*/*/artifact.json")), [])
         self.assertEqual(list(self.scratch.glob("national-object-*")), [])
 
-    def test_shared_scratch_budget_and_cleanup(self):
+    def test_shared_scratch_budget_and_cleanup(self) -> None:
         with patch("election_audit.national.guard"), patch.dict(LIMITS, {"spill_bytes": 100}):
             with self.assertRaisesRegex(OSError, "scratch budget exceeded"):
                 resume(self.config, self.store, self.scratch, max_objects=1)
         self.assertEqual(list((self.store / "structural").glob("*/*/artifact.json")), [])
         self.assertEqual(list(self.scratch.glob("national-object-*")), [])
 
-    def test_invalid_hash_rejected_before_content_path_creation(self):
+    def test_invalid_hash_rejected_before_content_path_creation(self) -> None:
         bad = {**self.log, "sha256": "../" + "x" * 61}
         with self.assertRaisesRegex(ValueError, "Invalid file metadata"):
             process_object(bad, self.store, self.scratch)
         self.assertFalse(self.store.exists())
 
-    def test_scoped_status_excludes_unrelated_shared_content(self):
+    def test_scoped_status_excludes_unrelated_shared_content(self) -> None:
         with patch("election_audit.national.guard"):
             result = resume(self.config, self.store, self.scratch, max_objects=1)
             other_body = io.BytesIO()
@@ -221,7 +221,7 @@ class NationalTests(unittest.TestCase):
             national_main(["status", "--store", str(self.store), "--config", str(config_path)])
         self.assertEqual(json.loads(output.getvalue())["structural_objects"], 1)
 
-    def test_reuse_checks_frozen_original_and_symlink(self):
+    def test_reuse_checks_frozen_original_and_symlink(self) -> None:
         with patch("election_audit.national.guard"):
             resume(self.config, self.store, self.scratch, max_objects=1)
         event = next((self.store / "structural").glob("*/*/events.parquet"))
@@ -237,7 +237,7 @@ class NationalTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Frozen original corrupt"):
             process_object(self.log, self.store, self.scratch)
 
-    def test_concurrent_census_and_run_lock_fail_without_duplicate_work(self):
+    def test_concurrent_census_and_run_lock_fail_without_duplicate_work(self) -> None:
         from election_audit.national import _lock
 
         with _lock(self.store, "national"):
@@ -245,7 +245,7 @@ class NationalTests(unittest.TestCase):
                 resume(self.config, self.store, self.scratch, max_objects=1)
         self.assertEqual(list(self.store.glob("censuses/*/census.json")), [])
 
-    def test_hdd_reserve_floor_survives_smaller_requested_reserve(self):
+    def test_hdd_reserve_floor_survives_smaller_requested_reserve(self) -> None:
         from collections import namedtuple
 
         disk = namedtuple("disk", "total used free")
@@ -255,7 +255,7 @@ class NationalTests(unittest.TestCase):
             with self.assertRaisesRegex(OSError, "Capacity reserve"):
                 guard(self.base, self.scratch, reserve_bytes=0)
 
-    def test_census_reuse_checks_frozen_metadata_bytes(self):
+    def test_census_reuse_checks_frozen_metadata_bytes(self) -> None:
         with patch("election_audit.national.guard"):
             census = freeze_census(self.config, self.store, self.scratch)
         with database(census / "census.sqlite") as db:
@@ -266,7 +266,7 @@ class NationalTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Frozen metadata original corrupt"):
             freeze_census(self.config, self.store, self.scratch)
 
-    def test_new_bounded_parser_preserves_existing_event_identity(self):
+    def test_new_bounded_parser_preserves_existing_event_identity(self) -> None:
         from election_audit.archive_parsing import parse_object
 
         old, _ = parse_object(
@@ -283,7 +283,7 @@ class NationalTests(unittest.TestCase):
         ]
         self.assertEqual(actual, expected)
 
-    def test_wide_rows_flush_before_row_count_limit(self):
+    def test_wide_rows_flush_before_row_count_limit(self) -> None:
         from election_audit.national import _compact_jsonl
 
         source = self.base / "wide.jsonl"
@@ -293,7 +293,7 @@ class NationalTests(unittest.TestCase):
         self.assertEqual(_compact_jsonl(source, output, batch_rows=2048), 3)
         self.assertEqual(pq.ParquetFile(output).num_row_groups, 2)
 
-    def test_explicit_sections_freeze_only_selected_versions_and_histories(self):
+    def test_explicit_sections_freeze_only_selected_versions_and_histories(self) -> None:
         self.save(
             self.prefix + "dados/ac/01007/0001/0002/pkg/b-log.jez",
             (self.raw / self.log["path"]).read_bytes(),
@@ -317,7 +317,7 @@ class NationalTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             read_config(config_path)
 
-    def test_info_counts_do_not_hide_errors_after_former_issue_cap(self):
+    def test_info_counts_do_not_hide_errors_after_former_issue_cap(self) -> None:
         archive = io.BytesIO()
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as z:
             z.writestr(
@@ -342,7 +342,9 @@ class NationalTests(unittest.TestCase):
         self.assertEqual(issues[-1]["record_locator"]["line_start"], 24000)
         self.assertTrue(all(r["issue_code"] == "malformed_columns" for r in issues))
 
-    def test_only_unknown_info_is_structurally_complete_but_not_scientifically_eligible(self):
+    def test_only_unknown_info_is_structurally_complete_but_not_scientifically_eligible(
+        self,
+    ) -> None:
         archive = io.BytesIO()
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as z:
             z.writestr(
@@ -360,7 +362,7 @@ class NationalTests(unittest.TestCase):
         self.assertEqual(doc["scientific_eligibility"], "unavailable_structural_only")
         self.assertEqual(doc["counts"], {"events": 11000, "issues": 0})
 
-    def test_published_uppercase_official_phase_is_normalized_without_rewriting_bytes(self):
+    def test_published_uppercase_official_phase_is_normalized_without_rewriting_bytes(self) -> None:
         row = self.save(
             self.prefix + "dados/ac/01007/0001/0001/p003221-ac-m01007-z0001-s0001-aux.json",
             b'{"f":"O","st":"Totalizada","hashes":[]}',

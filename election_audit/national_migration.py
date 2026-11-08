@@ -26,7 +26,7 @@ def sha(path):
     return h.hexdigest()
 
 
-def atomic(path, value):
+def atomic(path, value) -> None:
     path = Path(path)
     body = (json.dumps(value, sort_keys=True, indent=2) + "\n").encode()
     temporary = path.with_name(path.name + ".new")
@@ -73,7 +73,7 @@ def transfer_alive(expected, current):
     return bool(current and current["start"] == expected["start"] and current["state"] != "Z")
 
 
-def writers(roots, *, allowed=()):
+def writers(roots, *, allowed=()) -> None:
     """Detect other transfer processes and writable file descriptors in these roots."""
     roots = [str(Path(p)).rstrip("/") for p in roots]
     for proc in processes():
@@ -363,7 +363,7 @@ def verify_round(item, state, report, guard):
         return certificate
 
 
-def execute(plan_path):
+def execute(plan_path) -> None:
     plan_path = Path(plan_path).resolve()
     plan = json.loads(plan_path.read_text())
     state = Path(plan["state"])
@@ -372,7 +372,7 @@ def execute(plan_path):
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     started = time.time()
 
-    def report(stage, extra=None):
+    def report(stage, extra=None) -> None:
         value = {
             "stage": stage,
             "pid": os.getpid(),
@@ -388,7 +388,7 @@ def execute(plan_path):
         outcomes = wait_transfers(plan, report)
         roots = [x[k] for x in plan["rounds"] for k in ("new_root", "old_root")]
 
-        def guard():
+        def guard() -> None:
             writers(roots)
             for item in plan["rounds"]:
                 anchor = Path(item["mount"])

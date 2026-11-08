@@ -32,7 +32,7 @@ class ElectionDescriptor:
             raise ValueError("Election descriptor identifiers/date disagree")
 
     @property
-    def phase(self):
+    def phase(self) -> str:
         return "o"
 
     def as_dict(self):

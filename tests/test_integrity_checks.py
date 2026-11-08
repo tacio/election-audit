@@ -32,7 +32,7 @@ ITEM = {
 
 @unittest.skipUnless(importlib.util.find_spec("asn1tools"), "verification extra is not installed")
 class SectionCheckTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         from election_audit import integrity_checks as ic
 
         self.ic = ic
@@ -46,7 +46,7 @@ class SectionCheckTests(unittest.TestCase):
     def check(self, blobs=None, published=None):
         return self.ic.check_section(ITEM, blobs or self.blobs, published or self.published, 3221)
 
-    def test_real_section_passes_every_check(self):
+    def test_real_section_passes_every_check(self) -> None:
         row, contests, restricted, issues = self.check()
         self.assertEqual(issues, [])
         self.assertEqual((row["vsc_status"], row["bu_status"], row["rdv_status"]), ("decoded",) * 3)
@@ -71,13 +71,13 @@ class SectionCheckTests(unittest.TestCase):
         self.assertFalse({"attendance", "bu_votes", "eligible"} & (set(row) | set(contests[0])))
         self.assertEqual({r["attendance"] for r in restricted}, {r["bu_votes"] for r in restricted})
 
-    def test_a_changed_file_hash_is_named(self):
+    def test_a_changed_file_hash_is_named(self) -> None:
         published = dict(self.published, log=hashlib.sha512(b"other bytes").digest())
         row, _, _, _ = self.check(published=published)
         self.assertEqual(row["i1_hash_mismatches"], 1)
         self.assertEqual(json.loads(row["i1_detail_json"])["mismatched"], [ITEM["members"]["log"]])
 
-    def test_a_changed_vote_count_breaks_the_chain_and_the_recount(self):
+    def test_a_changed_vote_count_breaks_the_chain_and_the_recount(self) -> None:
         from election_audit.binary_bu import codec
 
         parser = codec()
@@ -101,7 +101,7 @@ class SectionCheckTests(unittest.TestCase):
         row, _, _, _ = self.check(blobs=blobs, published=published)
         self.assertEqual(row["i1_hash_mismatches"], 1)
 
-    def test_corrupt_files_are_recorded_not_raised(self):
+    def test_corrupt_files_are_recorded_not_raised(self) -> None:
         row, contests, _, _ = self.check(blobs={"bu": b"\x30\x03xyz", "rdv": b"", "vsc": b"junk"})
         self.assertEqual((row["bu_status"], row["rdv_status"], row["vsc_status"]), ("error",) * 3)
         self.assertEqual(contests, [])
@@ -182,7 +182,7 @@ class SectionCheckTests(unittest.TestCase):
             },
         )
 
-    def test_ecdsa_urn_signatures_are_verified(self):
+    def test_ecdsa_urn_signatures_are_verified(self) -> None:
         files = {"o1-bu.dat": b"bu bytes", "o1-log.jez": b"log bytes"}
         published = {n: hashlib.sha512(b).digest() for n, b in files.items()}
         row, verify = self.ic.check_signatures(self.ecdsa_vsc(files), published, "2026-10-25")
@@ -201,7 +201,7 @@ class SectionCheckTests(unittest.TestCase):
 class Ed521Tests(unittest.TestCase):
     """DOC-ICP-01.01 E-521 arithmetic and signatures, with no optional dependency."""
 
-    def test_base_point_has_order_l_and_lies_on_the_curve(self):
+    def test_base_point_has_order_l_and_lies_on_the_curve(self) -> None:
         from election_audit import ed521
 
         x, y = ed521.BASE_X, ed521.BASE_Y
@@ -211,7 +211,7 @@ class Ed521Tests(unittest.TestCase):
         self.assertFalse(ed521._equal(ed521._multiply(ed521.L - 1, ed521.BASE), ed521._IDENTITY))
         self.assertEqual(ed521.decode(ed521.encode(ed521.BASE)), ed521.BASE)
 
-    def test_fast_multiplication_agrees_with_double_and_add(self):
+    def test_fast_multiplication_agrees_with_double_and_add(self) -> None:
         import random
 
         from election_audit import ed521
@@ -228,7 +228,7 @@ class Ed521Tests(unittest.TestCase):
                 other = ed521._multiply(scalar, point)
                 self.assertTrue(ed521._equal(ed521._fast_multiply(scalar, point), other))
 
-    def test_sign_verify_round_trip(self):
+    def test_sign_verify_round_trip(self) -> None:
         from election_audit import ed521
 
         seed = bytes(range(66))
@@ -272,7 +272,7 @@ class Ed521rsParityTests(unittest.TestCase):
                 yield key, signature[:131], message
                 yield bytes(66), signature, message
 
-    def test_strict_verdicts_match_the_python_reference(self):
+    def test_strict_verdicts_match_the_python_reference(self) -> None:
         import ed521rs
 
         from election_audit import ed521
@@ -288,7 +288,7 @@ class Ed521rsParityTests(unittest.TestCase):
             self.assertEqual(got, expected)
         self.assertEqual(verdicts.count(True), 12)
 
-    def test_the_verifier_counts_ecpy_disagreements(self):
+    def test_the_verifier_counts_ecpy_disagreements(self) -> None:
         from election_audit import ed521
         from election_audit import integrity_checks as ic
 
@@ -309,7 +309,7 @@ class Ed521rsParityTests(unittest.TestCase):
 class UrnEd521Tests(unittest.TestCase):
     """The real UE2022 fixture: every hardware signature verifies, changes are caught."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         from cryptography import x509
         from cryptography.hazmat.primitives.serialization import Encoding
 
@@ -327,7 +327,7 @@ class UrnEd521Tests(unittest.TestCase):
     def signed(self, digest, signature):
         return self.ed521.verify(self.key, signature, hashlib.sha512(digest).digest())
 
-    def test_self_and_file_signatures_verify(self):
+    def test_self_and_file_signatures_verify(self) -> None:
         auto = self.hardware["autoAssinado"]["assinatura"]
         self.assertEqual(len(self.key), 66)
         self.assertTrue(self.signed(auto["hash"], auto["assinatura"]))
@@ -345,13 +345,13 @@ class UrnEd521Tests(unittest.TestCase):
                     hashlib.sha512(path.read_bytes()).digest(), entry["assinatura"]["hash"]
                 )
 
-    def test_a_flipped_hash_or_the_unhashed_digest_fails(self):
+    def test_a_flipped_hash_or_the_unhashed_digest_fails(self) -> None:
         auto = self.hardware["autoAssinado"]["assinatura"]
         flipped = bytes([auto["hash"][0] ^ 1]) + auto["hash"][1:]
         self.assertFalse(self.signed(flipped, auto["assinatura"]))
         self.assertFalse(self.ed521.verify(self.key, auto["assinatura"], auto["hash"]))
 
-    def test_a_changed_signature_is_reported_as_failed(self):
+    def test_a_changed_signature_is_reported_as_failed(self) -> None:
         codec = self.ic.signature_codec()
         entity = codec.decode(self.ic.SIGNATURE_TYPE, self.raw)
         signature = bytearray(entity["assinaturaHW"]["autoAssinado"]["assinatura"]["assinatura"])
@@ -364,7 +364,7 @@ class UrnEd521Tests(unittest.TestCase):
         self.assertEqual(row["ed521_ecpy_disagreements"], 0)
         self.assertFalse(verify(b"\x00" * 64, signature))
 
-    def test_other_key_types_have_no_ed521_key(self):
+    def test_other_key_types_have_no_ed521_key(self) -> None:
         from cryptography import x509
         from cryptography.hazmat.primitives.serialization import Encoding
 
@@ -382,7 +382,7 @@ class UrnEd521Tests(unittest.TestCase):
 
 @unittest.skipUnless(importlib.util.find_spec("asn1tools"), "verification extra is not installed")
 class SectionPassTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.bulk = Path(self.temp.name) / "bulk"
@@ -412,7 +412,7 @@ class SectionPassTests(unittest.TestCase):
             self.bulk, 2, self.output, ufs=["ac"], workers=1, shard_sections=1, **options
         )
 
-    def test_pass_hashes_logs_groups_sections_and_resumes(self):
+    def test_pass_hashes_logs_groups_sections_and_resumes(self) -> None:
         import pyarrow.parquet as pq
 
         result = self.run_pass()
@@ -435,7 +435,7 @@ class SectionPassTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             self.run_pass()
 
-    def test_only_reviewed_years_and_complete_archives(self):
+    def test_only_reviewed_years_and_complete_archives(self) -> None:
         from election_audit.integrity_checks import section_work_list
 
         with self.assertRaisesRegex(ValueError, "2026 member layout"):
@@ -461,7 +461,7 @@ class SectionPassTests(unittest.TestCase):
         envelope = codec().decode("EntidadeEnvelopeGenerico", raw)
         contests = bu_contests(codec().decode("EntidadeBoletimUrna", envelope["conteudo"]))
 
-        def stamp(v):
+        def stamp(v) -> str:
             return f"{v[:4]}-{v[4:6]}-{v[6:8]} {v[9:11]}:{v[11:13]}:{v[13:15]}"
 
         rows = []
@@ -516,7 +516,7 @@ class SectionPassTests(unittest.TestCase):
             db.commit()
         return root
 
-    def test_bweb_comparison_names_changed_counts_and_fields(self):
+    def test_bweb_comparison_names_changed_counts_and_fields(self) -> None:
         from election_audit.integrity_checks import run_bweb
 
         self.run_pass()
@@ -529,7 +529,7 @@ class SectionPassTests(unittest.TestCase):
         self.assertEqual(same["summary"]["i2"], {"equal": 2})
         self.assertEqual(same["discrepancy_kinds"], {})
 
-        def change(rows):
+        def change(rows) -> None:
             rows[0]["QT_VOTOS"] = str(int(rows[0]["QT_VOTOS"]) + 1)
             for row in rows:
                 row["CD_FLASHCARD_URNA_EFETIVADA"] = "00000000"
@@ -596,7 +596,7 @@ class SectionPassTests(unittest.TestCase):
         )
         return root
 
-    def test_hierarchy_matches_and_maps_voided_candidacies(self):
+    def test_hierarchy_matches_and_maps_voided_candidacies(self) -> None:
         from election_audit.integrity_checks import run_hierarchy
 
         self.run_pass()
@@ -617,7 +617,7 @@ class SectionPassTests(unittest.TestCase):
         self.assertEqual(changed["differing_measures"], {"candidate:13": 1})
         self.assertEqual(changed["summary"]["uf:children_vs_ea20"], {"equal": 1})
 
-    def test_effective_urn_matches_its_bu(self):
+    def test_effective_urn_matches_its_bu(self) -> None:
         import csv
         import io
 
@@ -681,7 +681,7 @@ class SectionPassTests(unittest.TestCase):
 
 
 class RdvBlockTests(unittest.TestCase):
-    def test_repeated_contest_blocks_are_summed(self):
+    def test_repeated_contest_blocks_are_summed(self) -> None:
         from election_audit.integrity_checks import rdv_contests
 
         def block(votes, choices=1):
@@ -729,7 +729,7 @@ class LogRuleTests(unittest.TestCase):
         }
         return base | values
 
-    def test_clock_and_session_rules(self):
+    def test_clock_and_session_rules(self) -> None:
         from election_audit.integrity_checks import clock_rules
 
         self.assertEqual(clock_rules([self.session()], "2026-10-25"), [])
@@ -762,7 +762,7 @@ class LogRuleTests(unittest.TestCase):
         ]
         self.assertEqual(clock_rules(last_open, "2026-10-25"), ["R2"])
 
-    def test_round1_blocks_are_compared_block_by_block(self):
+    def test_round1_blocks_are_compared_block_by_block(self) -> None:
         import pyarrow as pa
         import pyarrow.parquet as pq
 

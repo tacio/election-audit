@@ -45,7 +45,7 @@ def _db(path):
     return db
 
 
-def _initialize(db):
+def _initialize(db) -> None:
     db.executescript("""
       CREATE TABLE units(unit_key TEXT PRIMARY KEY,round INTEGER,uf TEXT,municipality_tse TEXT,zone TEXT,section TEXT,
        principal_section_id TEXT,location_id TEXT,stable_location_id TEXT,source_snapshot_id TEXT,source_ready INTEGER,payload TEXT);
@@ -61,7 +61,7 @@ def _initialize(db):
     """)
 
 
-def _store_unit(db, unit, counts, members=()):
+def _store_unit(db, unit, counts, members=()) -> None:
     required = ("round", "uf", "municipality_tse", "zone", "section", "source_snapshot_id")
     if any(unit.get(k) in (None, "") for k in required):
         raise ValueError("Unit requires explicit round/geography/source identity")
@@ -290,7 +290,7 @@ def ingest_release(db, path, ufs=None):
     }
 
 
-def apply_links(db, document=None):
+def apply_links(db, document=None) -> None:
     if document is None:
         return
     if document.get("version") != "reviewed-feature-links-v1":
@@ -378,7 +378,7 @@ def measures(unit, counts, operations, candidate_a=None, candidate_b=None):
     legal = totals.get("legal_final_counts_ready") is True
     result = {}
 
-    def ratio(feature, component, numerator, denominator, reason=None):
+    def ratio(feature, component, numerator, denominator, reason=None) -> None:
         if reason is None and (numerator is None or denominator is None):
             reason = "missing_input"
         if reason is None and denominator <= 0:
@@ -501,7 +501,7 @@ def measures(unit, counts, operations, candidate_a=None, candidate_b=None):
     return result
 
 
-def derive_features(db, candidate_a=None, candidate_b=None):
+def derive_features(db, candidate_a=None, candidate_b=None) -> None:
     definitions = {f["id"]: f for f in FEATURES}
     for unitrow in db.execute("SELECT * FROM units ORDER BY unit_key"):
         unit = dict(unitrow)
@@ -576,7 +576,7 @@ def derive_features(db, candidate_a=None, candidate_b=None):
             )
 
 
-def derive_rounds(db):
+def derive_rounds(db) -> None:
     groups = db.execute(
         "SELECT DISTINCT stable_location_id FROM units WHERE stable_location_id IS NOT NULL ORDER BY 1"
     )
@@ -684,7 +684,7 @@ def _write_table(db, table, output):
     file = None
     batch = []
 
-    def close():
+    def close() -> None:
         if writer:
             if batch:
                 writer.write_table(pa.Table.from_arrays([pa.array(batch)], schema=schema))
@@ -786,7 +786,7 @@ def publish_features(
         raise
 
 
-def features_main(argv=None):
+def features_main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--electoral", type=Path, action="append", required=True)
     parser.add_argument("--output", type=Path, required=True)

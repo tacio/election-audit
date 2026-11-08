@@ -12,14 +12,14 @@ from scripts.audit_statistics import (
 
 
 class AuditStatisticsTests(unittest.TestCase):
-    def test_conformal_ranks_are_conservative_with_ties(self):
+    def test_conformal_ranks_are_conservative_with_ties(self) -> None:
         self.assertEqual(conformal_tail_pvalues([1, 2, 2, 3], [0, 2, 3, 4]), [1, 0.8, 0.4, 0.2])
         self.assertEqual(conformal_tail_pvalues([7, 7], [7]), [1])
         for calibration, test in (([], [1]), ([math.nan], [1]), ([1], [math.inf])):
             with self.assertRaises(ValueError):
                 conformal_tail_pvalues(calibration, test)
 
-    def test_by_matches_step_up_decisions_for_every_threshold(self):
+    def test_by_matches_step_up_decisions_for_every_threshold(self) -> None:
         pvalues = [0.7, 0.0001, 0.02, 0.02, 0.1]
         adjusted = by_adjusted_pvalues(pvalues)
         order = sorted(range(len(pvalues)), key=pvalues.__getitem__)
@@ -39,7 +39,7 @@ class AuditStatisticsTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 by_adjusted_pvalues(invalid)
 
-    def test_removal_bounds_exhaust_all_feasible_anonymous_subsets(self):
+    def test_removal_bounds_exhaust_all_feasible_anonymous_subsets(self) -> None:
         # Enumerate every assignment, including blank/null ballots and empty sets.
         for a, b, other in itertools.product(range(5), repeat=3):
             for r in range(a + b + other + 1):
@@ -56,7 +56,7 @@ class AuditStatisticsTests(unittest.TestCase):
                         (min(feasible), max(feasible)),
                     )
 
-    def test_switch_threshold_really_reverses_and_is_minimal(self):
+    def test_switch_threshold_really_reverses_and_is_minimal(self) -> None:
         for margin in range(1, 100):
             switches = switches_to_reverse(margin)
             self.assertLess(margin - 2 * switches, 0)
@@ -64,7 +64,7 @@ class AuditStatisticsTests(unittest.TestCase):
         self.assertEqual(maximum_switch_margin_change(10, 50), 20)
         self.assertEqual(maximum_switch_margin_change(100, 3), 6)
 
-    def test_invalid_count_constraints(self):
+    def test_invalid_count_constraints(self) -> None:
         for bad in (-1, 1.5, True):
             with self.assertRaises(ValueError):
                 removal_contribution_bounds(bad, 1, 0, 0)

@@ -113,7 +113,7 @@ RESTART = timed_body(
 
 
 class SessionMachineTests(unittest.TestCase):
-    def test_matches_the_event_level_adapter_on_edge_cases(self):
+    def test_matches_the_event_level_adapter_on_edge_cases(self) -> None:
         cases = {
             "cycles": jez(log_body(CYCLES)),
             "two_members_nested": jez(log_body(CYCLES[:4]), log_body(CYCLES[4:]), nested=True),
@@ -140,7 +140,7 @@ class SessionMachineTests(unittest.TestCase):
                         counts.get("orphan_completions", 0),
                     )
 
-    def test_session_aggregates_cadence_and_segments(self):
+    def test_session_aggregates_cadence_and_segments(self) -> None:
         body = jez(log_body(CYCLES))
         with tempfile.TemporaryDirectory() as d:
             original = Path(d) / "x.jez"
@@ -166,7 +166,7 @@ class SessionMachineTests(unittest.TestCase):
         self.assertIn("Mesário # habilitou o eleitor", templates)
         self.assertFalse(any(VOTER in t or TOKEN in t for t in templates))
 
-    def test_sessions_started_the_day_before_and_restarts_keep_their_votes(self):
+    def test_sessions_started_the_day_before_and_restarts_keep_their_votes(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             original = Path(d) / "x.jez"
             original.write_bytes(jez(DAY_BEFORE))
@@ -186,7 +186,7 @@ class SessionMachineTests(unittest.TestCase):
         # The restart line stays in the official block.
         self.assertEqual([g["context"] for g in restart.segments], ["initial", "official_round_2"])
 
-    def test_readings_are_validated_exactly(self):
+    def test_readings_are_validated_exactly(self) -> None:
         self.assertIsNone(sp.reading_seconds("31/02/2026 10:00:00"))
         self.assertIsNone(sp.reading_seconds("25/10/2026 24:00:00"))
         self.assertIsNone(sp.reading_seconds("25/10/2026 1:00:000"))
@@ -195,7 +195,7 @@ class SessionMachineTests(unittest.TestCase):
 
 
 class PassTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         base = Path(self.temp.name)
@@ -237,7 +237,7 @@ class PassTests(unittest.TestCase):
             self.root, 2, self.output, exclusions_path=self.exclusions, workers=1, **options
         )
 
-    def test_pass_excludes_protected_records_errors_and_resumes(self):
+    def test_pass_excludes_protected_records_errors_and_resumes(self) -> None:
         result = self.run_pass(shard_objects=2)
         self.assertEqual(result["objects"], 3)
         self.assertEqual(result["excluded_objects"], 1)
@@ -262,7 +262,7 @@ class PassTests(unittest.TestCase):
         again = self.run_pass(shard_objects=2, resume=True)
         self.assertEqual(again["files"], result["files"])
 
-    def test_uf_filter_and_worker_cap(self):
+    def test_uf_filter_and_worker_cap(self) -> None:
         result = self.run_pass(ufs=["al"])
         self.assertEqual(result["objects"], 2)
         with self.assertRaisesRegex(ValueError, "half the CPUs"):
@@ -316,7 +316,7 @@ CYCLES_2022 = [
 
 
 class Year2022Tests(unittest.TestCase):
-    def test_2022_descriptors(self):
+    def test_2022_descriptors(self) -> None:
         first, second = election_for_round(1, 2022), election_for_round(2, 2022)
         self.assertEqual((first.pleito_code, first.election_date), ("406", "2022-10-02"))
         self.assertEqual((second.pleito_code, second.election_date), ("407", "2022-10-30"))
@@ -324,7 +324,7 @@ class Year2022Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             election_for_round(2, 2018)
 
-    def test_7z_logs_match_the_adapter_and_keep_unreviewed_methods_unknown(self):
+    def test_7z_logs_match_the_adapter_and_keep_unreviewed_methods_unknown(self) -> None:
         cases = {
             "cycles": make_7z([("logd.dat", log_body_2022(CYCLES_2022))]),
             "nested": make_7z(
@@ -356,7 +356,7 @@ class Year2022Tests(unittest.TestCase):
         self.assertEqual(session["authorization_failures"], 1)
         self.assertEqual(session["cycles_suspended_unknown"], 1)
 
-    def test_decades_long_clock_steps_are_kept_not_overflowed(self):
+    def test_decades_long_clock_steps_are_kept_not_overflowed(self) -> None:
         body = (
             log_body_2022(CYCLES_2022[:4])
             + log_body_2022(CYCLES_2022[:4], date="01/01/1933", start=10).split(b"\n", 4)[4]
@@ -369,7 +369,7 @@ class Year2022Tests(unittest.TestCase):
             rows = pq.read_table(Path(d) / "s.parquet").to_pylist()
         self.assertEqual(rows[-1]["reading_backstep_max_s"], session["reading_backstep_max_s"])
 
-    def test_rules_do_not_cross_years(self):
+    def test_rules_do_not_cross_years(self) -> None:
         log_2026 = jez(log_body(CYCLES, date="30/10/2022"))
         summary = sp.summarize_object(log_2026, "x", 2, 2022)
         self.assertFalse(any(s["session_kind"] == "official_vota" for s in summary.sessions))
@@ -379,7 +379,7 @@ class Year2022Tests(unittest.TestCase):
 
 
 class BulkPassTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.bulk = Path(self.temp.name) / "bulk"
@@ -408,7 +408,7 @@ class BulkPassTests(unittest.TestCase):
             None, 2, self.output, bulk_root=self.bulk, year=2022, workers=1, **options
         )
 
-    def test_bulk_pass_reads_members_in_order_with_witnesses(self):
+    def test_bulk_pass_reads_members_in_order_with_witnesses(self) -> None:
         result = self.run_bulk(ufs=["ac", "al"], shard_objects=1)
         self.assertEqual((result["objects"], result["errors"]), (2, 1))
         self.assertEqual(result["year"], 2022)
@@ -428,7 +428,7 @@ class BulkPassTests(unittest.TestCase):
         again = self.run_bulk(ufs=["ac", "al"], shard_objects=1, resume=True)
         self.assertEqual(again["files"], result["files"])
 
-    def test_bulk_mode_never_reads_2026_and_takes_no_exclusions(self):
+    def test_bulk_mode_never_reads_2026_and_takes_no_exclusions(self) -> None:
         with self.assertRaisesRegex(ValueError, "certified staging"):
             sp.bulk_archives(self.bulk, 2026, 2)
         with self.assertRaisesRegex(ValueError, "protected"):

@@ -181,7 +181,7 @@ def _rows(data, spec, name):
         raise PublicationError("Normalized format must be csv or jsonl")
 
 
-def validate_import_row(name, row, *, schema=None):
+def validate_import_row(name, row, *, schema=None) -> None:
     if name in SCHEMA:
         errors = validate_rows(name, [row], schema=schema)
         if errors:

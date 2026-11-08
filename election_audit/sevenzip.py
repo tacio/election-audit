@@ -42,7 +42,7 @@ class SevenZipError(ValueError):
 
 
 class _Reader:
-    def __init__(self, data):
+    def __init__(self, data) -> None:
         self.data, self.pos = data, 0
 
     def byte(self):
@@ -81,7 +81,7 @@ class _Reader:
         defined = [True] * count if self.byte() else self.bits(count)
         return [struct.unpack("<I", self.take(4))[0] if d else None for d in defined]
 
-    def expect(self, value):
+    def expect(self, value) -> None:
         if self.byte() != value:
             raise SevenZipError("Unexpected 7z header property")
 

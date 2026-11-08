@@ -31,13 +31,13 @@ def _sha(b):
     return hashlib.sha256(b).hexdigest()
 
 
-def _required(condition, message):
+def _required(condition, message) -> None:
     if not condition:
         raise ValueError(message)
 
 
 class Evidence:
-    def __init__(self, directory, *, allow_download=False):
+    def __init__(self, directory, *, allow_download=False) -> None:
         self.directory = Path(directory)
         self.allow_download = allow_download
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -105,7 +105,7 @@ class Evidence:
         time.sleep(0.125)
         return self.keep(body, url, role, **extra)
 
-    def import_pilot(self, directory):
+    def import_pilot(self, directory) -> None:
         directory = Path(directory)
         for spec in json.loads((directory / "sources.json").read_text()):
             url = spec.get("url")
@@ -120,7 +120,7 @@ class Evidence:
             )
             self.keep(body, url, spec["role"], original_observation=spec)
 
-    def import_manifest(self, manifest, root, election, uf):
+    def import_manifest(self, manifest, root, election, uf) -> None:
         root = Path(root).resolve()
         with sqlite3.connect(Path(manifest).resolve().as_uri() + "?mode=ro", uri=True) as db:
             db.row_factory = sqlite3.Row
@@ -143,7 +143,7 @@ class Evidence:
             db.rollback()
 
 
-def read_bweb(store, archive, expected_sha, election, uf):
+def read_bweb(store, archive, expected_sha, election, uf) -> None:
     # Stream the CSV, retaining only one section's records in Python during verification.
     path = Path(archive)
     h = hashlib.sha256()
@@ -543,7 +543,7 @@ def verify(
     return summary
 
 
-def electoral_verify_main(argv=None):
+def electoral_verify_main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--archive", required=True, type=Path)
     p.add_argument("--archive-sha256", required=True)

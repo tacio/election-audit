@@ -124,7 +124,7 @@ def electoral_data():
     return data
 
 
-def add_version(data, vid, status="totalized", supersedes=()):
+def add_version(data, vid, status="totalized", supersedes=()) -> None:
     for name in ("result_version", "section_contest_totals", "result_evidence"):
         r = copy.deepcopy(data[name][0])
         r["result_version_id"] = vid
@@ -142,7 +142,7 @@ def add_version(data, vid, status="totalized", supersedes=()):
 
 
 class ElectoralTests(unittest.TestCase):
-    def test_single_canonical_totals_and_denominators(self):
+    def test_single_canonical_totals_and_denominators(self) -> None:
         generated, _ = derive_electoral(electoral_data())
         self.assertEqual(generated["canonical_result"][0]["result_version_id"], "v")
         self.assertEqual(generated["result_reconciliation"][0]["state"], "reconciled")
@@ -152,7 +152,7 @@ class ElectoralTests(unittest.TestCase):
             generated["section_results"][0]["candidate_valid_shares"], {"candidate": 1.0}
         )
 
-    def test_present_external_electorate_mismatch_blocks_readiness(self):
+    def test_present_external_electorate_mismatch_blocks_readiness(self) -> None:
         data = electoral_data()
         data["electorate_reference"] = [
             {"snapshot_id": "snap", "principal_section_id": "s", "eligible_electors": 21}
@@ -165,7 +165,7 @@ class ElectoralTests(unittest.TestCase):
         self.assertEqual(generated["result_reconciliation"][0]["state"], "mismatch")
         self.assertIsNone(generated["section_results"][0]["turnout"])
 
-    def test_competing_version_without_snapshot_status_evidence_blocks_selection(self):
+    def test_competing_version_without_snapshot_status_evidence_blocks_selection(self) -> None:
         data = electoral_data()
         add_version(data, "unassigned")
         data["result_evidence"] = data["result_evidence"][:1]
@@ -173,7 +173,7 @@ class ElectoralTests(unittest.TestCase):
         self.assertEqual(generated["canonical_result"][0]["selection_state"], "conflict")
         self.assertIsNone(generated["section_results"][0]["turnout"])
 
-    def test_conflict_supersession_received_rejected_excluded(self):
+    def test_conflict_supersession_received_rejected_excluded(self) -> None:
         data = electoral_data()
         add_version(data, "new")
         self.assertEqual(
@@ -197,7 +197,7 @@ class ElectoralTests(unittest.TestCase):
         with self.assertRaisesRegex(PublicationError, "Cyclic"):
             derive_electoral(data)
 
-    def test_duplicate_candidate_and_wrong_round_or_contest_rejected(self):
+    def test_duplicate_candidate_and_wrong_round_or_contest_rejected(self) -> None:
         data = electoral_data()
         data["vote_choice"].append(
             {**data["vote_choice"][0], "vote_choice_id": "duplicate", "choice_code": "other"}
@@ -209,7 +209,7 @@ class ElectoralTests(unittest.TestCase):
         with self.assertRaisesRegex(PublicationError, "election mismatch"):
             derive_electoral(data)
 
-    def test_missing_zero_special_and_all_valid_unanimity(self):
+    def test_missing_zero_special_and_all_valid_unanimity(self) -> None:
         data = electoral_data()
         data["vote_choice_count"] = data["vote_choice_count"][:-1]
         mart = derive_electoral(data)[0]["unanimous_results"][0]
@@ -235,7 +235,7 @@ class ElectoralTests(unittest.TestCase):
         data["section_contest_totals"][0]["special_votes"] = None
         self.assertIsNone(derive_electoral(data)[0]["unanimous_results"][0]["strict_unanimity"])
 
-    def test_aggregation_members_and_sessions_never_multiply_totals(self):
+    def test_aggregation_members_and_sessions_never_multiply_totals(self) -> None:
         data = electoral_data()
         data["section"].append(
             {**data["section"][0], "section_id": "member", "section_code": "0002"}
@@ -253,7 +253,7 @@ class ElectoralTests(unittest.TestCase):
             generated["section_results"][0]["session_candidate_attribution"], "unavailable"
         )
 
-    def test_hierarchy_coverage_before_numeric_mismatch_and_ZZ(self):
+    def test_hierarchy_coverage_before_numeric_mismatch_and_ZZ(self) -> None:
         data = electoral_data()
         data["section"].append({**data["section"][0], "section_id": "zz", "uf": "zz"})
         ref = {
@@ -278,7 +278,7 @@ class ElectoralTests(unittest.TestCase):
         self.assertEqual(finding["state"], "mismatch")
         self.assertEqual(finding["metrics"]["attending_voters"]["difference"], -11)
 
-    def test_timing_negative_corrected_and_naive_unknown(self):
+    def test_timing_negative_corrected_and_naive_unknown(self) -> None:
         data = electoral_data()
 
         def event(eid, kind, time):
@@ -313,7 +313,7 @@ class ElectoralTests(unittest.TestCase):
             )
         )
 
-    def test_harmonized_rounds_disjoint_reviewed_and_aggregate_before_join(self):
+    def test_harmonized_rounds_disjoint_reviewed_and_aggregate_before_join(self) -> None:
         data = electoral_data()
         first = copy.deepcopy(data)
         for name in (

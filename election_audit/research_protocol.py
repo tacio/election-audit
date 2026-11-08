@@ -270,7 +270,7 @@ def publish_protocol(feature_release, output, *, inspected=None, seed=42):
         raise
 
 
-def research_protocol_main(argv=None):
+def research_protocol_main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("feature_release", type=Path)
     parser.add_argument("--output", type=Path, required=True)

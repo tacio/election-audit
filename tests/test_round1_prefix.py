@@ -49,7 +49,7 @@ def urn_bodies(device):
     )
 
 
-def staged(root, round_number, bodies):
+def staged(root, round_number, bodies) -> None:
     pleito = 3220 if round_number == 1 else 3221
     rows, logs = [], []
     for key, body in bodies.items():
@@ -79,7 +79,7 @@ class DescribeTests(unittest.TestCase):
     def records(names):
         return [(n, f"2026-10-04T08:00:{i:02d}", "VOTA", n) for i, n in enumerate(names)]
 
-    def test_insertion_deletion_and_replacement(self):
+    def test_insertion_deletion_and_replacement(self) -> None:
         a = self.records("abcdef")
         k, realigned, kind, detail = rp.describe(a, self.records("abXYcdefgh"))
         self.assertEqual((k, realigned, kind), (2, 4, "insertion_in_runoff"))
@@ -96,7 +96,7 @@ class DescribeTests(unittest.TestCase):
 
 
 class PrefixPassTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         base = Path(self.temp.name)
@@ -180,7 +180,7 @@ class PrefixPassTests(unittest.TestCase):
             self.logs, self.semantic[2], self.semantic[1], self.output, workers=1, **options
         )
 
-    def test_prefixes_are_verified_and_differences_described(self):
+    def test_prefixes_are_verified_and_differences_described(self) -> None:
         self.assertEqual(self.statuses[OPEN], "open_prefix_unverified")
         self.assertEqual(self.statuses[CLOSED], "differs+equal")
         result = self.run_prefix(chunk_objects=2)
@@ -215,7 +215,7 @@ class PrefixPassTests(unittest.TestCase):
         again = self.run_prefix(chunk_objects=2, resume=True)
         self.assertEqual(again["files"], result["files"])
 
-    def test_tampered_staging_object_is_an_object_error(self):
+    def test_tampered_staging_object_is_an_object_error(self) -> None:
         objects = pq.read_table(self.semantic[2] / "release" / "objects.parquet").to_pylist()
         target = next(o for o in objects if json.loads(o["witnesses_json"])[0] == list(OPEN))
         path = Path(self.temp.name) / "turno-2" / target["path"]

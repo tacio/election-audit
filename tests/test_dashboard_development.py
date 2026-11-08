@@ -13,7 +13,7 @@ from election_audit.research_protocol import hash_file, load_protocol, publish_p
 
 
 class DevelopmentDashboardTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -92,7 +92,7 @@ class DevelopmentDashboardTests(unittest.TestCase):
         self.protocol = publish_protocol(self.features, self.root / "protocol")
         self.frozen = load_protocol(self.protocol)
 
-    def test_physical_exclusion_metadata_counts_and_source_identity(self):
+    def test_physical_exclusion_metadata_counts_and_source_identity(self) -> None:
         output = export_development(self.features, self.protocol, self.root / "export")
         d = AuditDataset.open(output)
         with closing(sqlite3.connect(self.protocol / "research.sqlite")) as c:
@@ -125,7 +125,7 @@ class DevelopmentDashboardTests(unittest.TestCase):
         proof = json.loads((output.parent / "access-proof.json").read_text())
         self.assertEqual(proof["protocol_id"], self.frozen["protocol_id"])
 
-    def test_injected_protected_prediction_aborts_publication(self):
+    def test_injected_protected_prediction_aborts_publication(self) -> None:
         with closing(sqlite3.connect(self.protocol / "research.sqlite")) as c:
             key = c.execute(
                 "SELECT unit_key FROM unit_partition WHERE partition_name='test' LIMIT 1"
@@ -150,7 +150,7 @@ class DevelopmentDashboardTests(unittest.TestCase):
             export_development(self.features, self.protocol, self.root / "blocked", predictions=p)
         self.assertFalse((self.root / "blocked").exists())
 
-    def test_wrong_feature_release_is_rejected(self):
+    def test_wrong_feature_release_is_rejected(self) -> None:
         p = self.features / "manifest.json"
         d = json.loads(p.read_text())
         d["release_id"] = "wrong"

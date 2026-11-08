@@ -62,7 +62,7 @@ def session(**values):
 
 
 class CopyTests(unittest.TestCase):
-    def test_internal_and_external_copies_count_once(self):
+    def test_internal_and_external_copies_count_once(self) -> None:
         internal = session(stream_ordinal=0, block_lines=120, cycles_completed_biometric=10)
         external = session(stream_ordinal=1, block_lines=110, cycles_completed_biometric=9)
         ops = section_operations([internal, external])
@@ -72,12 +72,12 @@ class CopyTests(unittest.TestCase):
         self.assertEqual(ops["copy_conflicts"], 0)
         self.assertEqual(ops["completed_biometric"], 10)
 
-    def test_shorter_copy_with_more_completions_is_a_conflict(self):
+    def test_shorter_copy_with_more_completions_is_a_conflict(self) -> None:
         longer = session(block_lines=120, cycles_completed_biometric=10)
         shorter = session(stream_ordinal=1, block_lines=110, cycles_completed_biometric=11)
         self.assertEqual(section_operations([longer, shorter])["copy_conflicts"], 1)
 
-    def test_distinct_blocks_and_ranks_add(self):
+    def test_distinct_blocks_and_ranks_add(self) -> None:
         first = session(cycles_completed_manual=3)
         restart = session(session_ordinal=1, rank_in_segment=2, cycles_completed_manual=4)
         replacement = session(
@@ -96,7 +96,7 @@ class CopyTests(unittest.TestCase):
         self.assertEqual(ops["log_models"], ["UE2020", "UE2022"])
         self.assertEqual(ops["last_model"], "UE2022")
 
-    def test_unlinked_sessions_are_never_merged(self):
+    def test_unlinked_sessions_are_never_merged(self) -> None:
         a = session(block_start=None, cycles_completed_biometric=1)
         b = session(block_start=None, stream_ordinal=1, cycles_completed_biometric=1)
         ops = section_operations([a, b])
@@ -105,7 +105,7 @@ class CopyTests(unittest.TestCase):
 
 
 class ClockTests(unittest.TestCase):
-    def test_close_rules(self):
+    def test_close_rules(self) -> None:
         rows = [
             {"uf": "ac", "municipality": "01392", "configured_close": []},
             {"uf": "mt", "municipality": "90670", "configured_close": []},
@@ -137,7 +137,7 @@ class ClockTests(unittest.TestCase):
         self.assertEqual(rules[("am", "02496")], ("unresolved", None))  # Jutaí
         self.assertEqual(rules[("am", "02607")], ("unresolved", None))
 
-    def test_clock_states(self):
+    def test_clock_states(self) -> None:
         ops = section_operations([session()])
         day = "2026-10-25"
         self.assertEqual(clock_state(None, "15:00:00", day), "no_sessions")
@@ -180,7 +180,7 @@ def row(round_number, section, members, *, ops=None, protected=False, result=Tru
 
 
 class RowTests(unittest.TestCase):
-    def test_timing_needs_a_resolved_clock_and_counts_after_close(self):
+    def test_timing_needs_a_resolved_clock_and_counts_after_close(self) -> None:
         hours = [0] * 24
         hours[14], hours[15] = 5, 2
         ops = section_operations(
@@ -206,7 +206,7 @@ class RowTests(unittest.TestCase):
         self.assertIsNone(restricted["completed_after_close"])
         self.assertEqual(restricted["completed"], 7)
 
-    def test_protected_and_missing_inputs_stay_unavailable(self):
+    def test_protected_and_missing_inputs_stay_unavailable(self) -> None:
         protected = row(2, "0070", ["0070"], protected=True)
         restricted = _finish(protected, "law_uf", "15:00:00")
         self.assertEqual(protected["log_status"], "protected_until_freeze")
@@ -218,7 +218,7 @@ class RowTests(unittest.TestCase):
         self.assertEqual(missing["results_reason"], "missing_input")
         self.assertEqual(missing["log_status"], "no_log")
 
-    def test_recombined_sections_form_one_unit(self):
+    def test_recombined_sections_form_one_unit(self) -> None:
         rows = [
             row(1, "0070", ["0070", "0071"]),
             row(2, "0070", ["0070"]),
@@ -237,7 +237,7 @@ class RowTests(unittest.TestCase):
         self.assertEqual(len(ids), 1)
         self.assertEqual({r["unit_id"] for r in restricted[:3]}, ids)
 
-    def test_chunks_hold_whole_municipalities_of_one_uf(self):
+    def test_chunks_hold_whole_municipalities_of_one_uf(self) -> None:
         sizes = [
             ("ac", "01", 4),
             ("ac", "02", 4),

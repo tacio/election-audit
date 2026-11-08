@@ -24,7 +24,7 @@ class ReleaseInterfaceTests(test_snapshots.SourceFixture):
         base, _, parsed = self.frozen_parse()
         return base, build_from_parse(parsed, base / "warehouse")
 
-    def test_frozen_pipeline_validate_and_bounded_select(self):
+    def test_frozen_pipeline_validate_and_bounded_select(self) -> None:
         base, path = self.build()
         result = validate_release(path)
         self.assertEqual(result["logical_digests"], "passed")
@@ -43,7 +43,7 @@ class ReleaseInterfaceTests(test_snapshots.SourceFixture):
             )
         self.assertEqual(inspect_release(path)["tables"]["operational_coverage"]["rows"], 1)
 
-    def test_sql_cannot_copy_write_multistatement_or_read_external_files(self):
+    def test_sql_cannot_copy_write_multistatement_or_read_external_files(self) -> None:
         base, path = self.build()
         before = inspect_release(path)
         destination = base / "forbidden.csv"
@@ -66,7 +66,7 @@ class ReleaseInterfaceTests(test_snapshots.SourceFixture):
         with self.assertRaises(PublicationError):
             query_release(path, "SELECT 1", max_rows=0)
 
-    def test_reports_default_both_same_findings_sql_and_languages(self):
+    def test_reports_default_both_same_findings_sql_and_languages(self) -> None:
         base, path = self.build()
         output = base / "reports"
         products = report_release(path, output)
@@ -89,7 +89,7 @@ class ReleaseInterfaceTests(test_snapshots.SourceFixture):
         with self.assertRaises(PublicationError):
             report_release(path, path / "reports")
 
-    def test_cli_build_validate_query_report_and_bad_options(self):
+    def test_cli_build_validate_query_report_and_bad_options(self) -> None:
         base, _, parsed = self.frozen_parse()
         output = io.StringIO()
         with redirect_stdout(output):
@@ -117,7 +117,7 @@ class ReleaseInterfaceTests(test_snapshots.SourceFixture):
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             main(["query", path, "--sql", "COPY voting_session TO '/tmp/forbidden.csv'"])
 
-    def test_logical_digest_and_lineage_accounting_failures_are_detected(self):
+    def test_logical_digest_and_lineage_accounting_failures_are_detected(self) -> None:
         from election_audit.archive_parsing import _read_checked, _write_checked
         from election_audit.publication import _validate_accounting
 
@@ -143,7 +143,7 @@ class ReleaseInterfaceTests(test_snapshots.SourceFixture):
                     db, _read_checked(path, "context.json"), set(manifest["selected_objects"])
                 )
 
-    def test_evidenced_partitions_include_events_cycles_and_their_lineage(self):
+    def test_evidenced_partitions_include_events_cycles_and_their_lineage(self) -> None:
         from election_audit.archive_parsing import FrozenParseReader, iter_event_witnesses
         from election_audit.publication import publish_release
         from election_audit.reconstruction import reconstruct_parse
@@ -174,7 +174,7 @@ class ReleaseInterfaceTests(test_snapshots.SourceFixture):
         ]
         self.assertTrue(all("year=2026/round=2/uf=ac" in file for file in operational_lineage))
 
-    def test_snapshot_to_release_uses_worker_setting_and_is_standalone(self):
+    def test_snapshot_to_release_uses_worker_setting_and_is_standalone(self) -> None:
         import shutil
 
         from election_audit.publication import ResourceConfig, build_from_snapshot
@@ -190,7 +190,7 @@ class ReleaseInterfaceTests(test_snapshots.SourceFixture):
         self.assertEqual(validate_release(path)["integrity"], "passed")
         self.assertEqual(inspect_release(path)["settings_applied"]["parser_workers"], 2)
 
-    def test_report_reuses_one_verified_manifest(self):
+    def test_report_reuses_one_verified_manifest(self) -> None:
         from unittest.mock import patch
 
         from election_audit import release_tools
@@ -202,7 +202,7 @@ class ReleaseInterfaceTests(test_snapshots.SourceFixture):
             report_release(path, base / "reports")
         self.assertEqual(inspect.call_count, 1)
 
-    def test_disjoint_bounded_objects_preserve_global_overlap_uncertainty(self):
+    def test_disjoint_bounded_objects_preserve_global_overlap_uncertainty(self) -> None:
         from test_archive_parsing import archive_bytes, log_line
 
         from election_audit.archive_parsing import parse_snapshot

@@ -18,7 +18,7 @@ from election_audit.source_inventory import identity
 
 
 class CompactEventsTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.directory = Path(self.temp.name) / "compact"
@@ -64,7 +64,7 @@ class CompactEventsTests(unittest.TestCase):
             batch_rows=3,
         )
 
-    def test_exact_roundtrip_binary_hashes_member_templates_and_batches(self):
+    def test_exact_roundtrip_binary_hashes_member_templates_and_batches(self) -> None:
         original = list(self.rows())
         self.write(iter(original))
         self.assertEqual(list(iter_compact(self.directory, batch_rows=5)), original)
@@ -76,26 +76,26 @@ class CompactEventsTests(unittest.TestCase):
         self.assertEqual(len(doc["members"]), 3)
         self.assertEqual(doc["count"], 41)
 
-    def test_no_silent_extra_field_or_invalid_event_identity(self):
+    def test_no_silent_extra_field_or_invalid_event_identity(self) -> None:
         row = next(self.rows())
         row["unexpected"] = "must not disappear"
         with self.assertRaises(ValueError):
             self.write([row])
         self.assertFalse((self.directory / "compact.json").exists())
 
-    def test_inconsistent_event_id_rejected(self):
+    def test_inconsistent_event_id_rejected(self) -> None:
         row = next(self.rows())
         row["event_id"] = "changed"
         with self.assertRaisesRegex(ValueError, "identity"):
             self.write([row])
 
-    def test_corrupt_compact_bytes_fail_before_reading_events(self):
+    def test_corrupt_compact_bytes_fail_before_reading_events(self) -> None:
         self.write(self.rows())
         (self.directory / "events.parquet").write_bytes(b"bad")
         with self.assertRaisesRegex(ValueError, "integrity"):
             list(iter_compact(self.directory))
 
-    def test_logical_stream_digest_protects_context_reconstruction(self):
+    def test_logical_stream_digest_protects_context_reconstruction(self) -> None:
         self.write(self.rows())
         doc = _read_json(self.directory / "compact.json")
         doc["object_sha256"] = "b" * 64
@@ -105,11 +105,11 @@ class CompactEventsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "logical event digest"):
             list(iter_compact(self.directory))
 
-    def test_empty_events_are_not_invented(self):
+    def test_empty_events_are_not_invented(self) -> None:
         self.write([])
         self.assertEqual(list(iter_compact(self.directory)), [])
 
-    def test_registered_cas_compact_producer_preserves_original_and_full_events(self):
+    def test_registered_cas_compact_producer_preserves_original_and_full_events(self) -> None:
         from election_audit.archive_parsing import parse_object
         from election_audit.national_storage import process_compact_original, registered_original
         from election_audit.source_inventory import hash_file
@@ -158,7 +158,7 @@ class CompactEventsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "digest mismatch"):
             process_compact_original(row, store, scratch, output_budget_bytes=8 * 1024**2)
 
-    def test_registered_original_rejects_non_cas_namespace(self):
+    def test_registered_original_rejects_non_cas_namespace(self) -> None:
         from election_audit.national_storage import registered_original
 
         with self.assertRaisesRegex(ValueError, "content-addressed namespace"):

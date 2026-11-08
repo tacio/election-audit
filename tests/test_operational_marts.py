@@ -36,7 +36,7 @@ def inputs(completion="2026-10-25T20:00:00+00:00", confidence="verified"):
 
 
 class OperationalMartTests(unittest.TestCase):
-    def test_strict_boundary_offsets_and_open_vs_completion(self):
+    def test_strict_boundary_offsets_and_open_vs_completion(self) -> None:
         at = late_session_row(*inputs())
         self.assertEqual(at["completed_cycles_after17"], 0)
         self.assertTrue(at["remaining_open_at17"])
@@ -48,7 +48,7 @@ class OperationalMartTests(unittest.TestCase):
         args[3][2]["normalized_at"] = "2026-10-25T20:00:00+00:00"
         self.assertFalse(late_session_row(*args)["remaining_open_at17"])
 
-    def test_unresolved_context_clocks_missing_closing_and_overseas(self):
+    def test_unresolved_context_clocks_missing_closing_and_overseas(self) -> None:
         unknown = late_session_row(*inputs(None, "unresolved"))
         self.assertEqual(unknown["unknown_completion_clock_cycles"], 1)
         self.assertIsNone(unknown["remaining_open_at17"])
@@ -67,7 +67,7 @@ class OperationalMartTests(unittest.TestCase):
         self.assertIsNone(overseas["completed_cycles_after17"])
         self.assertEqual(overseas["convention"], "overseas_unavailable")
 
-    def test_bounded_clock_sensitivity_and_cross_shard_uncertainty(self):
+    def test_bounded_clock_sensitivity_and_cross_shard_uncertainty(self) -> None:
         args = inputs("2026-10-25T20:00:00+00:00", "bounded")
         row = late_session_row(
             *args, clock_bounds={"done": ["2026-10-25T19:59:59+00:00", "2026-10-25T20:00:01+00:00"]}
@@ -80,7 +80,9 @@ class OperationalMartTests(unittest.TestCase):
         self.assertIsNone(row["completed_cycles_after17"])
         self.assertIn("cross_shard_overlap_unresolved", row["blockers"])
 
-    def test_missing_lifecycle_never_uses_headers_and_repeats_do_not_multiply_population(self):
+    def test_missing_lifecycle_never_uses_headers_and_repeats_do_not_multiply_population(
+        self,
+    ) -> None:
         context = {
             "snapshot_id": "snap",
             "context_tables": {
@@ -118,7 +120,7 @@ class OperationalMartTests(unittest.TestCase):
         self.assertEqual(receipt["expected_package_denominator"], 1)
         self.assertEqual(receipt["normalized_event_count"], 2)
 
-    def test_expected_members_and_unknown_population_are_retained(self):
+    def test_expected_members_and_unknown_population_are_retained(self) -> None:
         context = {
             "snapshot_id": "snap",
             "context_tables": {

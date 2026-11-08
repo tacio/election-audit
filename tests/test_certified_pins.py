@@ -8,7 +8,7 @@ DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
 
 class CertifiedPinTests(unittest.TestCase):
-    def test_both_rounds_are_pinned_by_distinct_digests(self):
+    def test_both_rounds_are_pinned_by_distinct_digests(self) -> None:
         pins = json.loads(PIN.read_text())
         self.assertEqual(set(pins["rounds"]), {"1", "2"})
         digests = []

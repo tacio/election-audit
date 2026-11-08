@@ -16,7 +16,7 @@ from election_audit.national_workload import prepare as prepare_legacy
 
 
 class ParallelTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         from tests.test_national_migration import MigrationTests
         from tests.test_national_workload import WorkloadExecutionTests
 
@@ -89,7 +89,7 @@ class ParallelTests(unittest.TestCase):
                     rows.setdefault(table, []).extend(db.execute("SELECT * FROM " + table))
         return {k: sorted(v) for k, v in rows.items()}
 
-    def test_real_worker_counts_protected_exclusion_and_logical_determinism(self):
+    def test_real_worker_counts_protected_exclusion_and_logical_determinism(self) -> None:
         first, spec1 = self.setup_job("one", 1)
         second, spec2 = self.setup_job("two", 2)
         # A missing protected source proves scheduler filtering precedes body access.
@@ -107,7 +107,7 @@ class ParallelTests(unittest.TestCase):
                 2,
             )
 
-    def test_published_unledgered_group_recovers_without_reparse(self):
+    def test_published_unledgered_group_recovers_without_reparse(self) -> None:
         out, spec = self.setup_job("recover", 1)
         self.execute(out)
         with sqlite3.connect(Path(spec["store"]) / "work.sqlite") as db:
@@ -126,7 +126,7 @@ class ParallelTests(unittest.TestCase):
         self.assertEqual(parallel.status(out)["completed"], 2)
         self.assertEqual(before, self.logical(spec))
 
-    def test_changed_source_stops_without_published_group(self):
+    def test_changed_source_stops_without_published_group(self) -> None:
         out, spec = self.setup_job("corrupt", 2)
         target = self.copied / self.fixture.rows[0]["path"]
         target.write_bytes(b"x" * target.stat().st_size)
@@ -138,7 +138,7 @@ class ParallelTests(unittest.TestCase):
             )
         self.assertEqual(parallel.status(out)["failures"], 1)
 
-    def test_benchmark_cannot_select_protected_alias(self):
+    def test_benchmark_cannot_select_protected_alias(self) -> None:
         with self.assertRaisesRegex(ValueError, "Protected"):
             parallel.prepare(
                 self.fixture.config,
@@ -147,7 +147,7 @@ class ParallelTests(unittest.TestCase):
                 selection=[self.fixture.rows[2]["sha256"]],
             )
 
-    def test_cancellation_is_fail_fast_and_preserves_unpublished_group(self):
+    def test_cancellation_is_fail_fast_and_preserves_unpublished_group(self) -> None:
         out, spec = self.setup_job("cancel", 1)
         pool = Mock()
         pool._processes = {}
@@ -169,7 +169,7 @@ class ParallelTests(unittest.TestCase):
         self.execute(out)
         self.assertEqual(parallel.status(out)["completed"], 2)
 
-    def test_export_verifies_shard_and_retains_all_witness_unknowns(self):
+    def test_export_verifies_shard_and_retains_all_witness_unknowns(self) -> None:
         from election_audit.national_summary_tools import iter_source_observations, iter_table
 
         out, spec = self.setup_job("readers", 1)
@@ -186,7 +186,7 @@ class ParallelTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "checksum"):
             list(iter_table(out))
 
-    def test_documented_cli_prepare_and_bounded_frozen_run(self):
+    def test_documented_cli_prepare_and_bounded_frozen_run(self) -> None:
         out = self.fixture.root / "cli-config"
         store = self.fixture.root / "cli-store"
         command = [

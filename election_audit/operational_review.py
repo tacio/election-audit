@@ -72,24 +72,24 @@ _MARKERS = {}
 
 
 class Rows:
-    def __init__(self, path):
+    def __init__(self, path) -> None:
         self.writer = pq.ParquetWriter(
             path, pa.schema([("payload", pa.string())]), compression="zstd"
         )
         self.batch, self.count = [], 0
 
-    def append(self, row):
+    def append(self, row) -> None:
         self.batch.append(canonical(row).decode())
         self.count += 1
         if len(self.batch) >= 2048:
             self.flush()
 
-    def flush(self):
+    def flush(self) -> None:
         if self.batch:
             self.writer.write_table(pa.table({"payload": self.batch}))
             self.batch.clear()
 
-    def close(self):
+    def close(self) -> None:
         self.flush()
         self.writer.close()
 
@@ -345,7 +345,7 @@ def review_object(
         phase, phase_anchor, software = None, None, False
         fingerprint, stream_count = hashlib.sha256(), 0
 
-        def finish_cycle(state, event=None):
+        def finish_cycle(state, event=None) -> None:
             nonlocal pending
             if pending is None:
                 if state == "completed":
@@ -384,7 +384,7 @@ def review_object(
                 session["cycles_" + state] = session.get("cycles_" + state, 0) + 1
             pending = None
 
-        def finish_session(reason):
+        def finish_session(reason) -> None:
             nonlocal session, software
             finish_cycle("unresolved")
             if session:
@@ -403,7 +403,7 @@ def review_object(
                 counts["sessions_" + session["session_kind"]] += 1
             session, software = None, False
 
-        def finish_stream():
+        def finish_stream() -> None:
             if stream is not None:
                 finish_session("stream_end")
                 db.execute(
@@ -657,7 +657,7 @@ def review_national(store, output, *, round_number=2, max_objects=None, clock_ev
     }
 
 
-def operational_review_main(argv=None):
+def operational_review_main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--store", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)

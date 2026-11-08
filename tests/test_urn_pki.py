@@ -9,7 +9,7 @@ FIXTURE = Path(__file__).parent / "fixtures/urn-pki"
     importlib.util.find_spec("cryptography"), "verification extra is not installed"
 )
 class UrnPkiTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         from cryptography import x509
 
         from election_audit import urn_pki
@@ -19,7 +19,7 @@ class UrnPkiTests(unittest.TestCase):
     def leaf(self, stem):
         return self.x509.load_pem_x509_certificate((FIXTURE / f"{stem}-leaf.pem").read_bytes())
 
-    def test_authorities_and_revocation_lists_load_verified(self):
+    def test_authorities_and_revocation_lists_load_verified(self) -> None:
         authorities = self.pki.authorities()
         self.assertEqual(set(authorities), {"AC URNA", "AC UE2020", "AC UE2022"})
         self.assertEqual(authorities["AC URNA"].revoked, {2587697, 3042029, 3367061})
@@ -29,7 +29,7 @@ class UrnPkiTests(unittest.TestCase):
         self.assertEqual(len(manifest["files"]), 8)
         self.assertEqual(manifest["authorities"]["AC URNA"]["not_after"][:10], "2026-07-18")
 
-    def test_real_urn_certificates_verify_against_their_ca(self):
+    def test_real_urn_certificates_verify_against_their_ca(self) -> None:
         for stem, ca_valid in (("acurna", False), ("acue2020", True), ("acue2022", True)):
             with self.subTest(stem=stem):
                 row = self.pki.check_certificate(self.leaf(stem), "2026-10-25")
@@ -42,7 +42,7 @@ class UrnPkiTests(unittest.TestCase):
             self.pki.check_certificate(self.leaf("acue2022"))["pki_ca_valid_at_election"]
         )
 
-    def test_a_changed_certificate_fails(self):
+    def test_a_changed_certificate_fails(self) -> None:
         for stem in ("acurna", "acue2022"):
             with self.subTest(stem=stem):
                 der = bytearray(self.leaf(stem).public_bytes(_der()))
@@ -52,7 +52,7 @@ class UrnPkiTests(unittest.TestCase):
                 row = self.pki.check_certificate(changed, "2026-10-25")
                 self.assertEqual(row["pki_issuer_signature"], "failed")
 
-    def test_a_forged_issuer_and_a_revoked_serial_are_reported(self):
+    def test_a_forged_issuer_and_a_revoked_serial_are_reported(self) -> None:
         from datetime import UTC, datetime, timedelta
 
         from cryptography.hazmat.primitives import hashes

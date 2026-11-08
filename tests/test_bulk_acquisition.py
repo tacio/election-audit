@@ -28,7 +28,7 @@ def archive(text):
 class Server:
     """Range- and If-Range-aware fake of the TSE CKAN API and CDN."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.files = {"x_1t_AC.zip": archive("ac"), "x_1t_AL.zip": archive("al")}
         self.etags = {name: '"v1"' for name in self.files}
         self.cut = None  # (name, bytes) to truncate a GET once
@@ -39,13 +39,13 @@ class Server:
         outer = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
-            def log_message(self, *args):
+            def log_message(self, *args) -> None:
                 pass
 
             def _file(self):
                 return self.path.split("?", 1)[0].rsplit("/", 1)[-1]
 
-            def do_HEAD(self):
+            def do_HEAD(self) -> None:
                 name = self._file()
                 busted = "?" in self.path
                 self.send_response(200)
@@ -59,7 +59,7 @@ class Server:
                 self.send_header("Accept-Ranges", "bytes")
                 self.end_headers()
 
-            def do_GET(self):
+            def do_GET(self) -> None:
                 outer.requests.append((self.path, self.headers.get("Range")))
                 if self.path.startswith("/api/"):
                     dataset = self.path.split("id=", 1)[1]
@@ -111,13 +111,13 @@ class Server:
         self.base = f"http://127.0.0.1:{self.httpd.server_address[1]}"
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
 
-    def close(self):
+    def close(self) -> None:
         self.httpd.shutdown()
         self.httpd.server_close()
 
 
 class BulkAcquisitionTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.server = Server()
         self.addCleanup(self.server.close)
         self.temp = tempfile.TemporaryDirectory()
@@ -142,7 +142,7 @@ class BulkAcquisitionTests(unittest.TestCase):
                 " WHERE name NOT LIKE '%.sha512'"
             ).fetchall()
 
-    def test_downloads_are_exact_read_only_and_catalogued(self):
+    def test_downloads_are_exact_read_only_and_catalogued(self) -> None:
         result = self.run_acquire()
         self.assertEqual(result["complete_files"], 2)
         for name, status, digest, size, members in self.rows():
@@ -159,7 +159,7 @@ class BulkAcquisitionTests(unittest.TestCase):
         self.assertEqual(bulk.verify(self.output)["verified_files"], 2)
         self.assertEqual(json.loads((self.output / "status.json").read_text())["stage"], "finished")
 
-    def test_existing_output_is_refused_and_resume_skips_complete_files(self):
+    def test_existing_output_is_refused_and_resume_skips_complete_files(self) -> None:
         self.run_acquire()
         with self.assertRaises(FileExistsError):
             self.run_acquire()
@@ -168,7 +168,7 @@ class BulkAcquisitionTests(unittest.TestCase):
         downloads = [p for p, _ in self.server.requests[before:] if "/cdn/" in p]
         self.assertEqual(downloads, [])
 
-    def test_interrupted_download_resumes_with_a_range(self):
+    def test_interrupted_download_resumes_with_a_range(self) -> None:
         self.server.cut = ("x_1t_AC.zip", 100)
         with self.assertRaises(Exception):
             self.run_acquire()
@@ -180,7 +180,7 @@ class BulkAcquisitionTests(unittest.TestCase):
             (self.output / "files" / "x_1t_AC.zip").read_bytes(), self.server.files["x_1t_AC.zip"]
         )
 
-    def test_changed_server_object_restarts_instead_of_splicing(self):
+    def test_changed_server_object_restarts_instead_of_splicing(self) -> None:
         self.server.cut = ("x_1t_AC.zip", 100)
         with self.assertRaises(Exception):
             self.run_acquire()
@@ -191,7 +191,7 @@ class BulkAcquisitionTests(unittest.TestCase):
             (self.output / "files" / "x_1t_AC.zip").read_bytes(), self.server.files["x_1t_AC.zip"]
         )
 
-    def test_hosts_outside_the_allow_list_and_non_zips_fail_closed(self):
+    def test_hosts_outside_the_allow_list_and_non_zips_fail_closed(self) -> None:
         resources = [{"url": "https://evil.example/x.zip"}]
         with self.assertRaisesRegex(ValueError, "outside"):
             bulk.select_resources(resources, r"\.zip$")
@@ -199,13 +199,13 @@ class BulkAcquisitionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "file name|outside"):
             bulk.select_resources(resources, r"\.zip$", ("https://cdn.tse.jus.br/",))
 
-    def test_not_a_zip_is_not_accepted(self):
+    def test_not_a_zip_is_not_accepted(self) -> None:
         self.server.files["x_1t_AL.zip"] = b"not a zip"
         with self.assertRaises(zipfile.BadZipFile):
             self.run_acquire()
         self.assertFalse((self.output / "files" / "x_1t_AL.zip").exists())
 
-    def test_published_sha512_companions_are_fetched_and_reconciled(self):
+    def test_published_sha512_companions_are_fetched_and_reconciled(self) -> None:
         body = self.server.files["x_1t_AC.zip"]
         published = hashlib.sha512(body).hexdigest().upper().encode() + b"  x_1t_AC.zip\n"
         self.server.files["x_1t_AC.zip.sha512"] = published
@@ -214,7 +214,7 @@ class BulkAcquisitionTests(unittest.TestCase):
         self.assertEqual(result["published_sha512"], {"match": 1, "not_published": 1})
         self.assertEqual(result["complete_files"], 3)
 
-    def test_published_sha512_mismatch_fails_the_run(self):
+    def test_published_sha512_mismatch_fails_the_run(self) -> None:
         self.server.files["x_1t_AC.zip.sha512"] = b"0" * 128 + b"\n"
         self.server.etags["x_1t_AC.zip.sha512"] = '"s1"'
         with self.assertRaisesRegex(ValueError, "published SHA-512"):
@@ -226,7 +226,7 @@ class BulkAcquisitionTests(unittest.TestCase):
             ).fetchone()[0]
         self.assertEqual(state, "mismatch")
 
-    def test_unsized_archives_are_refused_but_unsized_checksums_are_capped(self):
+    def test_unsized_archives_are_refused_but_unsized_checksums_are_capped(self) -> None:
         with self.assertRaisesRegex(ValueError, "length"):
             bulk.download_one(
                 "http://unused.invalid/x.zip",
@@ -239,7 +239,7 @@ class BulkAcquisitionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "more bytes"):
             self.run_acquire()
 
-    def test_stale_cdn_copy_without_length_is_revalidated_once(self):
+    def test_stale_cdn_copy_without_length_is_revalidated_once(self) -> None:
         self.server.stale.add("x_1t_AL.zip")
         result = self.run_acquire()
         self.assertEqual(result["complete_files"], 2)
@@ -249,7 +249,7 @@ class BulkAcquisitionTests(unittest.TestCase):
             [row[:3] for row in self.rows()],
         )
 
-    def test_stale_cdn_head_from_an_earlier_version_is_bypassed(self):
+    def test_stale_cdn_head_from_an_earlier_version_is_bypassed(self) -> None:
         self.server.stale_head.add("x_1t_AL.zip")
         self.run_acquire()
         uri = (self.output / "manifest.sqlite").as_uri() + "?mode=ro"
@@ -257,7 +257,7 @@ class BulkAcquisitionTests(unittest.TestCase):
             etag = db.execute("SELECT etag FROM files WHERE name='x_1t_AL.zip'").fetchone()
         self.assertEqual(etag, ('"v1"',))
 
-    def test_stale_cdn_copy_on_get_is_refetched_from_the_current_version(self):
+    def test_stale_cdn_copy_on_get_is_refetched_from_the_current_version(self) -> None:
         old = archive("zz")
         self.server.stale_get["x_1t_AC.zip"] = old
         self.run_acquire()
@@ -266,7 +266,7 @@ class BulkAcquisitionTests(unittest.TestCase):
         self.assertEqual(stored, body)
         self.assertNotEqual(stored, old)
 
-    def test_tampered_archive_fails_verification(self):
+    def test_tampered_archive_fails_verification(self) -> None:
         self.run_acquire()
         path = self.output / "files" / "x_1t_AC.zip"
         os.chmod(path, 0o644)
@@ -274,7 +274,7 @@ class BulkAcquisitionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not match"):
             bulk.verify(self.output)
 
-    def test_insufficient_space_stops_before_downloading(self):
+    def test_insufficient_space_stops_before_downloading(self) -> None:
         with patch.object(bulk, "_free", return_value=10):
             with self.assertRaisesRegex(RuntimeError, "free space"):
                 self.run_acquire()

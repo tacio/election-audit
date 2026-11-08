@@ -293,7 +293,7 @@ def hardware_verifier(hardware):
     if not isinstance(key, ec.EllipticCurvePublicKey) or key.curve.name != "secp521r1":
         return None, certificate
 
-    def verify(digest_, signature):
+    def verify(digest_: bytes, signature: bytes) -> bool:
         try:
             key.verify(signature, digest_, ec.ECDSA(hashes.SHA512()))
             return True
@@ -309,7 +309,7 @@ class Ed521Verifier:
     Each signature is also checked as ECPy, TSE's reference verifier, would; ``disagreements``
     counts the signatures where the two verdicts differ (expected 0)."""
 
-    def __init__(self, key):
+    def __init__(self, key) -> None:
         import ed521rs
 
         self.keys = {}
@@ -837,7 +837,7 @@ def read_shard(bulk_root, items):
 # --------------------------------------------------------------------------- pass
 
 
-def _write(path, rows, schema):
+def _write(path, rows, schema) -> None:
     pq.write_table(pa.Table.from_pylist(rows, schema=schema), path, compression="zstd")
 
 
@@ -877,7 +877,7 @@ def run_shard(task):
     return index, len(items), sum(1 for s in sections if s.get("bu_status") == "error")
 
 
-def _init_worker():
+def _init_worker() -> None:
     for name in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
         os.environ[name] = "1"
 
@@ -947,7 +947,7 @@ def run_sections(
 
     started, finished, errors = time.monotonic(), sum(len(shards[i]) for i in done), 0
 
-    def report(stage, **extra):
+    def report(stage, **extra) -> None:
         atomic(
             output / "status.json",
             {
@@ -1219,7 +1219,7 @@ def bweb_contests(db):
     """
     contests, key, entries, rows = {}, None, {}, []
 
-    def flush():
+    def flush() -> None:
         if key is None:
             return
         eligible = [r[0] for r in rows] + [r[1] for r in rows]
@@ -1246,7 +1246,7 @@ def bweb_contests(db):
     return contests
 
 
-def bweb_sections_sql():
+def bweb_sections_sql() -> str:
     fields = ", ".join(f"{expr} AS {name}" for name, expr in METADATA.items())
     return f"""
 WITH m AS (
@@ -1295,7 +1295,7 @@ def _uf_db(temporary, uf, memory_limit):
     return db
 
 
-def _drop_uf_db(db, temporary, uf):
+def _drop_uf_db(db, temporary, uf) -> None:
     db.close()
     for name in (f"bweb-{uf}.duckdb", f"bweb-{uf}.duckdb.wal"):
         (temporary / name).unlink(missing_ok=True)
@@ -1732,7 +1732,7 @@ def run_hierarchy(bweb_root, ea20_root, round_number, output, *, ufs=None, memor
     rows, issues = [], []
     uf_sums, aggregated = {}, Counter()
 
-    def record(level, uf, municipality, comparison, expected, observed):
+    def record(level, uf, municipality, comparison, expected, observed) -> None:
         keys = set(expected) | set(observed)
         differing = _compare(expected, observed, keys)
         rows.append(
@@ -2380,7 +2380,7 @@ def run_logs(sections_root, semantic_root, output, *, semantic_round1=None):
     return result
 
 
-def integrity_check_main(argv=None):
+def integrity_check_main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit integrity-check", description=__doc__.splitlines()[0]
     )

@@ -50,7 +50,7 @@ def timestamp(value):
 class SummaryParser(_Parser):
     def __init__(
         self, object_sha, directory, *, output_limit=32 * 1024**2, block_lines=BLOCK_LINES
-    ):
+    ) -> None:
         super().__init__(object_sha, ParseConfig(), directory, None, None)
         self.output_limit, self.estimated_output, self.block_lines = output_limit, 0, block_lines
         self.members, self.blocks, self.anchors, self.errors = [], [], [], []
@@ -68,7 +68,7 @@ class SummaryParser(_Parser):
         # bounded scratch root. CRC is checked before emitting lines, as before.
         return tempfile.SpooledTemporaryFile(max_size=2 * 1024**2, dir=self.directory)
 
-    def retain(self, destination, row):
+    def retain(self, destination, row) -> None:
         self.estimated_output += 256 + sum(len(v) for v in row if isinstance(v, (str, bytes)))
         if self.estimated_output > self.output_limit:
             raise SummaryBudgetExceeded("Evidence/index output exceeds explicit per-object bound")
@@ -79,7 +79,7 @@ class SummaryParser(_Parser):
             self.current_line_hash = hashlib.sha256(self.current_line_bytes).hexdigest()
         return self.current_line_hash
 
-    def issue(self, code, segments, *, line=None, severity="error", **details):
+    def issue(self, code, segments, *, line=None, severity="error", **details) -> None:
         self.incomplete |= severity == "error"
         self.counts["issues_seen"] += 1
         self.diagnostics[(code, severity)] += 1
@@ -113,7 +113,7 @@ class SummaryParser(_Parser):
             ),
         )
 
-    def lines(self, body, segments):
+    def lines(self, body, segments) -> None:
         member = len(self.members)
         self.current_member = member
         first_sequence = self.counts["lines"] + 1
@@ -123,7 +123,7 @@ class SummaryParser(_Parser):
         block = hashlib.sha256()
         block_bytes = 0
 
-        def finish_block():
+        def finish_block() -> None:
             nonlocal block, block_start, block_unknown, block_events, block_bytes
             self.retain(
                 self.blocks,

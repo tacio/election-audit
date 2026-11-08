@@ -108,7 +108,7 @@ def _exclusions(path, round_number):
     return doc
 
 
-def _attach_scope(db, profile, exclusions):
+def _attach_scope(db, profile, exclusions) -> None:
     db.execute(
         "ATTACH DATABASE ? AS profile", ((Path(profile) / "profile.sqlite").as_uri() + "?mode=ro",)
     )
@@ -743,7 +743,7 @@ def run(directory, *, max_objects=None, retry_failed=False):
             return result
 
 
-def main(argv=None):
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     setup = sub.add_parser("prepare")

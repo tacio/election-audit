@@ -72,12 +72,12 @@ def _locator(segments, line=None):
     }
 
 
-def _json_line(handle, row):
+def _json_line(handle, row) -> None:
     handle.write(canonical(row) + b"\n")
 
 
 class _Parser:
-    def __init__(self, object_sha256, config, directory, events, issues):
+    def __init__(self, object_sha256, config, directory, events, issues) -> None:
         self.sha = object_sha256
         self.config = config
         self.directory = directory
@@ -91,7 +91,7 @@ class _Parser:
         """Seekable member storage; subclasses may provide a bounded RAM spool."""
         return tempfile.TemporaryFile(dir=self.directory)
 
-    def issue(self, code, segments, *, line=None, severity="error", **details):
+    def issue(self, code, segments, *, line=None, severity="error", **details) -> None:
         # No exception text, raw messages, line samples, tokens or personal IDs.
         self.incomplete |= severity == "error"
         self.counts["issues_seen"] += 1
@@ -120,7 +120,7 @@ class _Parser:
         )
         self.counts["issues_written"] += 1
 
-    def _directory_guard(self, stream, segments):
+    def _directory_guard(self, stream, segments) -> bool:
         # ZipFile loads its central directory into memory. Bound it BEFORE opening.
         stream.seek(0, 2)
         length = stream.tell()
@@ -188,7 +188,7 @@ class _Parser:
         stream.seek(0)
         return True
 
-    def archive(self, stream, segments=()):
+    def archive(self, stream, segments=()) -> None:
         segments = list(segments)
         if len(segments) > self.config.max_depth:
             self.issue("archive_depth_limit", segments, limit=self.config.max_depth)
@@ -278,7 +278,7 @@ class _Parser:
         except zipfile.BadZipFile, RuntimeError, NotImplementedError, EOFError, ValueError:
             self.issue("invalid_archive", segments)
 
-    def archive_7z(self, stream, segments):
+    def archive_7z(self, stream, segments) -> None:
         """2022 logs are 7z archives; the same bounds and issue codes apply."""
         stream.seek(0, 2)
         if stream.tell() > self.config.max_archive_bytes:
@@ -324,7 +324,7 @@ class _Parser:
                 ):
                     self.archive(body, nested)
 
-    def lines(self, body, segments):
+    def lines(self, body, segments) -> None:
         line_number = 0
         while line := body.readline(self.config.max_line_bytes + 1):
             line_number += 1
@@ -389,7 +389,7 @@ class _Parser:
             self.counts["events"] += 1
 
 
-def _write_checked(directory, name, value):
+def _write_checked(directory, name, value) -> None:
     encoded = canonical(value) + b"\n"
     with (directory / name).open("xb") as stream:
         stream.write(encoded)
@@ -657,7 +657,7 @@ class FrozenParseReader:
     The document is read-only by convention; callers must never mutate it.
     """
 
-    def __init__(self, path):
+    def __init__(self, path) -> None:
         self.path = Path(path).resolve()
         self.document = inspect_parse(self.path, object_sha256=[])
         self.artifacts = {item["object_sha256"]: item for item in self.document["artifacts"]}
@@ -772,7 +772,7 @@ def _parsing_issues(path, document, artifacts):
             }
 
 
-def parse_main(argv=None):
+def parse_main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Parse frozen JEZ/ZIP logs into structural events")
     parser.add_argument("snapshot", type=Path)
     parser.add_argument("--workers", type=int, default=4)

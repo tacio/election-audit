@@ -84,7 +84,7 @@ class AuditDataset:
     def open(cls, uri, *, cache=None, cache_bytes=256 * 1024**2, allow_http=False):
         return cls(uri, cache=cache, cache_bytes=cache_bytes, allow_http=allow_http)
 
-    def __init__(self, uri, *, cache=None, cache_bytes=256 * 1024**2, allow_http=False):
+    def __init__(self, uri, *, cache=None, cache_bytes=256 * 1024**2, allow_http=False) -> None:
         self.uri = str(uri)
         parsed = urlsplit(self.uri)
         self.remote = parsed.scheme in {"https", "http"}
@@ -180,7 +180,7 @@ class AuditDataset:
             raise ValueError("Dataset checksum/size mismatch")
         return path
 
-    def _view(self, db, table):
+    def _view(self, db, table) -> None:
         relation = db.read_parquet(str(self.file(table)))
         columns = set(relation.columns)
         relation.create_view("source_records")

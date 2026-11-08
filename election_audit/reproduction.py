@@ -38,7 +38,7 @@ VERSION = "offline-reproduction-v1"
 EXCLUDED = {".git", ".aws", ".codex", ".agents", ".venv", ".local-state", "__pycache__"}
 
 
-def _copy_tree(source, destination):
+def _copy_tree(source, destination) -> None:
     """Reject links before copytree can dereference them; walk explicit trees only."""
     for directory, folders, files in os.walk(source, followlinks=False):
         folders[:] = [name for name in folders if name not in EXCLUDED]
@@ -454,7 +454,7 @@ def reproduce(bundle, output):
     return result
 
 
-def reproduction_main(command, argv=None):
+def reproduction_main(command, argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     if command == "backfill":
         parser.add_argument("snapshot", type=Path)

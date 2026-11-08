@@ -193,7 +193,7 @@ def reading_seconds(timestamp):
     return base + hour * 3600 + minute * 60 + second
 
 
-def iso_reading(seconds):
+def iso_reading(seconds) -> str | None:
     if seconds is None:
         return None
     day, rest = divmod(seconds, 86400)
@@ -276,7 +276,7 @@ def _gap_stats(gaps):
 class ObjectSummary:
     """Mirror of ``operational_review.review_object``'s session/cycle machine."""
 
-    def __init__(self, object_sha256, round_number, year=2026):
+    def __init__(self, object_sha256, round_number, year=2026) -> None:
         self.sha = object_sha256
         self.round = round_number
         self.rules = rules_for(year)
@@ -314,7 +314,7 @@ class ObjectSummary:
         return found
 
     # ---- segments (context blocks inside one stream)
-    def _open_segment(self, context, device, path):
+    def _open_segment(self, context, device, path) -> None:
         self._close_segment()
         self.segment = {
             "object_sha256": self.sha,
@@ -332,7 +332,7 @@ class ObjectSummary:
         }
         self._segment_ordinal += 1
 
-    def _close_segment(self):
+    def _close_segment(self) -> None:
         if self.segment is not None:
             row = self.segment
             row["fingerprint"] = row.pop("hash").hexdigest()
@@ -340,7 +340,7 @@ class ObjectSummary:
             self.segment = None
 
     # ---- sessions and cycles
-    def _finish_cycle(self, state):
+    def _finish_cycle(self, state) -> None:
         pending = self.pending
         if pending is None:
             if state == "completed" and self.session is not None:
@@ -354,7 +354,7 @@ class ObjectSummary:
             session["completed_interrupted"] += 1
         self.pending = None
 
-    def _finish_session(self, reason):
+    def _finish_session(self, reason) -> None:
         self._finish_cycle("unresolved")
         session = self.session
         if session is not None:
@@ -379,7 +379,7 @@ class ObjectSummary:
             self.sessions.append(session)
         self.session, self.software = None, False
 
-    def _device_clock(self, application, message, reading):
+    def _device_clock(self, application, message, reading) -> None:
         """Device model and clock settings of the current stream, as read before a session."""
         clock = self.clock
         if message.startswith(MODEL_PREFIX):
@@ -402,7 +402,7 @@ class ObjectSummary:
             if before is not None and after is not None:
                 clock["tz_shift"] += after - before
 
-    def _new_stream(self, key, device, path):
+    def _new_stream(self, key, device, path) -> None:
         if self.stream is not None:
             self._finish_session("stream_end")
         self._close_segment()
@@ -413,7 +413,7 @@ class ObjectSummary:
         self._last_reading = None
         self._open_segment("initial", device, path)
 
-    def feed(self, segments, body):
+    def feed(self, segments, body) -> None:
         """Process one logd.dat member body."""
         self.members += 1
         path = member_path(segments)
@@ -435,7 +435,7 @@ class ObjectSummary:
                 continue
             self._event(path, segments, line, reading, device, application, message)
 
-    def _event(self, path, segments, line, reading, device, application, message):
+    def _event(self, path, segments, line, reading, device, application, message) -> None:
         self.events += 1
         key = (segments, device)
         if key != self.stream:
@@ -630,7 +630,7 @@ class ObjectSummary:
         elif kind == "unknown":
             session["active_unknown_events"] += 1
 
-    def finish(self):
+    def finish(self) -> None:
         if self.stream is not None:
             self._finish_session("stream_end")
         self._close_segment()
@@ -775,7 +775,7 @@ def bulk_bodies(bulk_root, items):
 # --------------------------------------------------------------------------- shards
 
 
-def _write(path, rows, schema):
+def _write(path, rows, schema) -> None:
     table = pa.Table.from_pylist(rows, schema=schema)
     pq.write_table(table, path, compression="zstd")
 
@@ -835,7 +835,7 @@ def run_shard(task):
     return index, len(items), sum(o["status"] == "error" for o in objects)
 
 
-def _init_worker():
+def _init_worker() -> None:
     for name in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
         os.environ[name] = "1"
 
@@ -947,7 +947,7 @@ def run_pass(
     completed_objects = sum(len(shards[i]) for i in done if i < len(shards))
     errors = 0
 
-    def report(stage, **extra):
+    def report(stage, **extra) -> None:
         elapsed = time.monotonic() - started
         atomic(
             status,
@@ -1245,7 +1245,7 @@ def equivalence(
     return report
 
 
-def semantic_pass_main(argv=None):
+def semantic_pass_main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit semantic-pass",
         description="Phase 21 streaming per-session aggregates from staged raw logs.",

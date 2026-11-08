@@ -119,7 +119,7 @@ def append_record(db, record_id, kind, payload, *, references=(), analysis_run_i
     return record_id
 
 
-def _same_population(db, table, id_column, record_id):
+def _same_population(db, table, id_column, record_id) -> bool:
     # Difference queries are disk-backed, including the empty-population case.
     expected = db.execute(
         "SELECT count(*) FROM unit_partition WHERE partition_name='test'"
@@ -137,7 +137,7 @@ def _same_population(db, table, id_column, record_id):
     ).fetchone()
 
 
-def record_evaluation_units(db, evaluation_id, unit_keys, *, access=False):
+def record_evaluation_units(db, evaluation_id, unit_keys, *, access=False) -> None:
     table, column = ("access_unit", "access_id") if access else ("evaluation_unit", "evaluation_id")
     record = db.execute(
         "SELECT record_kind FROM ledger WHERE record_id=?", (evaluation_id,)
@@ -220,7 +220,7 @@ def record_final_evaluation(db, record_id, *, model_run_id, evaluation_id, acces
     return record_id
 
 
-def _validate_final(db, record_id):
+def _validate_final(db, record_id) -> bool:
     rows = db.execute(
         "SELECT record_id,record_kind,analysis_run_id,payload,references_json,created_at,previous_hash,record_hash FROM ledger ORDER BY rowid"
     )

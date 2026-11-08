@@ -35,11 +35,11 @@ def _anchor(value):
     )
 
 
-def _write(path, value):
+def _write(path, value) -> None:
     Path(path).write_bytes(canonical(value) + b"\n")
 
 
-def _seal(directory, identity):
+def _seal(directory, identity) -> None:
     files = {
         p.name: {"sha256": hash_file(p), "bytes": p.stat().st_size}
         for p in sorted(Path(directory).iterdir())
@@ -539,7 +539,7 @@ def sensitivity_from_config(configuration, output):
     )
 
 
-def investigations_main(argv=None):
+def investigations_main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     cases = sub.add_parser("cases")

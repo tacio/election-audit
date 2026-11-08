@@ -8,10 +8,10 @@ from scripts.check_docs import check_docs, fence_signature
 
 
 class DocumentationTests(unittest.TestCase):
-    def test_repository_pairs_and_links(self):
+    def test_repository_pairs_and_links(self) -> None:
         self.assertEqual(check_docs(), [])
 
-    def test_reject_revision_example_and_broken_link(self):
+    def test_reject_revision_example_and_broken_link(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for language, revision, command in (
@@ -29,7 +29,7 @@ class DocumentationTests(unittest.TestCase):
             self.assertTrue(any("fenced examples differ" in e for e in errors))
             self.assertEqual(sum("missing local link" in e for e in errors), 2)
 
-    def test_translated_mermaid_labels_preserve_graph_structure(self):
+    def test_translated_mermaid_labels_preserve_graph_structure(self) -> None:
         english = (
             "```mermaid\nflowchart LR\n"
             "    inputs[Explicit sources] --> ready[Feature readiness]\n```\n\n"
@@ -67,7 +67,7 @@ class DocumentationTests(unittest.TestCase):
                     paths["pt-BR"].write_text(original.replace(before, after))
                     self.assertTrue(any("fenced examples differ" in e for e in check_docs(root)))
 
-    def test_unsupported_mermaid_constructs_are_compared_exactly(self):
+    def test_unsupported_mermaid_constructs_are_compared_exactly(self) -> None:
         english = "```mermaid\nsequenceDiagram\n    A->>B: evidence\n```"
         portuguese = "```mermaid\nsequenceDiagram\n    A->>B: evidência\n```"
         self.assertNotEqual(fence_signature(english), fence_signature(portuguese))

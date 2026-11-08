@@ -51,7 +51,7 @@ def _urls(round_number):
     return election, f"{BASE}/{election}", code
 
 
-def config_url(round_number):
+def config_url(round_number) -> str:
     _, root, code = _urls(round_number)
     return f"{root}/config/mun-{code}-cm.json"
 
@@ -108,7 +108,7 @@ def planned(config, round_number):
             }
 
 
-def check(entry, value, round_number):
+def check(entry, value, round_number) -> None:
     """Reject a body that is not official or names another election, round or scope."""
     election = election_for_round(round_number).election_code
     if str(value.get("f", "")).lower() != "o":
@@ -250,7 +250,7 @@ def fetch(round_number, output, *, delay=0.2, resume=False, get=_get):
     return result
 
 
-def results_hierarchy_main(argv=None):
+def results_hierarchy_main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit results-hierarchy",
         description="Fetch the official hierarchical presidential results (EA20) of a round.",

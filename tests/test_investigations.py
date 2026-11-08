@@ -84,7 +84,7 @@ class InvestigationTests(unittest.TestCase):
             for i, k in enumerate(dev)
         ]
 
-        def pin(rows):
+        def pin(rows) -> None:
             (evaluation / "predictions.jsonl").write_bytes(
                 b"".join(canonical(r) + b"\n" for r in rows)
             )
@@ -104,7 +104,7 @@ class InvestigationTests(unittest.TestCase):
         pin(predictions)
         return source, protocol, evaluation, predictions, test, pin
 
-    def test_development_symmetric_cases_control_export_and_review(self):
+    def test_development_symmetric_cases_control_export_and_review(self) -> None:
         from election_audit.dashboard_data import AuditDataset
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -149,7 +149,7 @@ class InvestigationTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 build_cases(source, protocol, evaluation, root / "cases")
 
-    def test_protected_prediction_and_changed_evidence_rejected(self):
+    def test_protected_prediction_and_changed_evidence_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             source, protocol, evaluation, rows, test, pin = self.fixture(root)
@@ -179,7 +179,7 @@ class InvestigationTests(unittest.TestCase):
             "assumed_margin": 10,
         }
 
-    def test_conditional_caps_overlap_and_no_national_guess(self):
+    def test_conditional_caps_overlap_and_no_national_guess(self) -> None:
         doc = self.scenario()
         result = conditional_scenario(doc)
         self.assertEqual(result["margin_change_bounds"], [-2, 3])
@@ -201,7 +201,7 @@ class InvestigationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             conditional_scenario(doc)
 
-    def test_uf_reference_is_never_national(self):
+    def test_uf_reference_is_never_national(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "ref.json"
             path.write_text(
@@ -221,7 +221,7 @@ class InvestigationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "not a UF"):
                 read_national_margin(path, "13", "22")
 
-    def test_geographic_full_pipeline_resume_integrity(self):
+    def test_geographic_full_pipeline_resume_integrity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "sensitivity"
             calls = []

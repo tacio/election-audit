@@ -138,7 +138,7 @@ def _csv_members(archive, exclude=()):
         ]
 
 
-def _insert(db, table, name):
+def _insert(db, table, name) -> None:
     db.register("batch", table)
     db.execute(f"INSERT INTO {name} SELECT * FROM batch")
     db.unregister("batch")
@@ -179,19 +179,19 @@ def load_bweb(db, root, year, round_number, ufs):
     return [{k: f[k] for k in ("path", "sha256", "bytes")} for f in files]
 
 
-def _when(column):
+def _when(column) -> str:
     return (
         f"strftime(coalesce(try_strptime({column}, '%Y-%m-%d %H:%M:%S'), "
         f"try_strptime({column}, '%d/%m/%Y %H:%M:%S')), '%Y-%m-%dT%H:%M:%S')"
     )
 
 
-def _single(expression):
+def _single(expression) -> str:
     """The value when all rows agree, else NULL (variants are counted separately)."""
     return f"CASE WHEN count(DISTINCT {expression}) = 1 THEN min({expression}) END"
 
 
-def results_sql(round_number):
+def results_sql(round_number) -> str:
     k = (
         "lower(SG_UF) AS uf, lpad(CD_MUNICIPIO, 5, '0') AS municipality, "
         "lpad(NR_ZONA, 4, '0') AS zone, lpad(NR_SECAO, 4, '0') AS section"
@@ -610,7 +610,7 @@ def close_rules(sections, municipality_names):
     return rules
 
 
-def clock_state(operations, expected, election_date):
+def clock_state(operations, expected, election_date) -> str:
     """Classify a section's clock evidence; time-of-day measures need ok or adjusted."""
     if operations is None or not operations["official_sessions"]:
         return "no_sessions"
@@ -1068,7 +1068,7 @@ def harmonize(section_rows, restricted_rows, year):
             x = parent[x]
         return x
 
-    def union(a, b):
+    def union(a, b) -> None:
         ra, rb = find(a), find(b)
         if ra != rb:
             parent[max(ra, rb)] = min(ra, rb)
@@ -1234,7 +1234,7 @@ def _publish(output, work, binding, totals, composition_errors):
 # --------------------------------------------------------------------------- CLI
 
 
-def section_table_main(argv=None):
+def section_table_main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit section-table", description=__doc__.splitlines()[0]
     )

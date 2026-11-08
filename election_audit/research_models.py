@@ -900,7 +900,7 @@ def validate_mechanisms(
     )
 
 
-def research_models_main(argv=None):
+def research_models_main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["fit", "evaluate", "simulate", "validate-mechanisms"])
     parser.add_argument("--features", type=Path, required=True)

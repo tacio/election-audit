@@ -4,7 +4,7 @@ from scripts.inspect_tse_logs import inspect_member
 
 
 class LogInspectionTests(unittest.TestCase):
-    def test_mixed_rounds_and_manual_requests_remain_separate(self):
+    def test_mixed_rounds_and_manual_requests_remain_separate(self) -> None:
         lines = [
             "04/10/2026 08:00:00\tINFO\t1234\tVOTA\tO voto do eleitor foi computado\ta\n",
             "25/10/2026 07:59:00\tINFO\t1234\tVOTA\tSolicitação de dado pessoal do eleitor para habilitação manual\tb\n",

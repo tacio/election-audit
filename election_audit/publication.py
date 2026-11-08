@@ -92,12 +92,12 @@ class ResourceConfig:
             raise PublicationError("Worker/thread/batch limit exceeded")
 
 
-def _guard(path, config, extra_bytes=0):
+def _guard(path, config, extra_bytes=0) -> None:
     if shutil.disk_usage(path).free < config.reserve_bytes + config.spill_bytes + extra_bytes:
         raise PublicationError("SSD free space cannot preserve reserve plus spill cap")
 
 
-def _configure(connection, temporary, config):
+def _configure(connection, temporary, config) -> None:
     connection.execute(f"SET threads={config.duckdb_threads}")
     connection.execute(f"SET memory_limit='{config.memory_bytes}B'")
     connection.execute(f"SET max_temp_directory_size='{config.spill_bytes}B'")
@@ -111,7 +111,7 @@ def _columns(name):
     return dict.fromkeys(EXTRA_KEYS[name], "text")
 
 
-def _create(connection, name):
+def _create(connection, name) -> None:
     fields = ",".join(f'"{key}" {TYPES[kind]}' for key, kind in _columns(name).items())
     connection.execute(f'CREATE TABLE "{name}" ({fields}, payload JSON NOT NULL)')
 
@@ -145,7 +145,7 @@ def _batches(rows, size):
         yield batch
 
 
-def _insert(connection, name, rows):
+def _insert(connection, name, rows) -> None:
     if not rows:
         return
     connection.register("incoming", _encoded(name, rows))
@@ -155,14 +155,14 @@ def _insert(connection, name, rows):
         connection.unregister("incoming")
 
 
-def _fact_view(connection, name, files):
+def _fact_view(connection, name, files) -> None:
     literals = ",".join("'" + file.replace("'", "''") + "'" for file in files)
     connection.execute(
         f'CREATE TEMP VIEW "{name}" AS SELECT * FROM read_parquet([{literals}], hive_partitioning=false)'
     )
 
 
-def _attach_facts(connection, path, tables):
+def _attach_facts(connection, path, tables) -> None:
     for name in FACTS:
         files = sorted(str(path / f) for f in tables.get(name, {}).get("files", []))
         if files:
@@ -231,7 +231,7 @@ def _table_summary(connection, name):
     }
 
 
-def _validate_accounting(connection, context, selected_objects):
+def _validate_accounting(connection, context, selected_objects) -> None:
     for name, key in (
         ("selected_event", "event_id"),
         ("anonymous_cycle", "cycle_id"),
@@ -270,7 +270,7 @@ def _validate_accounting(connection, context, selected_objects):
         raise PublicationError("Expected/member coverage accounting mismatch")
 
 
-def _safe_store(store):
+def _safe_store(store) -> None:
     for ancestor in (store, *store.parents):
         if any(
             (ancestor / name).exists()
@@ -515,7 +515,7 @@ def publish_release(shards, store, *, config=None, hook=None):
             raise
 
 
-def _point_current(store, key):
+def _point_current(store, key) -> None:
     temporary = store / ".current-next"
     with temporary.open("w", encoding="ascii") as output:
         output.write(key + "\n")

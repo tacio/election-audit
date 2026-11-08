@@ -217,7 +217,7 @@ def read_official_bu(bundle, document, bundle_bytes, *, max_rows, max_bytes):
         raise PublicationError("BWEB archive contains no target presidential records")
     tables, witnesses = defaultdict(dict), defaultdict(set)
 
-    def add(name, row, records):
+    def add(name, row, records) -> None:
         validate_import_row(name, row, schema=CONTRACT)
         key = canonical([row[k] for k in table_schema(name)["key"]]).decode()
         if key not in tables[name] and sum(map(len, tables.values())) >= max_rows:
@@ -554,7 +554,7 @@ def read_official_bu(bundle, document, bundle_bytes, *, max_rows, max_bytes):
     }
 
 
-def main(argv=None):
+def main(argv=None) -> int:
     """Inspect an explicit local official bundle without acquisition or publication."""
     import argparse
     from pathlib import Path

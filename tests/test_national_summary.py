@@ -22,7 +22,7 @@ from election_audit.national_summary import (
 
 
 class SummaryTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
@@ -62,7 +62,7 @@ class SummaryTests(unittest.TestCase):
             "latin-1"
         )
 
-    def test_fused_reference_counts_diagnostics_and_every_replayed_field(self):
+    def test_fused_reference_counts_diagnostics_and_every_replayed_field(self) -> None:
         lines = [
             self.line(),
             self.line(message="Eleitor foi habilitado"),
@@ -93,7 +93,7 @@ class SummaryTests(unittest.TestCase):
         self.assertNotIn("private-token", json.dumps(actual))
         self.assertEqual(actual["errors"][0][-1], hashlib.sha256(lines[3]).hexdigest())
 
-    def test_unknown_blocks_reproduce_physical_bytes_without_an_event_table(self):
+    def test_unknown_blocks_reproduce_physical_bytes_without_an_event_table(self) -> None:
         lines = [self.line() for _ in range(1200)]
         row = self.source(lines)
         doc = summarize(row, self.scratch)
@@ -111,19 +111,19 @@ class SummaryTests(unittest.TestCase):
             all(r["source_line_sha256"] == hashlib.sha256(lines[0]).hexdigest() for r in events)
         )
 
-    def test_evidence_limit_fails_instead_of_silent_truncation(self):
+    def test_evidence_limit_fails_instead_of_silent_truncation(self) -> None:
         row = self.source([self.line(message="Eleitor foi habilitado") for _ in range(100)])
         with self.assertRaises(SummaryBudgetExceeded):
             summarize(row, self.scratch, output_limit=1024)
 
-    def test_corrupt_source_never_publishes_summaries(self):
+    def test_corrupt_source_never_publishes_summaries(self) -> None:
         row = self.source([self.line()])
         target = Path(row["source_root"]) / row["path"]
         target.write_bytes(b"x" * row["bytes"])
         with self.assertRaisesRegex(ValueError, "hash/length"):
             summarize(row, self.scratch)
 
-    def test_cpu_and_worker_budgets_cannot_exceed_half_available_capacity(self):
+    def test_cpu_and_worker_budgets_cannot_exceed_half_available_capacity(self) -> None:
         with patch("os.sched_getaffinity", return_value=set(range(12))):
             cpus = cpu_allocation()
             self.assertLessEqual(len(cpus["allowed_cpus"]), 6)
@@ -143,7 +143,7 @@ class SummaryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 cpu_allocation()
 
-    def test_line_limit_does_not_mislabel_a_prefix_hash_as_full_line_evidence(self):
+    def test_line_limit_does_not_mislabel_a_prefix_hash_as_full_line_evidence(self) -> None:
         parser = SummaryParser("a" * 64, self.scratch)
         parser.config = ParseConfig(max_lines=1, max_line_bytes=8)
         parser.lines(io.BytesIO(b"x\n" + b"y" * 100 + b"\n"), [])

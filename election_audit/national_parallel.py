@@ -171,7 +171,7 @@ def connection(path):
     return db
 
 
-def capacity(spec, used=0):
+def capacity(spec, used=0) -> None:
     anchor = Path(spec["volume_anchor"])
     store = Path(spec["store"])
     parent = store
@@ -254,7 +254,7 @@ def shard_database(path):
     return db
 
 
-def insert_document(db, doc, object_id):
+def insert_document(db, doc, object_id) -> None:
     object_sha = doc["object_sha256"]
     metadata = {k: v for k, v in doc.items() if k not in ("members", "blocks", "anchors", "errors")}
     db.execute("INSERT INTO objects VALUES(?,?,?)", (object_id, object_sha, encoded(metadata)))
@@ -276,7 +276,7 @@ def insert_document(db, doc, object_id):
     )
 
 
-def worker_init(resources, registry, scratch):
+def worker_init(resources, registry, scratch) -> None:
     global _POLICY
     _POLICY = resources
     apply(resources, worker=True)
@@ -320,7 +320,7 @@ def publish(spec, temporary, group_id, objects, events):
     return destination, marker
 
 
-def reconcile(spec, db):
+def reconcile(spec, db) -> None:
     for marker_path in (Path(spec["store"]) / "shards").glob("*/*/shard.json"):
         group_id = marker_path.parent.name
         if db.execute("SELECT 1 FROM groups WHERE id=?", (group_id,)).fetchone():
@@ -355,7 +355,7 @@ def reconcile(spec, db):
         db.commit()
 
 
-def increment(db, objects, events, size):
+def increment(db, objects, events, size) -> None:
     db.executemany(
         "UPDATE metadata SET value=CAST(value AS INTEGER)+? WHERE key=?",
         [(objects, "completed"), (events, "events"), (size, "bytes")],
@@ -489,7 +489,7 @@ def run(directory, *, max_objects=None):
             object_ids = {r["sha"]: i for i, r in enumerate(rows)}
             group_timings = []
 
-            def submit():
+            def submit() -> bool:
                 row = next(iterator, None)
                 if row is None:
                     return False
@@ -632,7 +632,7 @@ def run(directory, *, max_objects=None):
         signal.signal(signal.SIGTERM, old_handler)
 
 
-def main(argv=None):
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     setup = sub.add_parser(

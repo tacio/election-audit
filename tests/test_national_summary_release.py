@@ -12,7 +12,7 @@ import pyarrow.parquet as pq
 
 
 class SummaryReleaseTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         from tests.test_national_parallel import ParallelTests
 
         self.helper = ParallelTests("test_documented_cli_prepare_and_bounded_frozen_run")
@@ -40,7 +40,7 @@ class SummaryReleaseTests(unittest.TestCase):
             timeout=60,
         )
 
-    def test_few_typed_files_portable_reads_unknowns_and_idempotent_budget(self):
+    def test_few_typed_files_portable_reads_unknowns_and_idempotent_budget(self) -> None:
         # Analytical publication and queries need no original body or per-source
         # checkpoint reads after the producer's committed group verification.
         shutil.rmtree(self.helper.copied)
@@ -76,7 +76,7 @@ class SummaryReleaseTests(unittest.TestCase):
                 before,
             )
 
-    def test_existing_parquet_corruption_is_never_overwritten(self):
+    def test_existing_parquet_corruption_is_never_overwritten(self) -> None:
         self.export()
         part = next((self.release / "source_summaries").glob("*.parquet"))
         part.write_bytes(b"corrupted")
@@ -85,7 +85,7 @@ class SummaryReleaseTests(unittest.TestCase):
         self.assertIn("checksum", result.stderr)
         self.assertEqual(part.read_bytes(), b"corrupted")
 
-    def test_metadata_only_scope_needs_no_legacy_event_work_ledger(self):
+    def test_metadata_only_scope_needs_no_legacy_event_work_ledger(self) -> None:
         # Existing scope metadata is sufficient on fresh hardware; completed old
         # event artifacts are optional references, never a setup prerequisite.
         for path in self.helper.fixture.store.glob("work.sqlite*"):
@@ -96,7 +96,7 @@ class SummaryReleaseTests(unittest.TestCase):
 
         self.assertEqual(status(out)["completed"], 2)
 
-    def test_run_can_finalize_automatically_after_worker_shutdown(self):
+    def test_run_can_finalize_automatically_after_worker_shutdown(self) -> None:
         out, spec = self.helper.setup_job("auto-finalize", 1)
         destination = self.helper.fixture.root / "auto-analysis"
         result = self.helper.execute(out, "--analysis-output", str(destination))

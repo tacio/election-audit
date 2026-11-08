@@ -465,7 +465,7 @@ def read_arvor(root):
 class Published:
     """Binary BUs and signature files of the bulk archives, opened per (round, UF)."""
 
-    def __init__(self, bulk_root):
+    def __init__(self, bulk_root) -> None:
         self.root = Path(bulk_root)
         self.archives, self.handles = {}, {}
 
@@ -492,7 +492,7 @@ class Published:
                 return handle.read(prefix + bu), signature, package
         return None
 
-    def close(self):
+    def close(self) -> None:
         for handle in self.handles.values():
             handle.close()
         self.handles = {}

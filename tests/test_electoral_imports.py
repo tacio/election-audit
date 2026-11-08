@@ -47,12 +47,12 @@ def bundle_at(root, tables):
 
 
 class ImportTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
 
-    def test_originals_lineage_retransmission_and_explicit_verification(self):
+    def test_originals_lineage_retransmission_and_explicit_verification(self) -> None:
         choice = row(
             "vote_choice", vote_choice_id="c", contest_id="p", choice_code="x", choice_kind="blank"
         )
@@ -66,7 +66,7 @@ class ImportTests(unittest.TestCase):
             (self.root / "vote_choice.jsonl").read_bytes(),
         )
 
-    def test_schema_categories_types_hash_encoding_and_naive_timestamp_rejected(self):
+    def test_schema_categories_types_hash_encoding_and_naive_timestamp_rejected(self) -> None:
         for change in ({"choice_kind": "invented"}, {"choice_code": 99}):
             choice = row(
                 "vote_choice",
@@ -95,7 +95,7 @@ class ImportTests(unittest.TestCase):
         with self.assertRaises(PublicationError):
             read_import(path)
 
-    def test_exact_csv_header_and_utf8_only(self):
+    def test_exact_csv_header_and_utf8_only(self) -> None:
         path = bundle_at(self.root, {"vote_choice_count": []})
         doc = json.loads(path.read_text())
         spec = doc["sources"][0]
@@ -116,7 +116,7 @@ class ImportTests(unittest.TestCase):
         with self.assertRaisesRegex(PublicationError, "encoding"):
             read_import(path)
 
-    def test_conflicting_immutable_rows_and_duplicate_json_key(self):
+    def test_conflicting_immutable_rows_and_duplicate_json_key(self) -> None:
         rows = [
             row("vote_choice_count", result_version_id="v", vote_choice_id="c", vote_count=n)
             for n in (1, 2)

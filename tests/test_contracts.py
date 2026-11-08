@@ -6,10 +6,10 @@ from election_audit.contracts import load_contract, validate_contracts, validate
 
 
 class ContractTests(unittest.TestCase):
-    def test_registry_references_are_many_to_one(self):
+    def test_registry_references_are_many_to_one(self) -> None:
         self.assertEqual(validate_contracts(), [])
 
-    def test_nullable_fields_require_reason_without_zero_imputation(self):
+    def test_nullable_fields_require_reason_without_zero_imputation(self) -> None:
         row = {
             "device_id": "d1",
             "serial_raw": None,
@@ -23,7 +23,7 @@ class ContractTests(unittest.TestCase):
             any("duplicate key" in e for e in validate_rows("physical_device", [row, row]))
         )
 
-    def test_hash_type_and_explicit_time_offset(self):
+    def test_hash_type_and_explicit_time_offset(self) -> None:
         row = {
             "observation_id": "o1",
             "run_id": "r1",
@@ -44,7 +44,7 @@ class ContractTests(unittest.TestCase):
         row.update(object_sha256="a" * 64, observed_at="2026-10-25T17:00:00-03:00", http_status=200)
         self.assertEqual(validate_rows("source_observation", [row]), [])
 
-    def test_different_grains_and_anonymous_cycles(self):
+    def test_different_grains_and_anonymous_cycles(self) -> None:
         tables = load_contract()["tables"]
         self.assertEqual(tables["section_contest_totals"]["primary_key"], ["result_version_id"])
         self.assertEqual(
@@ -56,7 +56,7 @@ class ContractTests(unittest.TestCase):
         self.assertTrue(lifecycle["result_version_id"]["nullable"])
         self.assertIn("event_time_raw", lifecycle)
 
-    def test_statistical_targets_have_explicit_prerequisites(self):
+    def test_statistical_targets_have_explicit_prerequisites(self) -> None:
         features = {f["id"]: f for f in load_contract("features")["features"]}
         for name in (
             "turnout_target",

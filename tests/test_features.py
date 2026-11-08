@@ -84,7 +84,7 @@ def links():
 
 
 class FeatureTests(unittest.TestCase):
-    def test_all_families_and_separate_zero_unknown(self):
+    def test_all_families_and_separate_zero_unknown(self) -> None:
         db = database()
         _store_unit(db, unit(), counts())
         derive_features(db, "13", "22")
@@ -108,7 +108,7 @@ class FeatureTests(unittest.TestCase):
         )
         db.close()
 
-    def test_unreconciled_and_zero_denominator_never_imputed(self):
+    def test_unreconciled_and_zero_denominator_never_imputed(self) -> None:
         u = unit()
         u["source_ready"] = False
         values = measures(u, counts(), [], "13", "22")
@@ -125,7 +125,7 @@ class FeatureTests(unittest.TestCase):
             measures(unit(), c, [], "13", "22")[("unanimous_results", "strict_unanimity")][0]
         )
 
-    def test_special_category_and_legal_destinations_are_separate(self):
+    def test_special_category_and_legal_destinations_are_separate(self) -> None:
         c = counts()
         c["choices"]["special:no_candidate"] = {"count": 0, "origin": "binary"}
         values = measures(unit(), c, [], "13", "22")
@@ -135,7 +135,7 @@ class FeatureTests(unittest.TestCase):
             measures(unit(), c, [], "13", "22")[("blank_null_targets", "null_share")][0]
         )
 
-    def test_conflicting_duplicate_fails_without_multiplication(self):
+    def test_conflicting_duplicate_fails_without_multiplication(self) -> None:
         db = database()
         _store_unit(db, unit(), counts())
         _store_unit(db, unit(), counts())
@@ -146,7 +146,7 @@ class FeatureTests(unittest.TestCase):
             _store_unit(db, unit(), c)
         db.close()
 
-    def test_reviewed_whole_member_join_and_electorate_change(self):
+    def test_reviewed_whole_member_join_and_electorate_change(self) -> None:
         db = database()
         for turn in (1, 2):
             c = counts()
@@ -161,7 +161,7 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(row["candidate_vectors"]["1"]["13"], 40)
         db.close()
 
-    def test_overlapping_principal_population_is_not_summed(self):
+    def test_overlapping_principal_population_is_not_summed(self) -> None:
         db = database()
         for turn, section in [(1, "0001"), (2, "0001"), (2, "0002")]:
             _store_unit(db, unit(turn, section), counts(), ["ac:01007:0009:0001"])
@@ -171,7 +171,7 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(row["unavailable_reason"], "overlapping_principals")
         db.close()
 
-    def test_legacy_aggregate_without_member_array_retains_composition(self):
+    def test_legacy_aggregate_without_member_array_retains_composition(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "evidence.sqlite"
             source = sqlite3.connect(path)
@@ -203,7 +203,7 @@ class FeatureTests(unittest.TestCase):
             self.assertEqual(_sha(path), pin["sha256"])
             db.close()
 
-    def test_composition_missing_codes_consistency_and_duplicates(self):
+    def test_composition_missing_codes_consistency_and_duplicates(self) -> None:
         for token in ("#NULO#", "#NULO", "-1", ""):
             self.assertEqual(verified_member_sections("1", {"composition_raw": token}), ["0001"])
         for token in ("#NE#", "#NE", "-3", None):
@@ -223,7 +223,7 @@ class FeatureTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 verified_member_sections("1", payload)
 
-    def test_unverified_link_and_new_directory_only(self):
+    def test_unverified_link_and_new_directory_only(self) -> None:
         db = database()
         _store_unit(db, unit(), counts())
         doc = links()

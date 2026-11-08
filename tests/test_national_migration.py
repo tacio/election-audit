@@ -21,7 +21,7 @@ from election_audit.national_workload import _reuse
 
 
 class MigrationTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -77,7 +77,7 @@ class MigrationTests(unittest.TestCase):
         os.environ.pop("ELECTION_AUDIT_RELOCATION_SHA256", None)
         self.addCleanup(self.reset_cache)
 
-    def reset_cache(self):
+    def reset_cache(self) -> None:
         if relocation._CACHE:
             for _, db in set(relocation._CACHE[1].values()):
                 db.close()
@@ -92,7 +92,7 @@ class MigrationTests(unittest.TestCase):
         relocation.configure(registry, migration.sha(registry))
         return certificate, registry
 
-    def test_receiver_survives_sender_and_pid_reuse_is_not_alive(self):
+    def test_receiver_survives_sender_and_pid_reuse_is_not_alive(self) -> None:
         expected = [
             {"pid": 1, "start": 10, "argv": ["rsync"]},
             {"pid": 2, "start": 20, "argv": ["rsync"]},
@@ -119,7 +119,7 @@ class MigrationTests(unittest.TestCase):
         self.assertIsNone(result["1"]["observed_exit_code"])
         self.assertFalse(migration.transfer_alive(expected[0], {"start": 99, "state": "S"}))
 
-    def test_observed_transfer_failure_stops(self):
+    def test_observed_transfer_failure_stops(self) -> None:
         with patch.object(
             migration,
             "process",
@@ -130,7 +130,7 @@ class MigrationTests(unittest.TestCase):
                     {"transfers": [{"pid": 1, "start": 10}], "rounds": [self.item]}, lambda *a: None
                 )
 
-    def test_unexpected_transfer_rejected_even_with_no_open_output(self):
+    def test_unexpected_transfer_rejected_even_with_no_open_output(self) -> None:
         proc = {
             "pid": os.getpid() + 100,
             "state": "S",
@@ -140,7 +140,7 @@ class MigrationTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Unexpected transfer"):
                 migration.writers([self.new])
 
-    def test_worker_guard_distinguishes_unrelated_test_from_relevant_source(self):
+    def test_worker_guard_distinguishes_unrelated_test_from_relevant_source(self) -> None:
         launcher = self.root / "test-job/run_frozen.py"
         launcher.parent.mkdir()
         spec = launcher.parent / "workload.json"
@@ -153,7 +153,7 @@ class MigrationTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Existing structural worker"):
                 migration.writers([self.new])
 
-    def test_blind_acceptance_preserves_unknowns_and_resume_rejects_mutation(self):
+    def test_blind_acceptance_preserves_unknowns_and_resume_rejects_mutation(self) -> None:
         cert, _ = self.accept()
         self.assertEqual(cert["identity"]["section_status_counts"], {"unknown": 1})
         self.assertFalse(cert["semantic_inspection"])
@@ -167,7 +167,7 @@ class MigrationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Previously verified copy changed"):
             migration.verify_round(self.item, self.state, lambda *a: None, lambda: None)
 
-    def test_missing_corrupt_symlink_and_traversal_fail(self):
+    def test_missing_corrupt_symlink_and_traversal_fail(self) -> None:
         target = self.new / self.row["path"]
         target.write_bytes(b"x" * self.row["bytes"])
         with self.assertRaisesRegex(ValueError, "digest"):
@@ -181,7 +181,7 @@ class MigrationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             migration.relative_object("../outside", self.row["sha256"])
 
-    def test_mixed_round_and_unfinished_manifest_fail(self):
+    def test_mixed_round_and_unfinished_manifest_fail(self) -> None:
         with sqlite3.connect(self.manifest) as db:
             db.execute("UPDATE files SET url=replace(url,'3221','3220')")
             with self.assertRaisesRegex(ValueError, "another election round"):
@@ -190,7 +190,7 @@ class MigrationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "not finished"):
                 migration.manifest_identity(db, "3221")
 
-    def test_original_old_path_absent_cache_reuse_keeps_checkpoint_bytes(self):
+    def test_original_old_path_absent_cache_reuse_keeps_checkpoint_bytes(self) -> None:
         store, scratch = self.root / "store", self.root / "scratch"
         with patch("election_audit.national.guard"):
             artifact = process_compact_original(
@@ -214,7 +214,7 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(checked_copy(artifact, copy), copy)
         self.assertEqual(verify_checkpoint(copy, self.row)["counts"]["events"], 1)
 
-    def test_no_old_fallback_unknown_root_or_ledger_pin(self):
+    def test_no_old_fallback_unknown_root_or_ledger_pin(self) -> None:
         _, registry = self.accept()
         with self.assertRaisesRegex(ValueError, "not in the pinned"):
             relocation.relocated_root(
@@ -231,7 +231,7 @@ class MigrationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "registry"):
             relocation.configure(registry, "0" * 64)
 
-    def test_failed_continuation_propagates_and_bad_gate_never_runs(self):
+    def test_failed_continuation_propagates_and_bad_gate_never_runs(self) -> None:
         gate = self.root / "gate.json"
         script = self.root / "child.py"
         script.write_text("raise SystemExit(9)\n")
@@ -269,7 +269,7 @@ class MigrationTests(unittest.TestCase):
             json.loads((self.state / "status.json").read_text())["stage"], "FAILED_STOPPED"
         )
 
-    def test_continuation_wires_new_job_reuse_and_protected_scope(self):
+    def test_continuation_wires_new_job_reuse_and_protected_scope(self) -> None:
         from election_audit import national_overnight as overnight
         from election_audit.national import _read_json, _write_json
         from tests.test_national_workload import WorkloadExecutionTests
@@ -324,7 +324,7 @@ class MigrationTests(unittest.TestCase):
         config_path = fixture.root / "overnight-config.json"
         migration.atomic(config_path, config)
 
-        def prepare_tuning(sample, report, directory, *args, **kwargs):
+        def prepare_tuning(sample, report, directory, *args, **kwargs) -> None:
             directory.mkdir()
             _write_json(directory / "recommended.json", _read_json(fixture.reco))
 

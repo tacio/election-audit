@@ -58,7 +58,7 @@ def fixture(root):
 
 
 class ResearchModelTests(unittest.TestCase):
-    def test_fit_reproducibility_integrity_and_final_once(self):
+    def test_fit_reproducibility_integrity_and_final_once(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             source, protocol = fixture(root)
@@ -97,7 +97,7 @@ class ResearchModelTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 _load_model(root / "model-b")
 
-    def test_changed_source_and_matrix_bound_fail(self):
+    def test_changed_source_and_matrix_bound_fail(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             source, protocol = fixture(root)
@@ -110,7 +110,7 @@ class ResearchModelTests(unittest.TestCase):
 
 
 class MechanismValidationTests(unittest.TestCase):
-    def test_count_caps_and_redacted_history_transforms(self):
+    def test_count_caps_and_redacted_history_transforms(self) -> None:
         records = [
             {
                 "group": "ac:1",
@@ -142,7 +142,7 @@ class MechanismValidationTests(unittest.TestCase):
         )
         self.assertFalse(saturated[0]["injected"])
 
-    def test_resume_invokes_refit_and_pins_inputs(self):
+    def test_resume_invokes_refit_and_pins_inputs(self) -> None:
         records = [{"group": "ac:1", "a": 30, "b": 40, "other": 10, "electorate": 100}]
         spec = {
             "mechanisms": ["switching"],

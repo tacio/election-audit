@@ -29,7 +29,7 @@ FILES = (
 )
 
 
-def save_state(path, state):
+def save_state(path, state) -> None:
     value = {k: v for k, v in state.items() if k != "state_sha256"}
     checksum = hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":")).encode()

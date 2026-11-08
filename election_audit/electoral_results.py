@@ -82,7 +82,7 @@ def _anchor(value):
     )
 
 
-def validate_electoral(data, generated):
+def validate_electoral(data, generated) -> None:
     """Reject invalid relations/evidence, retaining numerical mismatches as findings."""
     elections = _index(data, "election", "election_id")
     sections = _index(data, "section", "section_id")
@@ -160,7 +160,7 @@ def validate_electoral(data, generated):
                 )
     for vid in versions:
 
-        def visit(current, ancestors):
+        def visit(current, ancestors) -> None:
             if current in ancestors:
                 raise PublicationError("Cyclic result supersession")
             for old in evidence.get(current, {}).get("supersedes", []):
@@ -342,7 +342,7 @@ def _reconcile(data):
             sums[choices[count["vote_choice_id"]]["choice_kind"]] += count["vote_count"]
         checks = {}
 
-        def check(name, left, right):
+        def check(name, left, right) -> None:
             checks[name] = {
                 "observed": left,
                 "reference": right,

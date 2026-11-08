@@ -285,7 +285,7 @@ def stage(certificate, manifest, destination, *, order="inode", floor_gib=100, r
     started_unix = time.time()
     status_path = destination / "staging-status.json"
 
-    def report(stage_name, **extra):
+    def report(stage_name, **extra) -> None:
         atomic(
             status_path,
             {
@@ -327,7 +327,7 @@ def stage(certificate, manifest, destination, *, order="inode", floor_gib=100, r
         began = time.monotonic()
         session_bytes = 0
 
-        def flush():
+        def flush() -> None:
             nonlocal batch, batch_bytes
             if not batch:
                 return
@@ -425,7 +425,7 @@ def verify_destination(destination, rows):
     return {"objects": len(rows), "bytes": total, "seconds": round(time.monotonic() - began, 1)}
 
 
-def stage_sources_main(argv=None):
+def stage_sources_main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit stage-sources",
         description="Benchmark read orders or stage certified raw objects onto a new root.",

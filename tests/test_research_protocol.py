@@ -34,7 +34,7 @@ def connection(path):
 
 
 class ResearchProtocolTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.feature = self.root / "features"
@@ -62,10 +62,10 @@ class ResearchProtocolTests(unittest.TestCase):
         db.close()
         self.pin()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.temp.cleanup()
 
-    def pin(self):
+    def pin(self) -> None:
         (self.feature / "manifest.json").write_text(
             json.dumps(
                 {
@@ -83,7 +83,7 @@ class ResearchProtocolTests(unittest.TestCase):
         path = publish_protocol(self.feature, self.root / name, **kwargs)
         return path, load_protocol(path)
 
-    def test_grouped_populations_reproducibility_unknowns_and_catalog_pins(self):
+    def test_grouped_populations_reproducibility_unknowns_and_catalog_pins(self) -> None:
         a, doc = self.protocol()
         b, second = self.protocol("again")
         self.assertEqual(doc["protocol_id"], second["protocol_id"])
@@ -111,7 +111,7 @@ class ResearchProtocolTests(unittest.TestCase):
             load_protocol(a)
         self.assertEqual(hash_file(b / "research.sqlite"), second["catalog_sha256"])
 
-    def test_inspection_registry_survives_new_seed_and_both_rounds(self):
+    def test_inspection_registry_survives_new_seed_and_both_rounds(self) -> None:
         original, _ = self.protocol()
         with connection(original / "research.sqlite") as db:
             stable = db.execute(
@@ -136,7 +136,7 @@ class ResearchProtocolTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             record_inspection(registry, stable, reason="missing", evidence={})
 
-    def test_conflicting_stable_geography_and_wrong_feature_pin_rejected(self):
+    def test_conflicting_stable_geography_and_wrong_feature_pin_rejected(self) -> None:
         with connection(self.feature / "features.sqlite") as db:
             db.execute("UPDATE units SET uf='al' WHERE unit_key='0000-r2'")
         self.pin()
@@ -172,7 +172,7 @@ class ResearchProtocolTests(unittest.TestCase):
         ]
         return db, common, keys
 
-    def test_exact_population_final_proof_one_use_and_immutable_record_ids(self):
+    def test_exact_population_final_proof_one_use_and_immutable_record_ids(self) -> None:
         db, common, keys = self.journal()
         self.assertFalse(final_evaluation_complete(db))
         with self.assertRaisesRegex(ValueError, "Conflicting immutable"):
@@ -207,7 +207,7 @@ class ResearchProtocolTests(unittest.TestCase):
             append_record(db, "forged", "final_evaluation", common)
         db.close()
 
-    def test_wrong_partition_references_and_tampered_proof_are_rejected(self):
+    def test_wrong_partition_references_and_tampered_proof_are_rejected(self) -> None:
         db, common, keys = self.journal()
         with self.assertRaisesRegex(ValueError, "protocol/partition"):
             append_record(db, "wrong", "null_result", {**common, "partition_id": "wrong"})
@@ -228,7 +228,7 @@ class ResearchProtocolTests(unittest.TestCase):
         self.assertFalse(final_evaluation_complete(db))
         db.close()
 
-    def test_frozen_snapshot_and_legacy_dashboard_are_fail_closed(self):
+    def test_frozen_snapshot_and_legacy_dashboard_are_fail_closed(self) -> None:
         db, common, _ = self.journal()
         out = snapshot_journal(db, self.root / "snapshot")
         pin = hash_file(out / "research.sqlite")

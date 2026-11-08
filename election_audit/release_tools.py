@@ -76,7 +76,7 @@ def validate_release(path, *, _verified_document=None):
     }
 
 
-def _restrict_query(connection, path, document):
+def _restrict_query(connection, path, document) -> None:
     from election_audit.derivatives import allowed_fact_paths
 
     files = allowed_fact_paths(path, document)
@@ -391,7 +391,7 @@ def report_release(path, output, *, language="both"):
     return _mark_synthetic(path, output, document, [output / name for name in products])
 
 
-def release_main(command, argv=None):
+def release_main(command, argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     if command == "build":
         parser.add_argument("inputs", nargs="+", type=Path)

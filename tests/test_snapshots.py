@@ -29,7 +29,7 @@ from election_audit.source_inventory import (
 
 
 class SourceFixture(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name) / "raw"
@@ -73,7 +73,7 @@ class SourceFixture(unittest.TestCase):
         self.db.commit()
         return path
 
-    def record_section(self, code="0001", status="downloaded", metadata=None, run=None):
+    def record_section(self, code="0001", status="downloaded", metadata=None, run=None) -> None:
         self.db.execute(
             "INSERT OR REPLACE INTO sections VALUES (?,?,?,?,?,?,?,NULL)",
             (
@@ -86,7 +86,7 @@ class SourceFixture(unittest.TestCase):
         )
         self.db.commit()
 
-    def advertise(self, url=None, run=None, code="0001"):
+    def advertise(self, url=None, run=None, code="0001") -> None:
         self.db.execute(
             "INSERT INTO logs VALUES (?,?,?,?,?,?,?,?,?)",
             (run or self.run, *self.key[:3], code, url or self.log_url, "1", "pkg", "a-log.dat"),
@@ -107,7 +107,7 @@ class SourceFixture(unittest.TestCase):
 
 
 class InventoryTests(SourceFixture):
-    def test_marker_wal_current_observation_and_unknown_history(self):
+    def test_marker_wal_current_observation_and_unknown_history(self) -> None:
         self.record_section()
         self.advertise()
         self.save(self.log_url, b"original")
@@ -124,10 +124,10 @@ class InventoryTests(SourceFixture):
         for table in ("source_object", "source_observation"):
             self.assertEqual(validate_rows(table, inventory[table]), [])
 
-    def test_read_view_spans_tables_when_writer_commits(self):
+    def test_read_view_spans_tables_when_writer_commits(self) -> None:
         self.record_section(status="error")
 
-        def writer_commit():
+        def writer_commit() -> str:
             self.db.execute("UPDATE runs SET status='finished'")
             self.db.execute("UPDATE sections SET status='downloaded'")
             self.db.commit()
@@ -139,7 +139,7 @@ class InventoryTests(SourceFixture):
         self.assertEqual(view["manifest_rows"]["sections"][0]["status"], "error")
         self.assertEqual(self.db.execute("SELECT status FROM runs").fetchone()[0], "finished")
 
-    def test_missing_corrupt_and_unsafe_objects_retained(self):
+    def test_missing_corrupt_and_unsafe_objects_retained(self) -> None:
         self.advertise()
         path = self.save(self.log_url, b"original")
         path.write_bytes(b"corrupt!")
@@ -157,7 +157,7 @@ class InventoryTests(SourceFixture):
             "unsafe_storage_locator",
         )
 
-    def test_selection_validation_and_no_manifest_creation(self):
+    def test_selection_validation_and_no_manifest_creation(self) -> None:
         with self.assertRaises(ValueError):
             read_manifest(self.root, ["xx"])
         (self.root / "manifest-location.json").unlink()
@@ -165,7 +165,7 @@ class InventoryTests(SourceFixture):
             read_manifest(self.root, ["ac"])
         self.assertFalse((self.root / "manifest.sqlite").exists())
 
-    def test_latest_url_bytes_never_assigned_to_original_run(self):
+    def test_latest_url_bytes_never_assigned_to_original_run(self) -> None:
         self.record_section()
         self.advertise()
         self.save(self.log_url, b"old")
@@ -181,7 +181,7 @@ class PopulationTests(SourceFixture):
     def population(self, **kwargs):
         return build_population(inventory_sources(self.root, ["ac"], **kwargs))
 
-    def test_expected_members_and_unique_principals_never_multiply(self):
+    def test_expected_members_and_unique_principals_never_multiply(self) -> None:
         self.save_index(
             [
                 {"ns": "0001", "da": "date"},
@@ -220,7 +220,7 @@ class PopulationTests(SourceFixture):
             population["tables"]["package_observation"][0]["package_status"], "unknown"
         )
 
-    def test_missing_index_retains_observed_members_but_unknown_expected(self):
+    def test_missing_index_retains_observed_members_but_unknown_expected(self) -> None:
         self.record_section()
         population = self.population()
         self.assertIsNone(population["coverage_summary"]["expected_members"])
@@ -228,14 +228,14 @@ class PopulationTests(SourceFixture):
         self.assertEqual(len(population["tables"]["coverage_ledger"]), 1)
         self.assertEqual(population["section_evidence"][0]["acquisition_state"], "unresolved")
 
-    def test_current_file_without_run_or_index_still_has_coverage_row(self):
+    def test_current_file_without_run_or_index_still_has_coverage_row(self) -> None:
         self.save(self.log_url, b"unrecorded active download")
         population = self.population()
         self.assertEqual(len(population["tables"]["coverage_ledger"]), 1)
         self.assertEqual(population["coverage_summary"]["observed_only_sections"], 1)
         self.assertIsNone(population["coverage_summary"]["expected_members"])
 
-    def test_exact_package_status_mapping_is_versioned_and_raw_preserved(self):
+    def test_exact_package_status_mapping_is_versioned_and_raw_preserved(self) -> None:
         self.save_index([{"ns": "0001", "da": "date"}])
         for status, normalized in (
             ("Totalizado", "totalized"),
@@ -257,7 +257,7 @@ class PopulationTests(SourceFixture):
             self.assertEqual(row["package_status_raw"], status)
             self.assertEqual(row["package_status"], normalized)
 
-    def test_ambiguous_composition_and_unseen_principal_are_unresolved(self):
+    def test_ambiguous_composition_and_unseen_principal_are_unresolved(self) -> None:
         self.save_index(
             [
                 {"ns": "0001", "nsp": "0002"},
@@ -274,7 +274,7 @@ class PopulationTests(SourceFixture):
         self.assertEqual(population["tables"]["section_composition"], [])
         self.assertEqual(len(population["tables"]["coverage_ledger"]), 4)
 
-    def test_partial_interrupted_and_finished_runs_do_not_prove_coverage(self):
+    def test_partial_interrupted_and_finished_runs_do_not_prove_coverage(self) -> None:
         self.save_index([{"ns": "0001", "da": "date"}, {"ns": "0002", "da": "date"}])
         self.record_section()
         self.advertise()
@@ -291,7 +291,7 @@ class PopulationTests(SourceFixture):
                 )
                 self.assertFalse(population["coverage_summary"]["run_status_is_coverage_proof"])
 
-    def test_explicit_section_selection_bounds_bytes_preserves_index_denominator(self):
+    def test_explicit_section_selection_bounds_bytes_preserves_index_denominator(self) -> None:
         self.save_index([{"ns": "0001", "da": "date"}, {"ns": "0002", "da": "date"}])
         self.record_section()
         self.record_section("0002")
@@ -310,13 +310,13 @@ class PopulationTests(SourceFixture):
         )
         self.assertEqual(len(population["tables"]["coverage_ledger"]), 2)
 
-    def test_additional_ufs_can_enter_explicit_subsequent_snapshot(self):
+    def test_additional_ufs_can_enter_explicit_subsequent_snapshot(self) -> None:
         inventory = inventory_sources(self.root, ["sp", "zz"])
         population = build_population(inventory)
         self.assertEqual(population["coverage_summary"]["declared_ufs"], ["sp", "zz"])
         self.assertIsNone(population["coverage_summary"]["expected_members"])
 
-    def test_missing_advertised_asset_and_corrupt_metadata_stay_visible(self):
+    def test_missing_advertised_asset_and_corrupt_metadata_stay_visible(self) -> None:
         self.save_index([{"ns": "0001", "da": "date"}])
         path = self.save(
             aux_url(self.key),
@@ -339,7 +339,7 @@ class PopulationTests(SourceFixture):
 
 
 class SnapshotTests(SourceFixture):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.store = Path(self.temporary.name) / "snapshots"
         self.save_index([{"ns": "0001", "da": "date"}, {"ns": "0002", "nsp": "0001"}])
@@ -351,7 +351,7 @@ class SnapshotTests(SourceFixture):
         inventory = inventory_sources(self.root, ["ac"])
         return inventory, build_population(inventory)
 
-    def test_atomic_self_contained_snapshot_and_idempotent_publication(self):
+    def test_atomic_self_contained_snapshot_and_idempotent_publication(self) -> None:
         inventory, population = self.captured()
         path = publish_snapshot(inventory, population, self.store)
         document = inspect_snapshot(path, verify_objects=True)
@@ -364,7 +364,7 @@ class SnapshotTests(SourceFixture):
         self.assertEqual(len(list(self.store.glob("[0-9a-f]*"))), 1)
         self.assertEqual(list(self.store.glob(".snapshot-building-*")), [])
 
-    def test_later_download_and_raw_deletion_cannot_change_snapshot(self):
+    def test_later_download_and_raw_deletion_cannot_change_snapshot(self) -> None:
         path = create_snapshot(self.root, self.store, ["ac"])
         before = inspect_snapshot(path, verify_objects=True)
         self.save(self.log_url, b"changed!")
@@ -380,7 +380,7 @@ class SnapshotTests(SourceFixture):
             {"acquired": 1, "aggregated": 1},
         )
 
-    def test_changed_source_aborts_before_publication_and_retry_is_safe(self):
+    def test_changed_source_aborts_before_publication_and_retry_is_safe(self) -> None:
         inventory, population = self.captured()
         self.raw_log.write_bytes(b"changed!")
         with self.assertRaises(SnapshotError):
@@ -391,7 +391,7 @@ class SnapshotTests(SourceFixture):
         path = publish_snapshot(inventory, population, self.store)
         inspect_snapshot(path, verify_objects=True)
 
-    def test_abandoned_staging_and_interruption_never_look_complete(self):
+    def test_abandoned_staging_and_interruption_never_look_complete(self) -> None:
         self.store.mkdir()
         abandoned = self.store / ".snapshot-building-abandoned"
         abandoned.mkdir()
@@ -405,7 +405,7 @@ class SnapshotTests(SourceFixture):
         inspect_snapshot(path, verify_objects=True)
         self.assertTrue(abandoned.exists())
 
-    def test_snapshot_damage_is_detected_and_never_overwritten(self):
+    def test_snapshot_damage_is_detected_and_never_overwritten(self) -> None:
         inventory, population = self.captured()
         path = publish_snapshot(inventory, population, self.store)
         document = inspect_snapshot(path)
@@ -423,7 +423,7 @@ class SnapshotTests(SourceFixture):
         with self.assertRaisesRegex(SnapshotError, "checksum"):
             inspect_snapshot(path)
 
-    def test_inspection_uses_frozen_schema_and_detects_payload_tampering(self):
+    def test_inspection_uses_frozen_schema_and_detects_payload_tampering(self) -> None:
         path = create_snapshot(self.root, self.store, ["ac"])
         with patch(
             "election_audit.snapshots.load_contract",
@@ -437,7 +437,7 @@ class SnapshotTests(SourceFixture):
         with self.assertRaisesRegex(SnapshotError, "identity/inventory"):
             inspect_snapshot(path)
 
-    def test_missing_objects_and_failed_attempts_can_be_frozen_honestly(self):
+    def test_missing_objects_and_failed_attempts_can_be_frozen_honestly(self) -> None:
         self.raw_log.unlink()
         self.record_section(status="error")
         path = create_snapshot(self.root, self.store, ["ac"])
@@ -458,7 +458,7 @@ class SnapshotTests(SourceFixture):
             )
         )
 
-    def test_reserve_and_raw_root_protection(self):
+    def test_reserve_and_raw_root_protection(self) -> None:
         inventory, population = self.captured()
         with self.assertRaises(SnapshotError):
             publish_snapshot(inventory, population, self.root / "snapshots")
@@ -466,7 +466,7 @@ class SnapshotTests(SourceFixture):
             publish_snapshot(inventory, population, self.store, reserve_bytes=10**30)
         self.assertEqual(list(self.store.glob("[0-9a-f]*")), [])
 
-    def test_new_cli_recipes_are_usable_and_legacy_inspect_remains(self):
+    def test_new_cli_recipes_are_usable_and_legacy_inspect_remains(self) -> None:
         from election_audit.cli import main
 
         with redirect_stdout(io.StringIO()) as output:

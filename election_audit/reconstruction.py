@@ -87,7 +87,7 @@ def _claim(claim, events):
     return claim["review_state"] == "reviewed"
 
 
-def _contiguous(ids, events):
+def _contiguous(ids, events) -> None:
     if not ids or len(set(ids)) != len(ids) or any(key not in events for key in ids):
         raise ReconstructionError("Empty, duplicate or unknown event interval")
     group = [events[key] for key in ids]
@@ -479,7 +479,7 @@ def reconstruct_cycles(bundle):
                 "attempts": int(event["event_kind"] == "authorization_attempt"),
             }
 
-        def finish(state, end=None, reason=None):
+        def finish(state, end=None, reason=None) -> None:
             nonlocal active, sequence
             if reason:
                 active["reasons"].append(reason)
@@ -1223,7 +1223,7 @@ def iter_reconstruction_rows(path, table):
     yield from _rows(Path(path) / f"{table}.jsonl")
 
 
-def reconstruction_main(argv=None):
+def reconstruction_main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("parse", type=Path)
     parser.add_argument("--store", type=Path, required=True)

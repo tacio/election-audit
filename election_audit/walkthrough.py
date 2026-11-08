@@ -56,7 +56,7 @@ def synthetic_source(root):
         """)
         db.execute("INSERT INTO runs VALUES (?,?,?,'synthetic')", (SYNTHETIC_AT,) * 3)
 
-        def save(url, body):
+        def save(url, body) -> None:
             import hashlib
 
             raw = body if isinstance(body, bytes) else canonical(body)

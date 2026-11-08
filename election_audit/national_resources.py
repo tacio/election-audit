@@ -108,7 +108,7 @@ def apply(policy, *, worker=False):
     }
 
 
-def validate(resources):
+def validate(resources) -> None:
     cpus = resources["cpu"]
     if (
         not cpus["allowed_cpus"]

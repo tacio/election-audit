@@ -52,7 +52,7 @@ def population():
 
 
 class PartitionTests(unittest.TestCase):
-    def test_known_cross_round_identity_group_unknowns_and_no_overlap(self):
+    def test_known_cross_round_identity_group_unknowns_and_no_overlap(self) -> None:
         plans, rows = assign_partitions(population(), specification())
         self.assertEqual(rows[0]["stable_location_id"], rows[-1]["stable_location_id"])
         self.assertEqual(rows[0]["partition_name"], rows[-1]["partition_name"])
@@ -66,7 +66,7 @@ class PartitionTests(unittest.TestCase):
         self.assertTrue(all(len(v) == 1 for v in groups.values()))
         self.assertEqual(plans[0]["population_rows"], 4)
 
-    def test_reordering_resume_seed_version_population_and_stress(self):
+    def test_reordering_resume_seed_version_population_and_stress(self) -> None:
         spec, pop = specification(), population()
         expected = assign_partitions(pop, spec)
         spec["links"].reverse()
@@ -90,7 +90,7 @@ class PartitionTests(unittest.TestCase):
         with self.assertRaises(PublicationError):
             assign_partitions(pop, spec)
 
-    def test_stale_conflicting_unverified_geographic_links_fail(self):
+    def test_stale_conflicting_unverified_geographic_links_fail(self) -> None:
         for mutation in ("duplicate", "unverified", "stale", "geography", "fractions"):
             spec, pop = copy.deepcopy(specification()), population()
             if mutation == "duplicate":

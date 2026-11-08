@@ -112,7 +112,7 @@ def head(url):
     return _head(_revalidate(url))
 
 
-def _revalidate(url):
+def _revalidate(url) -> str:
     """Return ``url`` with a throwaway query that bypasses a stale CDN cache entry."""
     separator = "&" if urlsplit(url).query else "?"
     return f"{url}{separator}revalidate={time.time_ns()}"
@@ -283,7 +283,7 @@ def acquire(
     started = time.time()
     status_path = output / "status.json"
 
-    def report(stage, **extra):
+    def report(stage, **extra) -> None:
         atomic(
             status_path,
             {
@@ -396,7 +396,7 @@ def acquire(
             if target.exists():
                 raise FileExistsError(f"Refusing to overwrite an unrecorded file: {target}")
 
-            def progress(current, url=url, index=index):
+            def progress(current, url=url, index=index) -> None:
                 elapsed = time.monotonic() - began
                 rate = (done_bytes + current) / elapsed if elapsed else 0
                 report(
@@ -470,7 +470,7 @@ def verify(output):
     return {"verified_files": len(rows), "verified_bytes": sum(r[2] for r in rows)}
 
 
-def bulk_download_main(argv=None):
+def bulk_download_main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit bulk-download",
         description="Acquire or verify TSE open-data bulk archives with checksums.",

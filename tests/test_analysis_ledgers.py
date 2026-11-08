@@ -116,7 +116,7 @@ class LedgerTests(unittest.TestCase):
     def validated(self, incoming, inherited=()):
         return validate_records(inherited, incoming, partition_ids={"p"}, snapshot_ids={"snapshot"})
 
-    def test_append_resume_reordering_conflicts_and_missing_refs(self):
+    def test_append_resume_reordering_conflicts_and_missing_refs(self) -> None:
         fresh, records = self.validated(list(reversed(protocol_records())))
         self.assertEqual(len(fresh), 3)
         self.assertEqual(self.validated(protocol_records(), records.values())[0], [])
@@ -129,7 +129,7 @@ class LedgerTests(unittest.TestCase):
         with self.assertRaises(PublicationError):
             self.validated(broken)
 
-    def test_all_outcomes_and_null_results_complete_snapshot_and_exploratory(self):
+    def test_all_outcomes_and_null_results_complete_snapshot_and_exploratory(self) -> None:
         explored = record(
             "outcome",
             "exploration",
@@ -160,7 +160,7 @@ class LedgerTests(unittest.TestCase):
         explored["payload"]["family_status"] = "exploratory"
         self.validated([explored, *protocol_records()])
 
-    def test_calibration_score_investigation_populations_and_no_inference(self):
+    def test_calibration_score_investigation_populations_and_no_inference(self) -> None:
         calibration = record(
             "calibration",
             "calibration",
@@ -227,7 +227,7 @@ class LedgerTests(unittest.TestCase):
         with self.assertRaises(PublicationError):
             self.validated(fitted)
 
-    def test_test_inspection_contaminates_future_reseeded_holdout(self):
+    def test_test_inspection_contaminates_future_reseeded_holdout(self) -> None:
         inspection = record(
             "inspection",
             "test_access",
@@ -254,7 +254,7 @@ class LedgerTests(unittest.TestCase):
                 [*assignments(), new_assignment], {**records, "future": future}, [future]
             )
 
-    def test_conditional_bounds_overlap_unknown_margin_caps_and_tie(self):
+    def test_conditional_bounds_overlap_unknown_margin_caps_and_tie(self) -> None:
         payload = impact()
         result = conditional_impact(payload)
         self.assertEqual(result["margin_change_bounds"], [-20, 20])
@@ -276,12 +276,12 @@ class LedgerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             conditional_impact(payload)
 
-    def test_anchor_requires_preserved_source_bytes(self):
+    def test_anchor_requires_preserved_source_bytes(self) -> None:
         with self.assertRaisesRegex(PublicationError, "frozen source object"):
             validate_evidence(impact(), {"b" * 64})
         validate_evidence(impact(), {"a" * 64})
 
-    def test_query_reserves_untouched_outcomes_and_exposes_only_training_view(self):
+    def test_query_reserves_untouched_outcomes_and_exposes_only_training_view(self) -> None:
         import duckdb
 
         from election_audit.analysis import protect_test_query

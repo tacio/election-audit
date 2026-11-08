@@ -175,7 +175,7 @@ def review_original_messages(snapshot):
     keywords = ("biometr", "cancel", "suspens", "reinici", "modelo de urna", "habilita")
     total_bytes = 0
 
-    def visit(body, depth=0):
+    def visit(body, depth=0) -> None:
         nonlocal total_bytes
         if depth > 4:
             raise PublicationError("Review nested depth exceeded")
@@ -328,7 +328,7 @@ def run_pilot(source, output):
     return result
 
 
-def pilot_main(argv=None):
+def pilot_main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)

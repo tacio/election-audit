@@ -151,7 +151,7 @@ def selected_rows(db, spec):
                 raise ValueError("Selected section has no source mapping")
 
 
-def guard(store, scratch, extra=0, *, reserve_bytes=None):
+def guard(store, scratch, extra=0, *, reserve_bytes=None) -> None:
     if reserve_bytes is None:
         reserve_bytes = LIMITS["reserve_bytes"]
     existing = []
@@ -218,7 +218,7 @@ def preflight(
     return result
 
 
-def _sync_dir(path):
+def _sync_dir(path) -> None:
     fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
     try:
         os.fsync(fd)
@@ -235,7 +235,7 @@ def _lock(store, name):
         yield
 
 
-def _validate_row(row):
+def _validate_row(row) -> None:
     if (
         not isinstance(row.get("sha256"), str)
         or not re.fullmatch(r"[0-9a-f]{64}", row["sha256"])
@@ -245,14 +245,14 @@ def _validate_row(row):
         raise ValueError("Invalid file metadata")
 
 
-def _destinations(config, store, scratch):
+def _destinations(config, store, scratch) -> None:
     for source in config["sources"]:
         raw = Path(source["root"]).resolve()
         if any(p == raw or p.is_relative_to(raw) for p in (store, scratch)):
             raise ValueError("Derived paths must be outside raw roots")
 
 
-def _write_json(path, document):
+def _write_json(path, document) -> None:
     encoded = canonical(document) + b"\n"
     with Path(path).open("xb") as f:
         f.write(encoded)
@@ -272,7 +272,7 @@ def _read_json(path):
     return json.loads(body)
 
 
-def _verify_files(directory, document):
+def _verify_files(directory, document) -> None:
     for name, expected in document["files"].items():
         if Path(name).is_absolute() or ".." in Path(name).parts:
             raise ValueError("Unsafe artifact path")
@@ -484,7 +484,7 @@ def _compact_jsonl(source, output, batch_rows):
 
 
 class _BudgetWriter:
-    def __init__(self, stream, budget):
+    def __init__(self, stream, budget) -> None:
         self.stream, self.budget = stream, budget
 
     def write(self, body):
@@ -497,11 +497,11 @@ class _BudgetWriter:
 class _StreamingParser(_Parser):
     """Exact diagnostic counts; unknown-message info is addressable in event rows."""
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         super().__init__(*args)
         self.diagnostics = Counter()
 
-    def issue(self, code, segments, *, line=None, severity="error", **details):
+    def issue(self, code, segments, *, line=None, severity="error", **details) -> None:
         self.counts["issues_seen"] += 1
         self.diagnostics[(code, severity)] += 1
         self.incomplete |= severity == "error"
@@ -800,7 +800,7 @@ def status(store=DEFAULT_STORE, *, config_id=None):
     return result
 
 
-def national_main(argv=None):
+def national_main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("preflight", "resume", "status"))
     parser.add_argument("--config", type=Path)

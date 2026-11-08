@@ -13,7 +13,7 @@ from election_audit.dashboard_data import AuditDataset, export_release
 
 
 class DashboardReleaseTests(unittest.TestCase):
-    def test_partitioned_export_excludes_raw_outcomes_and_redacts_coverage(self):
+    def test_partitioned_export_excludes_raw_outcomes_and_redacts_coverage(self) -> None:
         with tempfile.TemporaryDirectory() as directory, duckdb.connect() as db:
             names = [
                 "test_partition_status",

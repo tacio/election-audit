@@ -15,7 +15,7 @@ from scripts.download_tse_logs import presidential_election, validate_manifest_r
 
 
 class ElectionTests(unittest.TestCase):
-    def test_descriptor_rejects_relabeling_and_keeps_default_identity(self):
+    def test_descriptor_rejects_relabeling_and_keeps_default_identity(self) -> None:
         self.assertEqual(election_for_round().pleito_code, "3221")
         self.assertEqual(election_for_round(1).election_code, "6257")
         self.assertEqual(coerce_election(election_for_round(1).as_dict()), election_for_round(1))
@@ -24,7 +24,7 @@ class ElectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             election_for_round(True)
 
-    def test_catalog_selection_checks_round_date_and_codes(self):
+    def test_catalog_selection_checks_round_date_and_codes(self) -> None:
         config = {
             "pl": [
                 {
@@ -42,7 +42,7 @@ class ElectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             presidential_election(config, 1)
 
-    def test_manifest_mismatch_prevents_cross_round_resume(self):
+    def test_manifest_mismatch_prevents_cross_round_resume(self) -> None:
         c = sqlite3.connect(":memory:")
         self.addCleanup(c.close)
         c.execute("CREATE TABLE files(url TEXT PRIMARY KEY)")
@@ -56,7 +56,7 @@ class ElectionTests(unittest.TestCase):
 
 
 class FirstRoundSnapshotTests(SourceFixture):
-    def test_first_round_inventory_snapshot_and_population_are_distinct(self):
+    def test_first_round_inventory_snapshot_and_population_are_distinct(self) -> None:
         election = election_for_round(1)
         self.record_section()
         index = {

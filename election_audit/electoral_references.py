@@ -249,7 +249,7 @@ def reconcile_hierarchy(parent, output, *, download=False):
     )
 
 
-def references_main(argv=None):
+def references_main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("operation", choices=("national", "hierarchy"))
     p.add_argument("--output", required=True, type=Path)

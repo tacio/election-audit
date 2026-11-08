@@ -72,7 +72,7 @@ def _signed_by(certificate_or_list, key, tbs):
 
 
 class Authority:
-    def __init__(self, name):
+    def __init__(self, name) -> None:
         from cryptography import x509
         from cryptography.hazmat.primitives.serialization import Encoding
 

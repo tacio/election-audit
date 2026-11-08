@@ -414,7 +414,7 @@ def derive_analysis(parent, document, spec, config):
     return result, schemas
 
 
-def validate_evidence(value, source_hashes):
+def validate_evidence(value, source_hashes) -> None:
     """Publication resolves anchors to preserved bytes; review truth remains asserted."""
     from election_audit.electoral_results import _anchor
 
@@ -430,7 +430,7 @@ def validate_evidence(value, source_hashes):
             validate_evidence(item, source_hashes)
 
 
-def validate_impact_target(db, payload, names):
+def validate_impact_target(db, payload, names) -> None:
     target = payload["target"]
     if (
         not isinstance(target, dict)
@@ -470,7 +470,7 @@ def validate_impact_target(db, payload, names):
             )
 
 
-def validate_populations(assignments, records, fresh):
+def validate_populations(assignments, records, fresh) -> None:
     from election_audit.analysis_ledgers import access_status
 
     units = {r["stable_location_id"] for r in assignments if r["eligible"]}
@@ -544,7 +544,7 @@ def _logical(rows):
     }
 
 
-def validate_analysis(path, document, connection):
+def validate_analysis(path, document, connection) -> None:
     spec = _read_checked(path, "import.json")["analysis"]
     pin = document["identity"]["adapter"]["configuration_sha256"]
     checked = read_analysis(
@@ -579,7 +579,7 @@ def validate_analysis(path, document, connection):
             raise PublicationError(f"Analysis derivation mismatch: {name}")
 
 
-def protect_test_query(connection, document, sql):
+def protect_test_query(connection, document, sql) -> None:
     """Require an immutable inspection record before exposing any untouched test outcomes."""
     import re
 
@@ -616,7 +616,7 @@ def publish_analysis(parent, bundle, store, *, config=None):
     return publish_derivative(parent, bundle, store, config=config, _analysis=True)
 
 
-def analysis_main(argv=None):
+def analysis_main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("parent", type=Path)
     parser.add_argument("--bundle", required=True, type=Path)

@@ -12,7 +12,7 @@ from election_audit.national_migration import file_stat, sha
 _CACHE = None
 
 
-def configure(path, expected_sha):
+def configure(path, expected_sha) -> None:
     path = str(Path(path).absolute())
     if Path(path).is_symlink() or sha(path) != expected_sha:
         raise ValueError("Verified relocation registry checksum mismatch")

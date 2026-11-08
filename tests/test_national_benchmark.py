@@ -12,7 +12,7 @@ from election_audit.national_benchmark import profile_source, select_sample
 
 
 class WorkloadTests(unittest.TestCase):
-    def test_deterministic_size_bands_tail_and_inspection_before_content(self):
+    def test_deterministic_size_bands_tail_and_inspection_before_content(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             manifest = root / "source.sqlite"

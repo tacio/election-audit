@@ -48,7 +48,7 @@ class DerivativeTests(test_snapshots.SourceFixture):
         bundle_at(directory, data)
         return base, parent, bundle, data
 
-    def test_end_to_end_query_validate_report_relocation_and_one_physical_hash_pass(self):
+    def test_end_to_end_query_validate_report_relocation_and_one_physical_hash_pass(self) -> None:
         base, parent, bundle, _ = self.parent_and_bundle()
         before = inspect_release(parent)
         child = publish_derivative(parent, bundle, base / "warehouse")
@@ -102,7 +102,9 @@ class DerivativeTests(test_snapshots.SourceFixture):
             query_release(moved_child, "SELECT count(*) FROM canonical_result")["rows"], [(1,)]
         )
 
-    def test_official_bu_child_preserves_verification_originals_unknowns_and_relocation(self):
+    def test_official_bu_child_preserves_verification_originals_unknowns_and_relocation(
+        self,
+    ) -> None:
         from test_official_bu import official_bundle
 
         base, parent, _, _ = self.parent_and_bundle()
@@ -148,7 +150,7 @@ class DerivativeTests(test_snapshots.SourceFixture):
         shutil.move(base / "warehouse", moved)
         self.assertEqual(validate_release(moved / "releases" / child.name)["integrity"], "passed")
 
-    def test_official_reobservation_appends_without_reusing_another_snapshot_identity(self):
+    def test_official_reobservation_appends_without_reusing_another_snapshot_identity(self) -> None:
         from test_official_bu import official_bundle
 
         base, parent, _, _ = self.parent_and_bundle()
@@ -179,7 +181,7 @@ class DerivativeTests(test_snapshots.SourceFixture):
             [("unknown",)],
         )
 
-    def test_append_derivative_retains_versions_and_recalculates_conflict(self):
+    def test_append_derivative_retains_versions_and_recalculates_conflict(self) -> None:
         base, parent, bundle, data = self.parent_and_bundle()
         child = publish_derivative(parent, bundle, base / "warehouse")
         second_data = {}
@@ -212,7 +214,7 @@ class DerivativeTests(test_snapshots.SourceFixture):
         )
         self.assertEqual(validate_release(latest)["integrity"], "passed")
 
-    def test_tamper_parent_pin_and_external_query_guards(self):
+    def test_tamper_parent_pin_and_external_query_guards(self) -> None:
         base, parent, bundle, _ = self.parent_and_bundle()
         child = publish_derivative(parent, bundle, base / "warehouse")
         for sql in (
@@ -229,7 +231,7 @@ class DerivativeTests(test_snapshots.SourceFixture):
         with self.assertRaisesRegex(PublicationError, "parent manifest"):
             inspect_release(child)
 
-    def test_row_resource_bound_and_missing_parent(self):
+    def test_row_resource_bound_and_missing_parent(self) -> None:
         base, parent, bundle, _ = self.parent_and_bundle()
         with self.assertRaisesRegex(PublicationError, "row limit"):
             publish_derivative(

@@ -195,7 +195,7 @@ def template(application, message):
 class _Target:
     __slots__ = ("offset", "lines", "prefixes", "keep", "hash", "seen", "first", "found", "records")
 
-    def __init__(self, offset, lines, prefixes, keep):
+    def __init__(self, offset, lines, prefixes, keep) -> None:
         self.offset, self.lines, self.prefixes, self.keep = offset, lines, set(prefixes), keep
         self.hash, self.seen, self.first, self.found, self.records = (
             hashlib.sha256(),
@@ -303,7 +303,7 @@ def run_chunk(task):
     return index, len(items), sum(r[2] is not None for r in results)
 
 
-def _init_worker():
+def _init_worker() -> None:
     for name in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
         os.environ[name] = "1"
 
@@ -327,7 +327,7 @@ def _staged_root(semantic_root):
     return staged, binding
 
 
-def compare(pair, side_results):
+def compare(pair, side_results) -> str:
     """Status of one block pair from the re-read results of its longer side."""
     l1, l2 = pair["round1_lines"], pair["runoff_lines"]
     if l1 == l2:
@@ -495,7 +495,7 @@ def run_prefix(
     started = time.monotonic()
     status_path = output / "status.json"
 
-    def report(stage, **extra):
+    def report(stage, **extra) -> None:
         atomic(
             status_path,
             {
@@ -605,7 +605,7 @@ def run_prefix(
     differing = [p for p in pairs if p["status"] == "differs"]
     cache = {}
 
-    def records(round_number, digest, path, key, offset, lines):
+    def records(round_number, digest, path, key, offset, lines) -> None:
         wanted = (round_number, digest)
         targets = cache.setdefault(wanted, {"path": path, "targets": {}})["targets"]
         targets[key] = (offset, lines, (), True)

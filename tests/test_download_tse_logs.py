@@ -24,13 +24,13 @@ def jez(content):
 
 
 class Response(io.BytesIO):
-    def __init__(self, body):
+    def __init__(self, body) -> None:
         super().__init__(body)
         self.headers = {"Content-Length": str(len(body)), "ETag": '"test"'}
 
 
 class CollectorTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
@@ -59,7 +59,7 @@ class CollectorTests(unittest.TestCase):
         }
         self.item = ("ac", "01120", "0001", "0001", {"ns": "0001", "da": "26/10/2026"})
 
-    def test_original_bytes_multiple_versions_and_resume(self):
+    def test_original_bytes_multiple_versions_and_resume(self) -> None:
         bodies = {
             self.aux_url: json.dumps(self.aux).encode(),
             self.directory + "/aaa/official-log.jez": jez(b"first"),
@@ -100,7 +100,7 @@ class CollectorTests(unittest.TestCase):
         )
         self.assertEqual(set(statuses), {("Totalizado",), ("Rejeitado",)})
 
-    def test_aggregates_and_unpublished_are_reported_without_requests(self):
+    def test_aggregates_and_unpublished_are_reported_without_requests(self) -> None:
         with patch.object(dl, "urlopen") as request:
             aggregated = (*self.item[:4], {"ns": "0002", "nsp": "0001"})
             unpublished = (*self.item[:3], "0003", {"ns": "0003"})
@@ -108,7 +108,7 @@ class CollectorTests(unittest.TestCase):
             self.assertEqual(self.collector.section(unpublished, "3221", "r"), "aux_not_published")
             request.assert_not_called()
 
-    def test_missing_only_skips_section_requests_and_carries_provenance(self):
+    def test_missing_only_skips_section_requests_and_carries_provenance(self) -> None:
         bodies = {
             self.aux_url: json.dumps(self.aux).encode(),
             self.directory + "/aaa/official-log.jez": jez(b"first"),
@@ -135,7 +135,7 @@ class CollectorTests(unittest.TestCase):
             "downloaded",
         )
 
-    def test_missing_only_repairs_deleted_or_corrupt_logs(self):
+    def test_missing_only_repairs_deleted_or_corrupt_logs(self) -> None:
         bodies = {
             self.aux_url: json.dumps(self.aux).encode(),
             self.directory + "/aaa/official-log.jez": jez(b"first"),
@@ -165,7 +165,7 @@ class CollectorTests(unittest.TestCase):
             self.assertEqual(calls, [self.aux_url, url])
             self.assertEqual((self.root / relative).read_bytes(), bodies[url])
 
-    def test_changed_metadata_and_failed_sections_are_revisited(self):
+    def test_changed_metadata_and_failed_sections_are_revisited(self) -> None:
         bodies = {
             self.aux_url: json.dumps(self.aux).encode(),
             self.directory + "/aaa/official-log.jez": jez(b"first"),
@@ -191,7 +191,7 @@ class CollectorTests(unittest.TestCase):
             self.assertEqual(request.call_count, 1)
         self.assertEqual(self.collector.reused_sections, 0)
 
-    def test_official_phase_accepts_uppercase_and_rejects_simulation(self):
+    def test_official_phase_accepts_uppercase_and_rejects_simulation(self) -> None:
         self.aux["f"] = "O"
         self.assertEqual(len(list(dl.log_urls(self.aux, self.directory))), 2)
         for phase in ("s", "S", "", None):
@@ -207,7 +207,7 @@ class CollectorTests(unittest.TestCase):
         }
         self.assertEqual(len(list(dl.sections(index, "ac", "3221"))), 1)
 
-    def test_cancelled_tasks_do_not_hide_original_failure(self):
+    def test_cancelled_tasks_do_not_hide_original_failure(self) -> None:
         invalid = {**self.aux, "f": "s"}
         with patch.object(dl, "urlopen", return_value=Response(json.dumps(invalid).encode())):
             with self.assertRaisesRegex(RuntimeError, "Auxiliary file is not official"):
@@ -226,13 +226,13 @@ class CollectorTests(unittest.TestCase):
             1,
         )
 
-    def test_invalid_zip_never_committed(self):
+    def test_invalid_zip_never_committed(self) -> None:
         with patch.object(dl, "urlopen", return_value=Response(b"<html>oops</html>")):
             with self.assertRaises(zipfile.BadZipFile):
                 self.collector.fetch(self.directory + "/aaa/official-log.jez")
         self.assertEqual(self.collector.db().execute("SELECT COUNT(*) FROM files").fetchone()[0], 0)
 
-    def test_throttle_stops_without_retry(self):
+    def test_throttle_stops_without_retry(self) -> None:
         error = dl.HTTPError(self.aux_url, 429, "too many requests", {}, None)
         with patch.object(dl, "urlopen", side_effect=error) as request:
             with self.assertRaisesRegex(RuntimeError, "HTTP 429"):
@@ -240,7 +240,7 @@ class CollectorTests(unittest.TestCase):
             self.assertEqual(request.call_count, 1)
         self.assertTrue(self.collector.stop.is_set())
 
-    def test_transient_network_errors_retry_and_log(self):
+    def test_transient_network_errors_retry_and_log(self) -> None:
         errors = [
             TimeoutError("read timed out"),
             dl.URLError(ConnectionResetError(104, "Connection reset by peer")),
@@ -261,7 +261,7 @@ class CollectorTests(unittest.TestCase):
                 self.assertIn("retrying", logs.output[0])
                 self.assertFalse(self.collector.stop.is_set())
 
-    def test_retry_exhaustion_logs_and_preserves_exception(self):
+    def test_retry_exhaustion_logs_and_preserves_exception(self) -> None:
         error = TimeoutError("read timed out")
         with (
             patch.object(dl, "urlopen", side_effect=error) as request,
@@ -276,7 +276,7 @@ class CollectorTests(unittest.TestCase):
         self.assertIn("ERROR", logs.output[-1])
         self.assertEqual(self.collector.query("SELECT COUNT(*) FROM files", one=True)[0], 0)
 
-    def test_read_timeout_discards_partial_response(self):
+    def test_read_timeout_discards_partial_response(self) -> None:
         response = Response(b"unused")
         with (
             patch.object(response, "read", side_effect=[b"partial", TimeoutError("read timeout")]),
@@ -287,14 +287,14 @@ class CollectorTests(unittest.TestCase):
             self.assertEqual(self.collector.json(self.aux_url), {})
         self.assertTrue(response.closed)
 
-    def test_disk_reserve_prevents_commit(self):
+    def test_disk_reserve_prevents_commit(self) -> None:
         self.collector.reserve = 10**30
         with patch.object(dl, "urlopen", return_value=Response(b"{}")):
             with self.assertRaisesRegex(OSError, "Disk reserve"):
                 self.collector.fetch(self.aux_url, metadata=True)
         self.assertEqual(self.collector.db().execute("SELECT COUNT(*) FROM files").fetchone()[0], 0)
 
-    def test_selection_and_padding(self):
+    def test_selection_and_padding(self) -> None:
         config = {
             "pl": [
                 {
@@ -322,12 +322,12 @@ class CollectorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             list(dl.sections(index, "ac", "3220"))
 
-    def test_rate_wait_does_not_hold_file_storage_lock(self):
+    def test_rate_wait_does_not_hold_file_storage_lock(self) -> None:
         waiting = threading.Event()
         release = threading.Event()
         self.collector.next_request = time.monotonic() + 10
 
-        def wait_for_release(delay):
+        def wait_for_release(delay) -> bool:
             waiting.set()
             if not release.wait(2):
                 raise AssertionError("Rate wait did not get released")
@@ -349,14 +349,14 @@ class CollectorTests(unittest.TestCase):
                 release.set()
             self.assertEqual(future.result(timeout=2), {})
 
-    def test_rate_budget_is_shared_by_workers(self):
+    def test_rate_budget_is_shared_by_workers(self) -> None:
         class FakeClock:
             value = 0.0
 
             def monotonic(self):
                 return self.value
 
-            def wait(self, delay):
+            def wait(self, delay) -> bool:
                 # Called under the rate lock, so clock updates are serialized.
                 self.value += delay
                 return False
@@ -376,7 +376,7 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(results, [{}] * 8)
         self.assertAlmostEqual(clock.value, 7 / 50)
 
-    def test_parallel_section_manifest_and_missing_only_resume(self):
+    def test_parallel_section_manifest_and_missing_only_resume(self) -> None:
         items = [
             (*self.item[:3], f"{i:04d}", {"ns": f"{i:04d}", "da": "26/10/2026"})
             for i in range(1, 7)
@@ -425,7 +425,7 @@ class CollectorTests(unittest.TestCase):
             12,
         )
 
-    def test_32_workers_share_one_connection_with_short_busy_timeout(self):
+    def test_32_workers_share_one_connection_with_short_busy_timeout(self) -> None:
         self.collector.db().execute("PRAGMA busy_timeout=1")
         barrier = threading.Barrier(32)
 
@@ -447,7 +447,7 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(len(set(ids)), 1)
         self.assertEqual(self.collector.query("SELECT COUNT(*) FROM runs", one=True)[0], 320)
 
-    def test_failed_manifest_transaction_rolls_back_all_rows(self):
+    def test_failed_manifest_transaction_rolls_back_all_rows(self) -> None:
         with self.assertRaisesRegex(ValueError, "interrupted update"):
             with self.collector.transaction() as db:
                 db.execute("INSERT INTO runs VALUES ('atomic','now',NULL,'running')")
@@ -459,7 +459,7 @@ class CollectorTests(unittest.TestCase):
             self.collector.query("SELECT status FROM runs WHERE id='next'", one=True), ("finished",)
         )
 
-    def test_cli_blocks_duplicate_downloader_before_opening_database(self):
+    def test_cli_blocks_duplicate_downloader_before_opening_database(self) -> None:
         arguments = ["download_tse_logs.py", "--output", str(self.root)]
         with (
             dl.output_lock(self.root),
@@ -476,7 +476,7 @@ class CollectorTests(unittest.TestCase):
         with dl.output_lock(self.root):
             self.assertTrue((self.root / ".download.lock").exists())
 
-    def test_cli_completes_with_parallel_downloads_and_closes_manifest(self):
+    def test_cli_completes_with_parallel_downloads_and_closes_manifest(self) -> None:
         config = {
             "pl": [
                 {
@@ -592,7 +592,7 @@ class CollectorTests(unittest.TestCase):
             self.collector.section(self.item, "3221", "001-seed")
         return bodies
 
-    def test_bulk_resume_uses_one_commit_without_reading_saved_contents(self):
+    def test_bulk_resume_uses_one_commit_without_reading_saved_contents(self) -> None:
         self.seed_section_for_bulk_resume()
         aggregate = (*self.item[:3], "0002", {"ns": "0002", "nsp": "0001"})
         statements = []
@@ -618,7 +618,7 @@ class CollectorTests(unittest.TestCase):
             self.collector.query("SELECT COUNT(*) FROM logs WHERE run='002-resume'", one=True)[0], 2
         )
 
-    def test_bulk_resume_detects_missing_and_resized_files(self):
+    def test_bulk_resume_detects_missing_and_resized_files(self) -> None:
         bodies = self.seed_section_for_bulk_resume()
         url = self.directory + "/aaa/official-log.jez"
         path = (
@@ -636,7 +636,7 @@ class CollectorTests(unittest.TestCase):
                 self.assertEqual(skipped, {})
                 path.write_bytes(bodies[url])
 
-    def test_bulk_strict_resume_detects_same_size_corruption(self):
+    def test_bulk_strict_resume_detects_same_size_corruption(self) -> None:
         self.seed_section_for_bulk_resume()
         url = self.directory + "/aaa/official-log.jez"
         path = (
@@ -654,7 +654,7 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(pending, [self.item])
         self.assertEqual(skipped, {})
 
-    def test_bulk_resume_revisits_changed_and_incomplete_sections(self):
+    def test_bulk_resume_revisits_changed_and_incomplete_sections(self) -> None:
         self.seed_section_for_bulk_resume()
         changed = (*self.item[:4], {**self.item[4], "ha": "15:00:00"})
         pending, _ = self.collector.prepare_resume([changed], "002-changed")
@@ -664,7 +664,7 @@ class CollectorTests(unittest.TestCase):
         pending, _ = self.collector.prepare_resume([self.item], "003-incomplete")
         self.assertEqual(pending, [self.item])
 
-    def test_external_manifest_copy_includes_committed_wal_and_preserves_source(self):
+    def test_external_manifest_copy_includes_committed_wal_and_preserves_source(self) -> None:
         with self.collector.transaction() as db:
             db.execute("INSERT INTO runs VALUES ('before-copy','now',NULL,'finished')")
         self.assertTrue((self.root / "manifest.sqlite-wal").exists())
@@ -684,7 +684,7 @@ class CollectorTests(unittest.TestCase):
         )
         self.assertEqual(dl.configure_manifest(self.root, external), external.resolve())
 
-    def test_external_manifest_refuses_to_overwrite_existing_target(self):
+    def test_external_manifest_refuses_to_overwrite_existing_target(self) -> None:
         target = self.root / "existing.sqlite"
         target.write_bytes(b"do not overwrite")
         with self.assertRaisesRegex(ValueError, "Refusing to overwrite"):
@@ -692,7 +692,7 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(target.read_bytes(), b"do not overwrite")
         self.assertFalse((self.root / "manifest-location.json").exists())
 
-    def test_missing_external_manifest_does_not_silently_start_fresh(self):
+    def test_missing_external_manifest_does_not_silently_start_fresh(self) -> None:
         target = self.root / "missing.sqlite"
         (self.root / "manifest-location.json").write_text(
             json.dumps({"version": 1, "path": str(target)})
@@ -703,7 +703,7 @@ class CollectorTests(unittest.TestCase):
 
 
 class ParallelSchedulingTests(unittest.TestCase):
-    def test_slow_task_does_not_prevent_new_work(self):
+    def test_slow_task_does_not_prevent_new_work(self) -> None:
         gate = threading.Event()
         released = []
 
@@ -718,7 +718,7 @@ class ParallelSchedulingTests(unittest.TestCase):
         self.assertTrue(released[0], "Later work stalled behind the first task")
         self.assertEqual(sorted(result), list(range(10)))
 
-    def test_failure_stops_scheduling_and_preserves_reason(self):
+    def test_failure_stops_scheduling_and_preserves_reason(self) -> None:
         stop = threading.Event()
         consumed = []
 
@@ -737,7 +737,7 @@ class ParallelSchedulingTests(unittest.TestCase):
         self.assertTrue(stop.is_set())
         self.assertLessEqual(len(consumed), 2)
 
-    def test_consumer_interrupt_stops_and_cancels_queued_work(self):
+    def test_consumer_interrupt_stops_and_cancels_queued_work(self) -> None:
         stop = threading.Event()
 
         def task(index):

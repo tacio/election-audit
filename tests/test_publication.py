@@ -26,7 +26,7 @@ class ReleaseTests(test_snapshots.SourceFixture):
         shard = reconstruct_parse(parsed, base / "operations")
         return base, shard
 
-    def test_release_partition_settings_integrity_and_relocation(self):
+    def test_release_partition_settings_integrity_and_relocation(self) -> None:
         base, shard = self.release_input()
         config = ResourceConfig(duckdb_threads=2, memory_bytes=128 * 1024**2, batch_rows=1)
         path = publish_release([shard], base / "warehouse", config=config)
@@ -49,14 +49,14 @@ class ReleaseTests(test_snapshots.SourceFixture):
             )
         self.assertIsNone(manifest["global_eligible_cycle_total"])
 
-    def test_interruptions_preserve_previous_current_and_resume(self):
+    def test_interruptions_preserve_previous_current_and_resume(self) -> None:
         base, shard = self.release_input()
         store = base / "warehouse"
         first = publish_release([shard], store)
         config = ResourceConfig(duckdb_threads=1)
         for stage in ("shard_written", "before_release", "before_current"):
 
-            def interrupt(current):
+            def interrupt(current) -> None:
                 if current == stage:
                     raise OSError("fixture interruption")
 
@@ -75,7 +75,7 @@ class ReleaseTests(test_snapshots.SourceFixture):
         self.assertNotEqual(first, second)
         self.assertEqual((store / "current").read_text().strip(), second.name)
 
-    def test_writer_resource_and_overlap_guards(self):
+    def test_writer_resource_and_overlap_guards(self) -> None:
         base, shard = self.release_input()
         store = base / "warehouse"
         store.mkdir()
@@ -101,7 +101,7 @@ class ReleaseTests(test_snapshots.SourceFixture):
         with self.assertRaisesRegex(PublicationError, "overlap"):
             publish_release([shard, other], store)
 
-    def test_duplicate_and_foreign_key_failures(self):
+    def test_duplicate_and_foreign_key_failures(self) -> None:
         base, shard = self.release_input()
         import json
 
@@ -121,7 +121,7 @@ class ReleaseTests(test_snapshots.SourceFixture):
             with self.assertRaisesRegex(PublicationError, "foreign key"):
                 _validate(db, ["selected_event", "voting_session"])
 
-    def test_corruption_rejected(self):
+    def test_corruption_rejected(self) -> None:
         base, shard = self.release_input()
         path = publish_release([shard], base / "warehouse")
         file = path / inspect_release(path)["tables"]["selected_event"]["files"][0]
@@ -129,7 +129,7 @@ class ReleaseTests(test_snapshots.SourceFixture):
         with self.assertRaises(PublicationError):
             inspect_release(path)
 
-    def test_parser_independent_keys_run_concurrently_identical_key_runs_once(self):
+    def test_parser_independent_keys_run_concurrently_identical_key_runs_once(self) -> None:
         import concurrent.futures
         import threading
         import time

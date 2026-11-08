@@ -141,7 +141,7 @@ def ingest(downloads, output):
     return result
 
 
-def integrity_documents_main(argv=None):
+def integrity_documents_main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit integrity-docs",
         description="File browser-collected TRE integrity test documents by SHA-256.",

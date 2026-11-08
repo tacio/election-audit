@@ -263,7 +263,7 @@ def select_sample(profile, output, *, per_band=2, exclusions=None):
     return sample
 
 
-def _progress(directory, value):
+def _progress(directory, value) -> None:
     temporary = directory / ".progress.tmp"
     temporary.write_bytes(canonical(value) + b"\n")
     temporary.replace(directory / "progress.json")
@@ -617,7 +617,7 @@ def run_compact_sample(
     return report
 
 
-def main(argv=None):
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("profile", "select", "run", "compact"))
     parser.add_argument("--config", type=Path)

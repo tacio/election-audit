@@ -30,7 +30,7 @@ from election_audit.source_inventory import canonical, hash_file
 
 
 class WorkloadExecutionTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -89,7 +89,7 @@ class WorkloadExecutionTests(unittest.TestCase):
         self.store = self.root / "store"
         self.scratch = self.root / "scratch"
 
-    def _profile(self):
+    def _profile(self) -> None:
         path = self.profile / "profile.sqlite"
         if path.exists():
             path.unlink()
@@ -143,7 +143,7 @@ class WorkloadExecutionTests(unittest.TestCase):
         ):
             return run(self.config, **kwargs)
 
-    def test_protected_missing_body_never_opened_and_bounded_resume(self):
+    def test_protected_missing_body_never_opened_and_bounded_resume(self) -> None:
         spec = self.configure()
         (self.raw / self.rows[2]["path"]).unlink()
         first = self.execute(max_objects=1)
@@ -159,7 +159,7 @@ class WorkloadExecutionTests(unittest.TestCase):
         self.assertFalse((self.store / "objects").exists())
         self.assertEqual(spec["scope"]["source_observations"], 3)
 
-    def test_observation_reader_preserves_unknowns_and_protected_coverage(self):
+    def test_observation_reader_preserves_unknowns_and_protected_coverage(self) -> None:
         self.configure()
         self.execute(max_objects=1)
         rows = list(iter_observations(self.config))
@@ -175,7 +175,7 @@ class WorkloadExecutionTests(unittest.TestCase):
             all(r["scientific_eligibility"] == "unavailable_structural_only" for r in rows)
         )
 
-    def test_identical_content_alias_of_protected_section_is_excluded(self):
+    def test_identical_content_alias_of_protected_section_is_excluded(self) -> None:
         alias = {
             **self.rows[2],
             "section": "0004",
@@ -189,7 +189,7 @@ class WorkloadExecutionTests(unittest.TestCase):
         self.assertEqual(spec["scope"]["excluded_observations"], 2)
         self.assertEqual(final["counters"]["completed"], 2)
 
-    def test_reuses_only_verified_explicit_external_checkpoint(self):
+    def test_reuses_only_verified_explicit_external_checkpoint(self) -> None:
         old = self.root / "old-store"
         with patch("election_audit.national.guard"):
             artifact = process_compact_original(
@@ -210,7 +210,7 @@ class WorkloadExecutionTests(unittest.TestCase):
         self.assertEqual(row, (str(artifact), 0))
         self.assertFalse((self.store / "objects").exists())
 
-    def test_failure_is_durable_and_explicit_retry_preserves_attempts(self):
+    def test_failure_is_durable_and_explicit_retry_preserves_attempts(self) -> None:
         self.configure()
         source = self.raw / self.rows[0]["path"]
         original = source.read_bytes()
@@ -226,7 +226,7 @@ class WorkloadExecutionTests(unittest.TestCase):
                 db.execute("SELECT count(*) FROM attempts WHERE state='failed'").fetchone()[0], 1
             )
 
-    def test_corrupt_scope_and_changed_exclusions_fail_before_processing(self):
+    def test_corrupt_scope_and_changed_exclusions_fail_before_processing(self) -> None:
         self.configure()
         scope = initialise(self.config)
         (scope / "observations.sqlite").write_bytes(b"bad")
@@ -236,7 +236,7 @@ class WorkloadExecutionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "registry changed"):
             preflight(self.config)
 
-    def test_capacity_and_unmounted_volume_stop_before_store_creation(self):
+    def test_capacity_and_unmounted_volume_stop_before_store_creation(self) -> None:
         self.configure()
         with patch("election_audit.national_workload.shutil.disk_usage") as usage:
             usage.return_value.free = 1
@@ -247,7 +247,7 @@ class WorkloadExecutionTests(unittest.TestCase):
             with self.assertRaisesRegex(OSError, "not mounted"):
                 preflight(self.config)
 
-    def test_malformed_protected_geography_is_rejected_before_source_access(self):
+    def test_malformed_protected_geography_is_rejected_before_source_access(self) -> None:
         self.excluded.unlink()
         Path(str(self.excluded) + ".sha256").unlink()
         _write_json(
@@ -262,7 +262,7 @@ class WorkloadExecutionTests(unittest.TestCase):
             self.configure()
         self.assertFalse(self.store.exists())
 
-    def test_shared_volume_reservations_are_added_once_with_largest_floor(self):
+    def test_shared_volume_reservations_are_added_once_with_largest_floor(self) -> None:
         spec = {
             "resources": {
                 "hdd_reserve_bytes": 2,
@@ -286,7 +286,7 @@ class WorkloadExecutionTests(unittest.TestCase):
             {"store": 122, "source": 32, "scratch": 18},
         )
 
-    def test_frozen_launcher_status_and_tampered_runtime_fail_closed(self):
+    def test_frozen_launcher_status_and_tampered_runtime_fail_closed(self) -> None:
         self.configure()
         spec = _read_json(self.config / "workload.json")
         self.assertIn("scripts/download_tse_logs.py", spec["runtime_files"])

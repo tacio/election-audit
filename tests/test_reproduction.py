@@ -22,17 +22,17 @@ from scripts.check_doc_commands import check_commands
 
 class ReproductionTests(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         cls.temp = tempfile.TemporaryDirectory()
         cls.base = Path(cls.temp.name)
         cls.fixture_run = cls.base / "demo"
         cls.descriptor = demo(cls.fixture_run)
 
     @classmethod
-    def tearDownClass(cls):
+    def tearDownClass(cls) -> None:
         cls.temp.cleanup()
 
-    def test_synthetic_numbers_unknowns_null_ledger_and_paired_reports(self):
+    def test_synthetic_numbers_unknowns_null_ledger_and_paired_reports(self) -> None:
         stages = self.descriptor["stages"]
         release = self.fixture_run / stages[-1]["locator"]
         self.assertEqual(
@@ -73,7 +73,7 @@ class ReproductionTests(unittest.TestCase):
         self.assertEqual(snapshot["payload"]["coverage_summary"]["expected_unique_principals"], 2)
         self.assertEqual(archive([("logd.dat", b"x")]), archive([("logd.dat", b"x")]))
 
-    def test_relocated_bundle_offline_replay_and_tamper(self):
+    def test_relocated_bundle_offline_replay_and_tamper(self) -> None:
         original = review_bundle(self.fixture_run, self.base / "bundle")
         moved = self.base / "relocated" / "review"
         moved.parent.mkdir()
@@ -89,7 +89,7 @@ class ReproductionTests(unittest.TestCase):
         with self.assertRaisesRegex(PublicationError, "inventory/hash"):
             verify_bundle(moved)
 
-    def test_interrupted_publication_then_bounded_resume(self):
+    def test_interrupted_publication_then_bounded_resume(self) -> None:
         evidence = json.loads((self.fixture_run / "inputs" / "evidence.json").read_text())
         output = self.base / "resume"
         parsed, shards, release, _ = frozen_pipeline(
@@ -99,7 +99,7 @@ class ReproductionTests(unittest.TestCase):
             object_groups=self.descriptor["object_groups"],
         )
 
-        def interrupt(stage):
+        def interrupt(stage) -> None:
             if stage == "before_release":
                 raise InterruptedError("fixture interruption")
 
@@ -117,7 +117,7 @@ class ReproductionTests(unittest.TestCase):
         )
         self.assertEqual((parsed_again, resumed), (parsed, release))
 
-    def test_selection_is_seeded_bounded_and_read_only(self):
+    def test_selection_is_seeded_bounded_and_read_only(self) -> None:
         root = self.fixture_run / "synthetic-source"
         before = (root / "manifest.sqlite").read_bytes()
         first = select_pilot(root, sampled_ufs=("ac",))
@@ -127,7 +127,7 @@ class ReproductionTests(unittest.TestCase):
         self.assertEqual(before, (root / "manifest.sqlite").read_bytes())
         self.assertEqual(first["national_status"], "partial_national")
 
-    def test_source_symlink_is_rejected_before_copy(self):
+    def test_source_symlink_is_rejected_before_copy(self) -> None:
         source = self.base / "unsafe-source"
         (source / "election_audit").mkdir(parents=True)
         (source / "election_audit" / "leak.py").symlink_to("/etc/passwd")
@@ -137,7 +137,7 @@ class ReproductionTests(unittest.TestCase):
 
 
 class DocumentationCommandTests(unittest.TestCase):
-    def test_known_flags_sql_and_invalid_examples_without_operation_execution(self):
+    def test_known_flags_sql_and_invalid_examples_without_operation_execution(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "justfile").write_text(

@@ -106,16 +106,16 @@ def make_7z(files, *, method="lzma", encoded_header=False):
 
 
 class SevenZipTests(unittest.TestCase):
-    def test_lzma_archive_with_several_files_round_trips(self):
+    def test_lzma_archive_with_several_files_round_trips(self) -> None:
         files = [("inner.jez", b"PK" + bytes(range(256)) * 40), ("logd.dat", b"line\tA\n" * 999)]
         self.assertEqual([(n, b) for n, b, _ in sevenzip.read(make_7z(files))], files)
 
-    def test_encoded_header_and_copy_coder(self):
+    def test_encoded_header_and_copy_coder(self) -> None:
         files = [("logd.dat", b"x" * 1000)]
         archive = make_7z(files, method="copy", encoded_header=True)
         self.assertEqual(sevenzip.read(archive), [("logd.dat", b"x" * 1000, False)])
 
-    def test_empty_archive_has_no_entries(self):
+    def test_empty_archive_has_no_entries(self) -> None:
         # 2022 SP 71072/0002/0310 round 2 nests a 32-byte empty .jez written by 7-Zip.
         start = struct.pack("<QQI", 0, 0, 0)
         empty = sevenzip.MAGIC + b"\x00\x04" + struct.pack("<I", zlib.crc32(start)) + start
@@ -123,7 +123,7 @@ class SevenZipTests(unittest.TestCase):
         with self.assertRaises(sevenzip.SevenZipError):
             sevenzip.read(empty + b"\x00")
 
-    def test_corruption_and_unsupported_features_fail_closed(self):
+    def test_corruption_and_unsupported_features_fail_closed(self) -> None:
         good = make_7z([("logd.dat", b"hello world " * 200)], method="copy")
         corrupt = bytearray(good)
         corrupt[40] ^= 0xFF  # inside the packed data: the file CRC no longer matches
@@ -141,7 +141,7 @@ class SevenZipTests(unittest.TestCase):
             sevenzip.read(make_7z([("logd.dat", b"y" * 100)]), limit=99)
 
     @unittest.skipUnless(shutil.which("7z"), "7z binary not installed")
-    def test_matches_archives_written_by_7z(self):
+    def test_matches_archives_written_by_7z(self) -> None:
         body = "".join(
             f"02/10/2022 08:{i // 60:02d}:{i % 60:02d}\tINFO\t1\tVOTA\tm {i}\tT\n"
             for i in range(3000)

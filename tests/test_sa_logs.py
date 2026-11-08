@@ -16,7 +16,7 @@ BASE = "https://resultados.tse.jus.br/oficial/ele2026/arquivo-urna/3220/dados"
 OPERATOR = "151116550256"
 
 
-def line(stamp, app, message):
+def line(stamp, app, message) -> str:
     return f"{stamp}\tINFO\t02254078\t{app}\t{message}\t0123456789ABCDEF"
 
 
@@ -79,7 +79,7 @@ ORPHAN = jez(attempt("04/10/2026", "18:00", "29300", "0001", "0006", kind="DIGIT
 
 
 class SaLogTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -148,7 +148,7 @@ class SaLogTests(unittest.TestCase):
     def fetch(self, name="fetch", **options):
         return sa_logs.fetch(self.staged, 1, self.root / name, delay=0, get=self.get, **options)
 
-    def test_fetch_lists_only_sa_logs_stores_them_and_matches_the_bulk_archive(self):
+    def test_fetch_lists_only_sa_logs_stores_them_and_matches_the_bulk_archive(self) -> None:
         result = self.fetch(bulk_root=self.bulk)
         self.assertEqual(result["listed"], 3)
         self.assertEqual(result["bulk_checks"], {"match": 3})
@@ -163,7 +163,7 @@ class SaLogTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             self.fetch(bulk_root=self.bulk)
 
-    def test_a_bulk_mismatch_is_recorded_and_fails_the_run(self):
+    def test_a_bulk_mismatch_is_recorded_and_fails_the_run(self) -> None:
         tampered = self.bulk_root(tamper="o03220zz2925400010001-logsa.jez")
         with self.assertRaisesRegex(ValueError, "mismatch"):
             self.fetch(bulk_root=tampered)
@@ -171,13 +171,13 @@ class SaLogTests(unittest.TestCase):
             checks = dict(db.execute("SELECT section, bulk_check FROM files").fetchall())
         self.assertEqual(checks["0001"], "mismatch")
 
-    def test_hosts_outside_the_allow_list_and_broken_containers_fail_closed(self):
+    def test_hosts_outside_the_allow_list_and_broken_containers_fail_closed(self) -> None:
         with self.assertRaisesRegex(ValueError, "allow list"):
             sa_logs._get("https://example.invalid/x-logsa.jez")
         with self.assertRaises(zipfile.BadZipFile):
             sa_logs.check_jez(b"not a zip")
 
-    def test_summary_attributes_attempts_by_printed_identity_only(self):
+    def test_summary_attributes_attempts_by_printed_identity_only(self) -> None:
         self.fetch()
         exclusions = self.root / "exclusions.json"
         exclusions.write_text(json.dumps({"section_keys": []}))
@@ -204,7 +204,7 @@ class SaLogTests(unittest.TestCase):
         written = (self.root / "summary" / "sa_sections.parquet").read_bytes()
         self.assertNotIn(OPERATOR.encode(), written)
 
-    def test_protected_sections_are_skipped_before_reading(self):
+    def test_protected_sections_are_skipped_before_reading(self) -> None:
         self.fetch()
         stored = self.root / "fetch" / "objects"
         protected = ["zz", "29254", "0001", "0001"]
@@ -218,7 +218,7 @@ class SaLogTests(unittest.TestCase):
         self.assertEqual((manifest["rows"], manifest["excluded"]), (2, {"round 1": 1}))
         self.assertTrue(stored.exists())
 
-    def test_attempts_on_another_round_date_are_not_attributed(self):
+    def test_attempts_on_another_round_date_are_not_attributed(self) -> None:
         late = jez(attempt("25/10/2026", "17:00", "41238", "0039", "0168", kind="X"))
         row = {
             "round": 1,

@@ -52,7 +52,7 @@ def rows(path, name):
 
 
 class ArchiveTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
@@ -67,7 +67,7 @@ class ArchiveTests(unittest.TestCase):
     def codes(self, issues):
         return {row["issue_code"] for row in issues}
 
-    def test_nested_duplicate_occurrences_order_and_no_path_extraction(self):
+    def test_nested_duplicate_occurrences_order_and_no_path_extraction(self) -> None:
         nested = archive_bytes([("logd.dat", log_line()), ("logd.dat", log_line())])
         path, events, issues = self.parse(
             [
@@ -86,7 +86,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertFalse((self.root / "escape.zip").exists())
         self.assertEqual(inspect_artifact(path)["counts"]["verified_members"], 7)
 
-    def test_crc_corruption_never_emits_events_from_invalid_member(self):
+    def test_crc_corruption_never_emits_events_from_invalid_member(self) -> None:
         body = bytearray(archive_bytes([("logd.dat", log_line()), ("other", b"data")]))
         position = body.index(b"O voto")
         body[position] ^= 1
@@ -95,7 +95,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertIn("member_integrity_error", self.codes(issues))
         self.assertIn("missing_log_member", self.codes(issues))
 
-    def test_all_members_crc_checked_even_when_not_logs(self):
+    def test_all_members_crc_checked_even_when_not_logs(self) -> None:
         body = bytearray(archive_bytes([("logd.dat", log_line()), ("other", b"other-body")]))
         body[body.index(b"other-body")] ^= 1
         path, events, issues = self.parse(body=bytes(body))
@@ -103,14 +103,14 @@ class ArchiveTests(unittest.TestCase):
         self.assertIn("member_integrity_error", self.codes(issues))
         self.assertEqual(inspect_artifact(path)["status"], "partial")
 
-    def test_missing_log_and_invalid_zip_are_explicit(self):
+    def test_missing_log_and_invalid_zip_are_explicit(self) -> None:
         _, events, issues = self.parse([("readme", b"hello")])
         self.assertFalse(events)
         self.assertEqual(self.codes(issues), {"missing_log_member"})
         _, _, issues = self.parse(body=b"not an archive")
         self.assertEqual(self.codes(issues), {"invalid_archive", "missing_log_member"})
 
-    def test_archive_member_expansion_depth_and_directory_guards(self):
+    def test_archive_member_expansion_depth_and_directory_guards(self) -> None:
         nested = archive_bytes([("next.jez", archive_bytes([("logd.dat", log_line())]))])
         cases = [
             (
@@ -146,14 +146,14 @@ class ArchiveTests(unittest.TestCase):
                 self.assertIn(code, self.codes(issues))
                 self.assertEqual(inspect_artifact(path)["status"], "partial")
 
-    def test_lying_eocd_count_cannot_bypass_member_guard(self):
+    def test_lying_eocd_count_cannot_bypass_member_guard(self) -> None:
         body = bytearray(archive_bytes([("a", b""), ("b", b"")]))
         end = body.rfind(b"PK\x05\x06")
         struct.pack_into("<HH", body, end + 8, 1, 1)
         _, _, issues = self.parse(body=bytes(body), config=replace(ParseConfig(), max_members=1))
         self.assertIn("member_count_limit", self.codes(issues))
 
-    def test_oversized_line_drains_without_splitting_then_keeps_original_line(self):
+    def test_oversized_line_drains_without_splitting_then_keeps_original_line(self) -> None:
         content = b"SENSITIVE-ID" * 30 + b"\n" + log_line()
         _, events, issues = self.parse(
             [("logd.dat", content)], config=replace(ParseConfig(), max_line_bytes=120)
@@ -163,7 +163,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(issues[0]["issue_code"], "line_size_limit")
         self.assertNotIn("SENSITIVE", json.dumps(issues))
 
-    def test_malformed_unknown_sensitive_and_mixed_contexts_remain_honest(self):
+    def test_malformed_unknown_sensitive_and_mixed_contexts_remain_honest(self) -> None:
         content = (
             log_line(timestamp="04/10/2026 08:00:00")
             + log_line()
@@ -196,7 +196,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(issues[-1]["record_locator"]["line_start"], 9)
         self.assertIsNone(events[0]["record_locator"]["byte_start"])
 
-    def test_unknown_exact_line_fingerprints_distinguish_content_and_line_endings(self):
+    def test_unknown_exact_line_fingerprints_distinguish_content_and_line_endings(self) -> None:
         first = log_line("unsupported class one")
         second = log_line("unsupported class two")
         third = first.rstrip(b"\n") + b"\r\n"
@@ -208,7 +208,7 @@ class ArchiveTests(unittest.TestCase):
         )
         self.assertEqual(len({event["source_line_sha256"] for event in events}), 3)
 
-    def test_line_and_diagnostic_limits_are_visible_and_bounded(self):
+    def test_line_and_diagnostic_limits_are_visible_and_bounded(self) -> None:
         path, events, issues = self.parse(
             [("logd.dat", b"bad\n" * 20 + log_line())],
             config=replace(ParseConfig(), max_issues=2, max_lines=5),
@@ -220,7 +220,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(metadata["status"], "partial")
         self.assertEqual(metadata["counts"]["issues_seen"], 6)
 
-    def test_cache_key_config_hits_damage_and_interrupted_restart(self):
+    def test_cache_key_config_hits_damage_and_interrupted_restart(self) -> None:
         self.source.write_bytes(archive_bytes([("logd.dat", log_line())]))
         path, hit = parse_object(self.source, self.store)
         self.assertFalse(hit)
@@ -249,7 +249,7 @@ class ArchiveTests(unittest.TestCase):
         inspect_artifact(recovered)
         self.assertFalse(hit)
 
-    def test_mutating_input_is_never_published_and_invalid_limits_rejected(self):
+    def test_mutating_input_is_never_published_and_invalid_limits_rejected(self) -> None:
         self.source.write_bytes(archive_bytes([("logd.dat", log_line())]))
         actual_sha = hashlib.sha256(self.source.read_bytes()).hexdigest()
         with self.assertRaises(ParseError):
@@ -266,7 +266,7 @@ class ArchiveTests(unittest.TestCase):
 
 
 class ParseSnapshotTests(SourceFixture):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.store = Path(self.temporary.name) / "derived"
 
@@ -288,7 +288,7 @@ class ParseSnapshotTests(SourceFixture):
         self.save(second_url, archive_bytes([("logd.dat", log_line() + b"malformed SECRET\n")]))
         return create_snapshot(self.root, Path(self.temporary.name) / "snapshots", ["ac"])
 
-    def test_same_content_multiple_packages_observations_and_snapshots_parse_once(self):
+    def test_same_content_multiple_packages_observations_and_snapshots_parse_once(self) -> None:
         snapshot = self.frozen()
         publication = parse_snapshot(snapshot, self.store)
         document = inspect_parse(publication)
@@ -315,7 +315,7 @@ class ParseSnapshotTests(SourceFixture):
             inspect_parse(publication)["coverage_summary"]["national_status"], "partial_national"
         )
 
-    def test_only_frozen_objects_and_no_output_inside_source(self):
+    def test_only_frozen_objects_and_no_output_inside_source(self) -> None:
         snapshot = self.frozen()
         for path in (self.root / "objects").rglob("*"):
             if path.is_file():
@@ -332,7 +332,7 @@ class ParseSnapshotTests(SourceFixture):
                 parse_snapshot(snapshot, unsafe)
             self.assertFalse(unsafe.exists())
 
-    def test_missing_asset_retains_association_without_false_parse_success(self):
+    def test_missing_asset_retains_association_without_false_parse_success(self) -> None:
         self.record_section()
         self.advertise()
         self.save(

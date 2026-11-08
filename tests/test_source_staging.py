@@ -18,7 +18,7 @@ def digest(path):
 
 
 class StagingTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         base = Path(self.temp.name)
@@ -61,7 +61,7 @@ class StagingTests(unittest.TestCase):
             self.certificate, self.manifest, self.destination, floor_gib=0, **options
         )
 
-    def test_copy_is_exact_read_only_and_certified(self):
+    def test_copy_is_exact_read_only_and_certified(self) -> None:
         for order in ("path", "inode"):
             with self.subTest(order=order):
                 result = self.copy(order=order)
@@ -82,12 +82,12 @@ class StagingTests(unittest.TestCase):
                 )
                 self.destination = self.destination.with_name(self.destination.name + "-b")
 
-    def test_existing_destination_is_refused_without_resume(self):
+    def test_existing_destination_is_refused_without_resume(self) -> None:
         self.destination.mkdir(parents=True)
         with self.assertRaises(FileExistsError):
             self.copy()
 
-    def test_wrong_manifest_and_unreconciled_certificate_fail_closed(self):
+    def test_wrong_manifest_and_unreconciled_certificate_fail_closed(self) -> None:
         certificate = json.loads(self.certificate.read_text())
         certificate["manifest_sha256"] = "0" * 64
         self.certificate.write_text(json.dumps(certificate))
@@ -99,7 +99,7 @@ class StagingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "reconcile"):
             self.copy()
 
-    def test_corrupt_source_body_stops_the_copy(self):
+    def test_corrupt_source_body_stops_the_copy(self) -> None:
         relative = sorted(self.bodies)[3]
         path = self.source / relative
         path.write_bytes(b"X" * len(self.bodies[relative]))
@@ -109,7 +109,7 @@ class StagingTests(unittest.TestCase):
         self.assertEqual(status["stage"], "FAILED_STOPPED")
         self.assertFalse((self.destination / "staging-certificate.json").exists())
 
-    def test_interrupted_copy_resumes_without_recopying_synced_objects(self):
+    def test_interrupted_copy_resumes_without_recopying_synced_objects(self) -> None:
         original = staging.read_verified
         calls = []
 
@@ -143,7 +143,7 @@ class StagingTests(unittest.TestCase):
         self.assertFalse(committed & set(seen))
         self.assertEqual(result["objects"], len(self.bodies))
 
-    def test_destination_tampering_is_detected(self):
+    def test_destination_tampering_is_detected(self) -> None:
         self.copy(order="path")
         rows = staging.manifest_objects(self.manifest)
         target = self.destination / rows[0][0]
@@ -158,7 +158,7 @@ class StagingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unexpected"):
             staging.verify_destination(self.destination, rows)
 
-    def test_benchmark_reads_disjoint_windows_and_refuses_existing_output(self):
+    def test_benchmark_reads_disjoint_windows_and_refuses_existing_output(self) -> None:
         output = Path(self.temp.name) / "bench" / "results.json"
         report = staging.benchmark(
             self.certificate, self.manifest, output, window=3, orders=("url", "path", "inode")
@@ -169,7 +169,7 @@ class StagingTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             staging.benchmark(self.certificate, self.manifest, output, window=3)
 
-    def test_physical_order_when_fiemap_is_supported(self):
+    def test_physical_order_when_fiemap_is_supported(self) -> None:
         rows = staging.manifest_objects(self.manifest)
         try:
             ordered = staging.order_rows(self.source, rows, "physical")

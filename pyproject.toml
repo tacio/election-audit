@@ -32,7 +32,10 @@ verification = [
 ]
 
 [dependency-groups]
-dev = ["ruff==0.17.0"]
+dev = [
+    "ruff==0.17.0",
+    "ty==0.0.94",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["election_audit", "scripts"]
@@ -53,3 +56,15 @@ select = ["E4", "E7", "E9", "F", "I"]
 [tool.ruff.lint.per-file-ignores]
 # Preserve the legacy worker callback while separating formatting from behavior.
 "scripts/download_tse_logs.py" = ["E731"]
+# marimo regenerates its cell functions; ty still checks them.
+"election_audit/notebooks/*" = ["ANN"]
+
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.ty.src]
+include = ["election_audit", "scripts", "tests"]
+exclude = ["election_audit/notebooks/__marimo__"]
+
+[tool.ty.terminal]
+error-on-warning = true

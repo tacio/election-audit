@@ -331,7 +331,7 @@ def validate_records(inherited, incoming, *, partition_ids, snapshot_ids):
             conditional_impact(p)
 
     # Generic references must be acyclic, regardless of incoming ordering.
-    def visit(identifier, chain):
+    def visit(identifier, chain) -> None:
         if identifier in chain:
             raise PublicationError("Cyclic analysis record references")
         for ref in records[identifier]["references"]:

@@ -62,7 +62,7 @@ def bodies(**overrides):
 
 
 class ResultsHierarchyTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -78,7 +78,7 @@ class ResultsHierarchyTests(unittest.TestCase):
 
         return get, calls
 
-    def test_fetch_stores_every_scope_read_only_and_records_stamps(self):
+    def test_fetch_stores_every_scope_read_only_and_records_stamps(self) -> None:
         get, calls = self.getter(bodies())
         out = self.root / "r2"
         result = rh.fetch(2, out, delay=0, get=get)
@@ -104,7 +104,7 @@ class ResultsHierarchyTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             rh.fetch(2, out, delay=0, get=get)
 
-    def test_an_interrupted_fetch_resumes_without_refetching(self):
+    def test_an_interrupted_fetch_resumes_without_refetching(self) -> None:
         files = bodies()
         get, _ = self.getter(files, fail_after=4)
         out = self.root / "r2"
@@ -117,7 +117,7 @@ class ResultsHierarchyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "another round"):
             rh.fetch(1, out, delay=0, resume=True, get=get)
 
-    def test_wrong_scope_round_or_unofficial_files_fail_closed(self):
+    def test_wrong_scope_round_or_unofficial_files_fail_closed(self) -> None:
         url = f"{ROOT}/dados/ac/ac01570-c0001-e006258-u.json"
         for bad, message in (
             (unified("mu", "01120"), "Wrong scope"),
@@ -129,13 +129,13 @@ class ResultsHierarchyTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, message):
                 rh.fetch(2, self.root / message, delay=0, get=get)
 
-    def test_non_final_totalization_is_counted_not_hidden(self):
+    def test_non_final_totalization_is_counted_not_hidden(self) -> None:
         url = f"{ROOT}/dados/zz/zz29300-c0001-e006258-u.json"
         get, _ = self.getter(bodies(**{url: unified("mu", "29300", tf="n")}))
         result = rh.fetch(2, self.root / "r2", delay=0, get=get)
         self.assertEqual(result["unified_not_final"], 1)
 
-    def test_planned_rejects_malformed_configuration(self):
+    def test_planned_rejects_malformed_configuration(self) -> None:
         broken = dict(CONFIG, abr=[{"cd": "ac", "mu": [{"cd": "1120"}]}])
         with self.assertRaisesRegex(ValueError, "municipality code"):
             list(rh.planned(broken, 2))

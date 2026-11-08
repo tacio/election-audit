@@ -106,7 +106,7 @@ def official(events, **values):
 
 
 class SessionTests(unittest.TestCase):
-    def test_identical_content_packages_do_not_multiply_sessions_events(self):
+    def test_identical_content_packages_do_not_multiply_sessions_events(self) -> None:
         first = event(1)
         second = {**first, "observation_id": "obs2", "package_assets": [{"package_id": "pkg2"}]}
         result = reconstruct_sessions(document(), [first, second])
@@ -117,7 +117,7 @@ class SessionTests(unittest.TestCase):
         self.assertFalse(result["tables"]["selected_event"][0]["selected"])
         self.assertEqual(result["tables"]["physical_device"], [])
 
-    def test_replacement_devices_and_source_order_mixed_round(self):
+    def test_replacement_devices_and_source_order_mixed_round(self) -> None:
         first = [event(1, date="04/10/2026"), event(2, time="08:01:00")]
         replacement = [event(3, device="5678"), event(4, device="5678", time="08:00:30")]
         rules = evidence(
@@ -137,7 +137,7 @@ class SessionTests(unittest.TestCase):
             [e["event_id"] for e in first + replacement],
         )
 
-    def test_copy_requires_exact_bytes_and_keeps_duplicate_lineage(self):
+    def test_copy_requires_exact_bytes_and_keeps_duplicate_lineage(self) -> None:
         first = [event(1), event(2, "completion_message", time="08:01:00")]
         copied = [event(1, source="b"), event(2, "completion_message", source="b", time="08:01:00")]
         rule = claim(
@@ -164,7 +164,7 @@ class SessionTests(unittest.TestCase):
         with self.assertRaises(ReconstructionError):
             reconstruct_sessions(document(), first + changed, evidence=evidence(copies=[rule]))
 
-    def test_repeated_same_second_preserved_and_ambiguous_overlap_visible(self):
+    def test_repeated_same_second_preserved_and_ambiguous_overlap_visible(self) -> None:
         repeated = [event(1), event(2)]
         other = event(1, source="b")
         result = reconstruct_sessions(document(), repeated + [other])
@@ -177,7 +177,7 @@ class SessionTests(unittest.TestCase):
             )
         )
 
-    def test_unverified_claim_does_not_select_and_bad_anchor_rejected(self):
+    def test_unverified_claim_does_not_select_and_bad_anchor_rejected(self) -> None:
         source = [event(1)]
         rule = official(source)
         rule["review_state"] = "unverified"
@@ -187,7 +187,7 @@ class SessionTests(unittest.TestCase):
         with self.assertRaises(ReconstructionError):
             reconstruct_sessions(document(), source, evidence=evidence(segments=[rule]))
 
-    def test_candidate_date_device_boundaries_limits_and_contracts(self):
+    def test_candidate_date_device_boundaries_limits_and_contracts(self) -> None:
         source = [event(1), event(2, date="04/10/2026"), event(3, date="04/10/2026", device=None)]
         result = reconstruct_sessions(document(), source)
         self.assertEqual(len(result["tables"]["voting_session"]), 3)
@@ -206,7 +206,7 @@ class CycleTests(unittest.TestCase):
     def semantic(self, source, kind):
         return claim([source], event_id=source["event_id"], kind=kind)
 
-    def test_baseline_and_repeated_authorizations_completion_orphans(self):
+    def test_baseline_and_repeated_authorizations_completion_orphans(self) -> None:
         source = [
             event(1),
             event(2),
@@ -222,19 +222,19 @@ class CycleTests(unittest.TestCase):
         self.assertIsNone(cycles[2]["start_event_id"])
         self.assertEqual(validate_rows("anonymous_cycle", cycles), [])
 
-    def test_manual_request_completion_is_not_completed_manual_vote(self):
+    def test_manual_request_completion_is_not_completed_manual_vote(self) -> None:
         source = [event(1, "manual_request_message"), event(2, "completion_message")]
         cycles = self.cycles(source)["tables"]["anonymous_cycle"]
         self.assertEqual(cycles[0]["completion_state"], "unresolved")
         self.assertEqual(cycles[0]["authorization_mode"], "unresolved")
 
-    def test_request_then_authorization_still_unknown_method(self):
+    def test_request_then_authorization_still_unknown_method(self) -> None:
         source = [event(1, "manual_request_message"), event(2), event(3, "completion_message")]
         cycles = self.cycles(source)["tables"]["anonymous_cycle"]
         self.assertEqual(cycles[0]["completion_state"], "completed")
         self.assertEqual(cycles[0]["authorization_mode"], "unresolved")
 
-    def test_manual_cancel_abandonment_full_and_partial_suspensions(self):
+    def test_manual_cancel_abandonment_full_and_partial_suspensions(self) -> None:
         kinds = [
             "manual_request_message",
             "unknown",
@@ -265,7 +265,7 @@ class CycleTests(unittest.TestCase):
         )
         self.assertEqual(cycles[2]["uncertainty"]["suspension_kind"], "partial")
 
-    def test_only_explicit_method_and_success_make_completed_manual_cycle(self):
+    def test_only_explicit_method_and_success_make_completed_manual_cycle(self) -> None:
         source = [event(1, "manual_request_message"), event(2), event(3, "completion_message")]
         cycles = self.cycles(source, [self.semantic(source[1], "authorization_manual")])["tables"][
             "anonymous_cycle"
@@ -276,7 +276,7 @@ class CycleTests(unittest.TestCase):
         )
         self.assertNotIn("candidate", str(cycles))
 
-    def test_unknown_and_incomplete_history_not_silently_completed(self):
+    def test_unknown_and_incomplete_history_not_silently_completed(self) -> None:
         source = [event(1), event(2, "unknown"), event(3, "completion_message"), event(4)]
         cycles = self.cycles(source)["tables"]["anonymous_cycle"]
         self.assertEqual([c["completion_state"] for c in cycles], ["unresolved", "unresolved"])
@@ -301,7 +301,7 @@ def timed_bundle(source, *, clock=None, semantics=None):
 
 
 class ClockTests(unittest.TestCase):
-    def test_unknown_timezone_stays_unknown_but_explicit_local_continuity_works(self):
+    def test_unknown_timezone_stays_unknown_but_explicit_local_continuity_works(self) -> None:
         source = [event(1), event(2, "completion_message", time="08:01:00")]
         bundle = timed_bundle(source)
         self.assertEqual(
@@ -313,7 +313,7 @@ class ClockTests(unittest.TestCase):
         self.assertTrue(all(row["normalized_at"] is None for row in rows))
         self.assertEqual(elapsed_seconds(bundle, [e["event_id"] for e in source])[0], 60)
 
-    def test_explicit_zone_correction_and_geography(self):
+    def test_explicit_zone_correction_and_geography(self) -> None:
         source = [event(1), event(2, "completion_message", time="08:01:00")]
         bundle = timed_bundle(
             source,
@@ -328,7 +328,7 @@ class ClockTests(unittest.TestCase):
         with self.assertRaises(ReconstructionError):
             timed_bundle(source, clock=[bad])
 
-    def test_reversal_and_rule_change_invalidate_duration(self):
+    def test_reversal_and_rule_change_invalidate_duration(self) -> None:
         source = [event(1, time="08:01:00"), event(2, "completion_message", time="08:00:00")]
         bundle = timed_bundle(source, clock=[clock_rule(source, timezone=None)])
         self.assertEqual(
@@ -348,7 +348,7 @@ class ClockTests(unittest.TestCase):
             "clock_rule_change_or_unknown_continuity",
         )
 
-    def test_overseas_explicit_zone_and_dst_ambiguity(self):
+    def test_overseas_explicit_zone_and_dst_ambiguity(self) -> None:
         source = [
             event(1, date="01/11/2026", time="01:10:00"),
             event(2, "completion_message", date="01/11/2026", time="01:11:00"),
@@ -363,7 +363,7 @@ class ClockTests(unittest.TestCase):
 
 
 class SummaryTests(unittest.TestCase):
-    def test_durations_gaps_and_method_denominators(self):
+    def test_durations_gaps_and_method_denominators(self) -> None:
         source = [
             event(1),
             event(2, "completion_message", time="08:01:00"),
@@ -395,7 +395,7 @@ class SummaryTests(unittest.TestCase):
         self.assertIsNone(summary["exposure_seconds"])
         self.assertIsNone(summary["known_attempt_failure_rate"])
 
-    def test_exposure_requires_boundaries_and_resolved_interruptions(self):
+    def test_exposure_requires_boundaries_and_resolved_interruptions(self) -> None:
         kinds = [
             "unknown",
             "authorization_message",
@@ -422,7 +422,7 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(summary["exposure_seconds"], 240)
         self.assertEqual(summary["interruption_seconds"], [60])
 
-    def test_unknown_clocks_incomplete_and_partial_suspension_denominators(self):
+    def test_unknown_clocks_incomplete_and_partial_suspension_denominators(self) -> None:
         source = [
             event(1),
             event(2, "unknown", time="08:01:00"),
@@ -466,7 +466,7 @@ class PublicationTests(SourceFixture):
         parsed = parse_snapshot(snapshot, base / "parsed")
         return base, snapshot, parsed
 
-    def test_standalone_immutable_restart_safe_cli_and_contract_rows(self):
+    def test_standalone_immutable_restart_safe_cli_and_contract_rows(self) -> None:
         base, snapshot, parsed = self.frozen_parse()
         path = reconstruct_parse(parsed, base / "operations")
         self.assertEqual(path, reconstruct_parse(parsed, base / "operations"))
@@ -487,7 +487,7 @@ class PublicationTests(SourceFixture):
             inspect_reconstruction(path)["snapshot_id"],
         )
 
-    def test_shared_context_once_relocation_and_reused_parse_reader(self):
+    def test_shared_context_once_relocation_and_reused_parse_reader(self) -> None:
         base, _, parsed = self.frozen_parse()
         reader = FrozenParseReader(parsed)
         first = reconstruct_parse(parsed, base / "operations", reader=reader)
@@ -506,7 +506,7 @@ class PublicationTests(SourceFixture):
             reader.document["snapshot_id"],
         )
 
-    def test_shard_filter_and_corruption_rejected(self):
+    def test_shard_filter_and_corruption_rejected(self) -> None:
         base, _, parsed = self.frozen_parse()
         content = list(iter_event_witnesses(parsed))[0]["object_sha256"]
         path = reconstruct_parse(parsed, base / "operations", object_sha256=[content])
@@ -516,7 +516,7 @@ class PublicationTests(SourceFixture):
         with self.assertRaises(ReconstructionError):
             inspect_reconstruction(path)
 
-    def test_interruption_does_not_publish_partial_and_raw_store_rejected(self):
+    def test_interruption_does_not_publish_partial_and_raw_store_rejected(self) -> None:
         base, snapshot, parsed = self.frozen_parse()
         with patch(
             "election_audit.reconstruction._write_checked",

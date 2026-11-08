@@ -324,7 +324,7 @@ def _store_table(
     return {**schema, "mode": mode, "storage": "facts" if facts else "compact", "files": files}
 
 
-def _check_keys(connection, tables):
+def _check_keys(connection, tables) -> None:
     for name, spec in tables.items():
         keys = ",".join(_identifier(k) for k in spec["key"])
         null = " OR ".join(f"{_identifier(k)} IS NULL" for k in spec["key"])
@@ -625,7 +625,7 @@ def validate_derivative(path, document):
     }
 
 
-def derivative_main(argv=None):
+def derivative_main(argv=None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
