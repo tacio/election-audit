@@ -8,6 +8,7 @@ import os
 import shlex
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import duckdb
 
@@ -26,13 +27,14 @@ from election_audit.publication import (
     resolve_release,
 )
 from election_audit.source_inventory import digest
+from election_audit.types import JSON, Argv
 
 COUNT_SQL = "SELECT completion_state, count(*) AS observed_cycles FROM anonymous_cycle GROUP BY completion_state ORDER BY completion_state"
 LATE_SQL = "SELECT count(*) AS sessions, count(try_cast(json_extract_string(payload, '$.completed_cycles_after17') AS BIGINT)) AS classifiable_sessions FROM late_voting"
 LIFECYCLE_SQL = "SELECT event_kind, sum(json_extract(payload, '$.normalized_event_count')::BIGINT) AS normalized_events FROM processing_event_availability GROUP BY event_kind ORDER BY event_kind"
 
 
-def validate_release(path, *, _verified_document=None):
+def validate_release(path: Path, *, _verified_document: JSON | None = None) -> JSON:
     """Rehash all bytes, recompute logical rows and verify relational/accounting rules."""
     path = resolve_release(path)
     document = _verified_document if _verified_document is not None else inspect_release(path)
@@ -76,7 +78,7 @@ def validate_release(path, *, _verified_document=None):
     }
 
 
-def _restrict_query(connection, path, document) -> None:
+def _restrict_query(connection: duckdb.DuckDBPyConnection, path: Path, document: JSON) -> None:
     from election_audit.derivatives import allowed_fact_paths
 
     files = allowed_fact_paths(path, document)
@@ -85,7 +87,7 @@ def _restrict_query(connection, path, document) -> None:
     connection.execute("SET lock_configuration=true")
 
 
-def _query_connection(connection, sql, max_rows):
+def _query_connection(connection: duckdb.DuckDBPyConnection, sql: str, max_rows: int) -> JSON:
     statements = connection.extract_statements(sql)
     if len(statements) != 1 or statements[0].type != duckdb.StatementType.SELECT:
         raise PublicationError("Queries require exactly one SELECT statement")
@@ -99,7 +101,7 @@ def _query_connection(connection, sql, max_rows):
     }
 
 
-def query_release(path, sql, *, max_rows=1000):
+def query_release(path: Path, sql: str, *, max_rows: int = 1000) -> JSON:
     """One full integrity pass, one parsed SELECT, bounded output, no external access."""
     if type(max_rows) is not int or not 1 <= max_rows <= 100_000:
         raise PublicationError("Query row limit must be between 1 and 100000")
@@ -114,7 +116,7 @@ def query_release(path, sql, *, max_rows=1000):
         return _query_connection(connection, sql, max_rows)
 
 
-def _findings(path, output, document):
+def _findings(path: Path, output: Path, document: JSON) -> JSON:
     context = _read_checked(path, "context.json")
     with open_release(path, _verified_document=document) as connection:
         _restrict_query(connection, path, document)
@@ -200,7 +202,7 @@ def _findings(path, output, document):
     }
 
 
-TEXT = {
+TEXT: dict[str, dict[str, Any]] = {
     "en": {
         "title": "Initial operational report",
         "scope": "Partial national corpus: available AC–RJ 2026 presidential runoff logs. Frozen subsets retain the full indexed denominator; this report does not establish national completeness.",
@@ -256,7 +258,7 @@ TEXT = {
 }
 
 
-def _mark_synthetic(path, output, document, products):
+def _mark_synthetic(path: Path, output: Path, document: JSON, products: list[Path]) -> list[Path]:
     """Pair report metadata and keep fixture reports visibly marked."""
     with open_release(path, _verified_document=document) as db:
         synthetic = db.execute(
@@ -289,7 +291,7 @@ def _mark_synthetic(path, output, document, products):
     return products
 
 
-def report_release(path, output, *, language="both"):
+def report_release(path: Path, output: str | Path, *, language: str = "both") -> list[Path]:
     """Write both translated Markdown reports by default, sharing one findings ledger."""
     if language not in ("en", "pt-BR", "both"):
         raise PublicationError("Report language must be en, pt-BR or both")
@@ -391,7 +393,7 @@ def report_release(path, output, *, language="both"):
     return _mark_synthetic(path, output, document, [output / name for name in products])
 
 
-def release_main(command, argv=None) -> int:
+def release_main(command: str, argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     if command == "build":
         parser.add_argument("inputs", nargs="+", type=Path)

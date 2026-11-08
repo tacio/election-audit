@@ -5,9 +5,13 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from datetime import datetime
+from typing import Any
 
 from election_audit.publication import SCHEMA, PublicationError
 from election_audit.source_inventory import canonical
+from election_audit.types import JSON, Row
+
+type Tables = dict[str, list[Row]]
 
 VERSION = "electoral-results-v1"
 CATEGORY_FIELDS = {
@@ -68,11 +72,17 @@ MART_SCHEMAS = {
 }
 
 
-def _index(data, name, key):
+def _index(data: Tables, name: str, key: str) -> dict[Any, Row]:
     return {r[key]: r for r in data.get(name, [])}
 
 
-def _anchor(value):
+def _known_sum(values: list[int | None]) -> int | None:
+    """The sum when every value is known, otherwise None (unknown is not zero)."""
+    known = [v for v in values if v is not None]
+    return sum(known) if len(known) == len(values) else None
+
+
+def _anchor(value: object) -> bool:
     return (
         isinstance(value, dict)
         and isinstance(value.get("object_sha256"), str)
@@ -82,7 +92,7 @@ def _anchor(value):
     )
 
 
-def validate_electoral(data, generated) -> None:
+def validate_electoral(data: Tables, generated: Tables) -> None:
     """Reject invalid relations/evidence, retaining numerical mismatches as findings."""
     elections = _index(data, "election", "election_id")
     sections = _index(data, "section", "section_id")
@@ -97,7 +107,7 @@ def validate_electoral(data, generated) -> None:
     }
     objects = {r["object_sha256"] for r in data.get("source_object", [])}
 
-    def anchor(value):
+    def anchor(value: Any) -> bool:
         return _anchor(value) and (not objects or value["object_sha256"] in objects)
 
     for choice in choices.values():
@@ -238,7 +248,7 @@ def validate_electoral(data, generated) -> None:
         raise PublicationError("Electoral derivative requires frozen election context")
 
 
-def _canonical(data):
+def _canonical(data: Tables) -> list[Row]:
     sections = _index(data, "section", "section_id")
     contests = _index(data, "contest", "contest_id")
     evidence = _index(data, "result_evidence", "result_version_id")
@@ -318,7 +328,7 @@ def _canonical(data):
     return result
 
 
-def _reconcile(data):
+def _reconcile(data: Tables) -> list[Row]:
     choices = _index(data, "vote_choice", "vote_choice_id")
     evidence = _index(data, "result_evidence", "result_version_id")
     totals = _index(data, "section_contest_totals", "result_version_id")
@@ -359,7 +369,7 @@ def _reconcile(data):
         categories = [total.get(field) for field in CATEGORY_FIELDS.values()]
         check(
             "category_sum",
-            sum(categories) if all(v is not None for v in categories) else None,
+            _known_sum(categories),
             total.get("total_presidential_ballots"),
         )
         check(
@@ -417,7 +427,7 @@ def _reconcile(data):
     return result
 
 
-def _hierarchy(data, canonical):
+def _hierarchy(data: Tables, canonical: list[Row]) -> list[Row]:
     sections = _index(data, "section", "section_id")
     contests = _index(data, "contest", "contest_id")
     totals = _index(data, "section_contest_totals", "result_version_id")
@@ -490,7 +500,7 @@ def _hierarchy(data, canonical):
             known = (
                 bool(expected) and not missing and not extra and all(v is not None for v in values)
             )
-            observed = sum(values) if known else None
+            observed = _known_sum(values) if known else None
             metrics[field] = {
                 "observed": observed,
                 "reference": reference,
@@ -519,7 +529,9 @@ def _hierarchy(data, canonical):
     return output
 
 
-def _section_marts(data, canonical, reconciliation):
+def _section_marts(
+    data: Tables, canonical: list[Row], reconciliation: list[Row]
+) -> tuple[list[Row], list[Row]]:
     totals = _index(data, "section_contest_totals", "result_version_id")
     reconciled = {r["result_version_id"]: r for r in reconciliation}
     choices = _index(data, "vote_choice", "vote_choice_id")
@@ -597,7 +609,7 @@ def _section_marts(data, canonical, reconciliation):
     return results, unanimous
 
 
-def _timing(data):
+def _timing(data: Tables) -> list[Row]:
     evidence = _index(data, "result_evidence", "result_version_id")
     events = defaultdict(lambda: defaultdict(list))
     for event in data.get("processing_event", []):
@@ -633,7 +645,7 @@ def _timing(data):
                             datetime.fromisoformat(b["event_at"])
                             - datetime.fromisoformat(a["event_at"])
                         ).total_seconds()
-                        if known
+                        if known and a and b
                         else None
                     )
                     result.append(
@@ -648,7 +660,7 @@ def _timing(data):
                             "availability": "known_pair"
                             if known
                             else "unavailable_endpoint_or_clock",
-                            "negative": seconds < 0 if known else None,
+                            "negative": seconds < 0 if seconds is not None else None,
                             "repeated_or_corrected": len(starts) > 1 or len(ends) > 1,
                             "pairing": "all_explicit_endpoint_pairs_no_latest_timestamp_selection",
                         }
@@ -656,7 +668,7 @@ def _timing(data):
     return result
 
 
-def _rounds(data, section_results):
+def _rounds(data: Tables, section_results: list[Row]) -> list[Row]:
     evidence = _index(data, "harmonization_evidence", "population_id")
     sections = _index(data, "section", "section_id")
     elections = _index(data, "election", "election_id")
@@ -718,7 +730,7 @@ def _rounds(data, section_results):
                 )
                 and bool(ev.get("evidence"))
             )
-            aggregates = []
+            aggregates: list[dict[str, Any]] = []
             for contest in (a, b):
                 rows = [
                     result_index.get(
@@ -726,14 +738,19 @@ def _rounds(data, section_results):
                     )
                     for m in groups[contest["election_id"]]
                 ]
-                available = bool(rows) and all(r and r["availability"] == "available" for r in rows)
+                present = [r for r in rows if r]
+                available = (
+                    bool(rows)
+                    and len(present) == len(rows)
+                    and all(r["availability"] == "available" for r in present)
+                )
                 usable = usable and available
                 if available:
                     values = {
-                        field: sum(r["totals"][field] for r in rows) for field in TOTAL_FIELDS
+                        field: sum(r["totals"][field] for r in present) for field in TOTAL_FIELDS
                     }
                     candidate_votes = defaultdict(int)
-                    for r in rows:
+                    for r in present:
                         # Candidacy IDs are contest-scoped; never imply a cross-round identity.
                         for candidate, votes in r["candidate_votes"].items():
                             candidate_votes[candidate] += votes
@@ -780,7 +797,7 @@ def _rounds(data, section_results):
     return output
 
 
-def derive_electoral(data):
+def derive_electoral(data: Tables) -> tuple[Tables, JSON]:
     # Validate before any selection or aggregation can hide conflicting semantics.
     validate_electoral(data, {})
     canonical = _canonical(data)

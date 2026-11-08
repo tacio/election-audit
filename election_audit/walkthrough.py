@@ -4,8 +4,10 @@ import io
 import json
 import sqlite3
 import zipfile
+from collections.abc import Iterable
 from contextlib import closing
 from pathlib import Path
+from typing import Any
 
 from election_audit.publication import SCHEMA, open_release
 from election_audit.source_inventory import (
@@ -15,18 +17,19 @@ from election_audit.source_inventory import (
     index_url,
     section_directory,
 )
+from election_audit.types import JSON, Row
 
 SYNTHETIC_AT = "2026-10-29T00:00:00+00:00"
 
 
-def write_json(path, value):
+def write_json(path: Path, value: Any) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(canonical(value) + b"\n")
     return path
 
 
-def archive(members):
+def archive(members: Iterable[tuple[str, bytes]]) -> bytes:
     """Deterministic ZIP metadata, independent of wall clock and host permissions."""
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_STORED) as output:
@@ -37,7 +40,7 @@ def archive(members):
     return stream.getvalue()
 
 
-def synthetic_source(root):
+def synthetic_source(root: Path) -> Path:
     """Create only tiny local source fixtures; no downloader or test imports."""
     root = Path(root)
     root.mkdir(parents=True, exist_ok=False)
@@ -165,17 +168,17 @@ def synthetic_source(root):
     return root
 
 
-def synthetic_evidence(parsed):
+def synthetic_evidence(parsed: Path) -> JSON:
     from election_audit.archive_parsing import inspect_parse, iter_event_witnesses
 
     document = inspect_parse(parsed)
     events = list({r["event_id"]: r for r in iter_event_witnesses(parsed)}.values())
     section = next(r for r in document["context_tables"]["section"] if r["section_code"] == "0001")
 
-    def member(event):
+    def member(event: Row) -> str:
         return event["record_locator"]["archive_segments"][0]["member_name"]
 
-    def claim(group, **values):
+    def claim(group: list[Row], **values: Any) -> JSON:
         return {
             "rule_id": "SYNTHETIC-reviewed-v1",
             "review_state": "reviewed",
@@ -226,7 +229,7 @@ def synthetic_evidence(parsed):
     }
 
 
-def normalized_demo(parent, directory):
+def normalized_demo(parent: Path, directory: str | Path) -> Path:
     """Known 10/20 turnout with fully synthetic normalized-only evidence."""
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -236,7 +239,7 @@ def normalized_demo(parent, directory):
         )
         snapshot = db.execute("SELECT snapshot_id FROM snapshot LIMIT 1").fetchone()[0]
 
-    def row(name, **values):
+    def row(name: str, **values: Any) -> Row:
         result = {key: values.get(key) for key in SCHEMA[name]["fields"]}
         result["field_states"] = {key: "unknown" for key, value in result.items() if value is None}
         return result
@@ -349,7 +352,7 @@ def normalized_demo(parent, directory):
     )
 
 
-def analysis_config(parent, directory):
+def analysis_config(parent: Path, directory: Path) -> tuple[Path, Path, list[Path]]:
     """Persist partitions then a complete registered null result, without fitting."""
     from election_audit.analysis import publish_analysis
     from election_audit.release_tools import query_release
@@ -380,7 +383,13 @@ def analysis_config(parent, directory):
         "historical_comparison": "none",
     }
 
-    def record(identifier, kind, payload, run=None, references=()):
+    def record(
+        identifier: str,
+        kind: str,
+        payload: JSON,
+        run: str | None = None,
+        references: Iterable[str] = (),
+    ) -> JSON:
         return {
             "record_id": identifier,
             "version": "analysis-ledger-v1",

@@ -6,11 +6,14 @@ import json
 import shutil
 import sqlite3
 import tempfile
+from collections.abc import Iterable
 from contextlib import closing
 from pathlib import Path
+from typing import Any
 
 from election_audit.research_protocol import hash_file, load_protocol, read_only
 from election_audit.source_inventory import canonical, digest, utc_now
+from election_audit.types import JSON
 
 VERSION = "research-journal-v2"
 KINDS = {
@@ -26,7 +29,7 @@ KINDS = {
 }
 
 
-def open_journal(path, protocol):
+def open_journal(path: str | Path, protocol: str | Path) -> sqlite3.Connection:
     document = load_protocol(protocol)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -66,7 +69,15 @@ def open_journal(path, protocol):
     return db
 
 
-def append_record(db, record_id, kind, payload, *, references=(), analysis_run_id=None):
+def append_record(
+    db: sqlite3.Connection,
+    record_id: str,
+    kind: str,
+    payload: JSON,
+    *,
+    references: Iterable[str] = (),
+    analysis_run_id: str | None = None,
+) -> str:
     if (
         kind not in KINDS
         or not isinstance(record_id, str)
@@ -119,7 +130,7 @@ def append_record(db, record_id, kind, payload, *, references=(), analysis_run_i
     return record_id
 
 
-def _same_population(db, table, id_column, record_id) -> bool:
+def _same_population(db: sqlite3.Connection, table: str, id_column: str, record_id: str) -> bool:
     # Difference queries are disk-backed, including the empty-population case.
     expected = db.execute(
         "SELECT count(*) FROM unit_partition WHERE partition_name='test'"
@@ -137,7 +148,9 @@ def _same_population(db, table, id_column, record_id) -> bool:
     ).fetchone()
 
 
-def record_evaluation_units(db, evaluation_id, unit_keys, *, access=False) -> None:
+def record_evaluation_units(
+    db: sqlite3.Connection, evaluation_id: str, unit_keys: Iterable[Any], *, access: bool = False
+) -> None:
     table, column = ("access_unit", "access_id") if access else ("evaluation_unit", "evaluation_id")
     record = db.execute(
         "SELECT record_kind FROM ledger WHERE record_id=?", (evaluation_id,)
@@ -153,7 +166,9 @@ def record_evaluation_units(db, evaluation_id, unit_keys, *, access=False) -> No
         db.execute(f"INSERT OR IGNORE INTO {table} VALUES(?,?)", (evaluation_id, key))
 
 
-def record_final_evaluation(db, record_id, *, model_run_id, evaluation_id, access_id):
+def record_final_evaluation(
+    db: sqlite3.Connection, record_id: str, *, model_run_id: str, evaluation_id: str, access_id: str
+) -> str:
     """Atomically validate and seal exactly one final evaluation per protocol."""
     identity = json.loads(
         db.execute("SELECT payload FROM journal_identity WHERE name='identity'").fetchone()[0]
@@ -220,7 +235,7 @@ def record_final_evaluation(db, record_id, *, model_run_id, evaluation_id, acces
     return record_id
 
 
-def _validate_final(db, record_id) -> bool:
+def _validate_final(db: sqlite3.Connection, record_id: str) -> bool:
     rows = db.execute(
         "SELECT record_id,record_kind,analysis_run_id,payload,references_json,created_at,previous_hash,record_hash FROM ledger ORDER BY rowid"
     )
@@ -280,7 +295,7 @@ def _validate_final(db, record_id) -> bool:
     return True
 
 
-def final_evaluation_complete(db, document=None):
+def final_evaluation_complete(db: Any, document: JSON | None = None) -> bool:
     """Dashboard seam: ordinary inspection is never a final-evaluation certificate."""
     try:
         rows = db.execute(
@@ -294,7 +309,7 @@ def final_evaluation_complete(db, document=None):
         return False
 
 
-def snapshot_journal(db, output):
+def snapshot_journal(db: sqlite3.Connection, output: str | Path) -> Path:
     """Atomically freeze a journal; mutable execution state is never a release."""
     output = Path(output).resolve()
     if output.exists():
