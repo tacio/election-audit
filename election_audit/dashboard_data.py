@@ -87,7 +87,7 @@ class AuditDataset:
     @classmethod
     def open(
         cls,
-        uri: str,
+        uri: str | Path,
         *,
         cache: str | Path | None = None,
         cache_bytes: int = 256 * 1024**2,
@@ -97,7 +97,7 @@ class AuditDataset:
 
     def __init__(
         self,
-        uri: str,
+        uri: str | Path,
         *,
         cache: str | Path | None = None,
         cache_bytes: int = 256 * 1024**2,

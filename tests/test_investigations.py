@@ -5,6 +5,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 from election_audit.investigations import (
     build_cases,
@@ -19,7 +20,7 @@ from election_audit.source_inventory import canonical
 
 
 class InvestigationTests(unittest.TestCase):
-    def fixture(self, root):
+    def fixture(self, root: Path) -> tuple[Any, ...]:
         source = root / "features"
         source.mkdir()
         with sqlite3.connect(source / "features.sqlite") as db:
@@ -84,7 +85,7 @@ class InvestigationTests(unittest.TestCase):
             for i, k in enumerate(dev)
         ]
 
-        def pin(rows) -> None:
+        def pin(rows: list[dict[str, Any]]) -> None:
             (evaluation / "predictions.jsonl").write_bytes(
                 b"".join(canonical(r) + b"\n" for r in rows)
             )
@@ -162,7 +163,7 @@ class InvestigationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "changed"):
                 build_cases(source, protocol, evaluation, root / "cases")
 
-    def scenario(self):
+    def scenario(self) -> dict[str, Any]:
         return {
             "mechanism": "removal_exact",
             "population": [
@@ -226,7 +227,7 @@ class InvestigationTests(unittest.TestCase):
             path = Path(tmp) / "sensitivity"
             calls = []
 
-            def callback(blocks, seed):
+            def callback(blocks: list[str], seed: int) -> dict[str, Any]:
                 calls.append(seed)
                 if seed == 44:
                     raise RuntimeError("interrupted")
@@ -242,7 +243,7 @@ class InvestigationTests(unittest.TestCase):
                 )
             resumed = []
 
-            def full(blocks, seed):
+            def full(blocks: list[str], seed: int) -> dict[str, Any]:
                 resumed.append(seed)
                 return {
                     "fit_rerun": True,

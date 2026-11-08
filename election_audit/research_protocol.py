@@ -97,7 +97,7 @@ def valid_anchor(anchor: object) -> bool:
 
 
 def record_inspection(
-    registry: str | Path, stable_location_id: str, *, reason: str, evidence: str
+    registry: str | Path, stable_location_id: str, *, reason: str, evidence: Any
 ) -> str:
     """An append-only registry survives reseeding and new source populations."""
     if (

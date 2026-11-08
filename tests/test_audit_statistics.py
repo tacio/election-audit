@@ -1,6 +1,7 @@
 import itertools
 import math
 import unittest
+from typing import Any
 
 from scripts.audit_statistics import (
     by_adjusted_pvalues,
@@ -65,7 +66,8 @@ class AuditStatisticsTests(unittest.TestCase):
         self.assertEqual(maximum_switch_margin_change(100, 3), 6)
 
     def test_invalid_count_constraints(self) -> None:
-        for bad in (-1, 1.5, True):
+        bad_counts: tuple[Any, ...] = (-1, 1.5, True)  # deliberately not counts
+        for bad in bad_counts:
             with self.assertRaises(ValueError):
                 removal_contribution_bounds(bad, 1, 0, 0)
         with self.assertRaises(ValueError):

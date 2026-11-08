@@ -2,6 +2,8 @@
 
 import fcntl
 import shutil
+from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import test_reconstruction
@@ -22,7 +24,7 @@ class ReleaseTests(test_snapshots.SourceFixture):
     frozen_parse = test_reconstruction.PublicationTests.frozen_parse
 
     # Reuse fixture setup, not the reconstruction test methods.
-    def release_input(self):
+    def release_input(self) -> tuple[Path, Path]:
         base, _, parsed = self.frozen_parse()
         shard = reconstruct_parse(parsed, base / "operations")
         return base, shard
@@ -59,7 +61,7 @@ class ReleaseTests(test_snapshots.SourceFixture):
         config = ResourceConfig(duckdb_threads=1)
         for stage in ("shard_written", "before_release", "before_current"):
 
-            def interrupt(current) -> None:
+            def interrupt(current: str) -> None:
                 if current == stage:
                     raise OSError("fixture interruption")
 
@@ -149,7 +151,7 @@ class ReleaseTests(test_snapshots.SourceFixture):
         barrier = threading.Barrier(2)
         calls = []
 
-        def independent(parser, source, *args, **kwargs):
+        def independent(parser: Any, source: Any, *args: Any, **kwargs: Any) -> Any:
             # Only outer archives participate in the concurrency assertion.
             if not args and not kwargs:
                 calls.append(parser)
@@ -165,7 +167,7 @@ class ReleaseTests(test_snapshots.SourceFixture):
         self.assertTrue(all(not hit for _path, hit in results))
         calls.clear()
 
-        def serialized(parser, source, *args, **kwargs):
+        def serialized(parser: Any, source: Any, *args: Any, **kwargs: Any) -> Any:
             calls.append(parser)
             time.sleep(0.01)
             return original(parser, source, *args, **kwargs)

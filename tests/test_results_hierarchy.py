@@ -4,7 +4,9 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from election_audit import results_hierarchy as rh
 
@@ -21,7 +23,7 @@ CONFIG = {
 }
 
 
-def unified(scope_type, scope, *, tf="s", **changes):
+def unified(scope_type: str, scope: str, *, tf: str = "s", **changes: Any) -> bytes:
     value = {
         "ele": "6258",
         "t": "2",
@@ -40,13 +42,13 @@ def unified(scope_type, scope, *, tf="s", **changes):
     return json.dumps(value).encode()
 
 
-def progress():
+def progress() -> bytes:
     return json.dumps(
         {"ele": "6258", "t": "2", "f": "o", "dg": "25/10/2026", "hg": "23:26:59", "abr": []}
     ).encode()
 
 
-def bodies(**overrides):
+def bodies(**overrides: bytes) -> dict[str, bytes]:
     files = {
         f"{ROOT}/config/mun-e006258-cm.json": json.dumps(CONFIG).encode(),
         f"{ROOT}/dados/br/br-c0001-e006258-u.json": unified("br", "br"),
@@ -67,10 +69,12 @@ class ResultsHierarchyTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
 
-    def getter(self, files, fail_after=None):
+    def getter(
+        self, files: dict[str, bytes], fail_after: int | None = None
+    ) -> tuple[Callable[[str], tuple[bytes, str | None, str | None]], list[str]]:
         calls = []
 
-        def get(url):
+        def get(url: str) -> tuple[bytes, str | None, str | None]:
             if fail_after is not None and len(calls) >= fail_after:
                 raise ConnectionError("network down")
             calls.append(url)

@@ -11,6 +11,7 @@ import unittest
 import zipfile
 from contextlib import closing
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from election_audit.national import _read_json, _write_json
@@ -37,7 +38,7 @@ class WorkloadExecutionTests(unittest.TestCase):
         self.raw = self.root / "raw"
         self.profile = self.root / "profile"
         self.profile.mkdir()
-        self.rows = []
+        self.rows: list[dict[str, Any]] = []
         for section in ("0001", "0002", "0003"):
             archive = io.BytesIO()
             with zipfile.ZipFile(archive, "w") as z:

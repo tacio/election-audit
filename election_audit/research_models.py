@@ -538,7 +538,7 @@ def simulate_models(
 
 
 def perturb_mechanism(
-    records: Sequence[Row], mechanism: str, *, seed: int, fraction: float, concentration: float
+    records: Sequence[Row], mechanism: str, *, seed: int, fraction: float, concentration: str
 ) -> Sequence[Row]:
     """Transform reconciled anonymous counts or sanitized histories on independent copies."""
     import copy

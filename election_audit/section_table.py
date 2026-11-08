@@ -927,7 +927,7 @@ def _section_row(
     place_round: Any,
     member_list: Sequence[str] | None,
     unknown_composition: bool,
-    profile: Mapping[tuple[str, ...], Row],
+    profile: Mapping[Any, Row],
     witness: Any,
     ops: JSON | None,
     is_protected: bool,

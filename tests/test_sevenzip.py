@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import unittest
 import zlib
+from collections.abc import Sequence
 from pathlib import Path
 
 from election_audit import sevenzip
@@ -14,7 +15,7 @@ from election_audit import sevenzip
 LZMA_FILTER = {"id": lzma.FILTER_LZMA1, "dict_size": 1 << 20, "lc": 3, "lp": 0, "pb": 2}
 
 
-def number(value):
+def number(value: int) -> bytes:
     if value < 0x80:
         return bytes([value])
     if value < 0x4000:
@@ -24,7 +25,7 @@ def number(value):
     return bytes([0xE0 | (value >> 24)]) + (value & 0xFFFFFF).to_bytes(3, "little")
 
 
-def coder(method):
+def coder(method: str) -> bytes:
     if method == "lzma":
         props = bytes([(2 * 5 + 0) * 9 + 3]) + struct.pack("<I", 1 << 20)
         return b"\x23" + sevenzip.LZMA1 + number(len(props)) + props
@@ -33,13 +34,15 @@ def coder(method):
     return b"\x04\x03\x03\x01\x03"  # x86 BCJ filter: not supported
 
 
-def pack(data, method):
+def pack(data: bytes, method: str) -> bytes:
     if method == "lzma":
         return lzma.compress(data, format=lzma.FORMAT_RAW, filters=[LZMA_FILTER])
     return data
 
 
-def make_7z(files, *, method="lzma", encoded_header=False):
+def make_7z(
+    files: Sequence[tuple[str, bytes]], *, method: str = "lzma", encoded_header: bool = False
+) -> bytes:
     """Write a one-folder 7z archive: enough of the format to exercise the reader."""
     data = b"".join(body for _, body in files)
     packed = pack(data, method)

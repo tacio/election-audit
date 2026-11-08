@@ -9,6 +9,7 @@ import unittest
 import zipfile
 from contextlib import closing, contextmanager
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pyarrow.parquet as pq
@@ -48,7 +49,7 @@ class NationalTests(unittest.TestCase):
                 CREATE TABLE files(url TEXT PRIMARY KEY,path TEXT,sha256 TEXT,bytes INTEGER,fetched_at TEXT,etag TEXT,last_modified TEXT);
                 CREATE TABLE sections(run TEXT,uf TEXT,municipality TEXT,zone TEXT,section TEXT,status TEXT,metadata TEXT,details TEXT);
             """)
-        self.spec = {
+        self.spec: dict[str, Any] = {
             "round": 2,
             "root": str(self.raw),
             "manifest": str(self.manifest),

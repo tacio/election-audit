@@ -8,6 +8,7 @@ import sys
 import unittest
 from concurrent.futures import Future
 from pathlib import Path
+from typing import Any
 from unittest.mock import Mock, patch
 
 from election_audit import national_parallel as parallel
@@ -57,7 +58,7 @@ class ParallelTests(unittest.TestCase):
         # Protected original may be unavailable: no semantic/cache read is allowed.
         self.copied = copied
 
-    def setup_job(self, name, workers):
+    def setup_job(self, name: str, workers: int) -> tuple[Path, dict[str, Any]]:
         resources = policy(workers=workers, batch=1, prefetch=0)
         resources.update(
             hdd_reserve_bytes=0,
@@ -72,7 +73,9 @@ class ParallelTests(unittest.TestCase):
         )
         return out, spec
 
-    def execute(self, out, *args, check=True):
+    def execute(
+        self, out: Path, *args: str, check: bool = True
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [sys.executable, "-B", str(out / "run_frozen.py"), "run", *args],
             capture_output=True,
@@ -81,7 +84,7 @@ class ParallelTests(unittest.TestCase):
             timeout=60,
         )
 
-    def logical(self, spec):
+    def logical(self, spec: dict[str, Any]) -> dict[str, list[Any]]:
         rows = {}
         for path in sorted((Path(spec["store"]) / "shards").glob("*/*/summary.sqlite")):
             with sqlite3.connect(path) as db:
@@ -153,7 +156,7 @@ class ParallelTests(unittest.TestCase):
         pool._processes = {}
         pool.submit.side_effect = lambda *a: Future()
 
-        def cancel(pending, **kwargs):
+        def cancel(pending: Any, **kwargs: Any) -> tuple[set[Any], set[Any]]:
             parallel._STOP = True
             return set(), set(pending)
 

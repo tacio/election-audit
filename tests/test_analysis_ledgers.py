@@ -2,6 +2,8 @@
 
 import copy
 import unittest
+from collections.abc import Iterable
+from typing import Any
 
 from election_audit.analysis import validate_evidence, validate_populations
 from election_audit.analysis_ledgers import (
@@ -22,7 +24,14 @@ CASE = {
 }
 
 
-def record(identifier, kind, payload, *, run="run", refs=()):
+def record(
+    identifier: str,
+    kind: str,
+    payload: dict[str, Any],
+    *,
+    run: str | None = "run",
+    refs: Iterable[str] = (),
+) -> dict[str, Any]:
     return {
         "record_id": identifier,
         "version": VERSION,
@@ -34,7 +43,7 @@ def record(identifier, kind, payload, *, run="run", refs=()):
     }
 
 
-def protocol_records():
+def protocol_records() -> list[dict[str, Any]]:
     return [
         record(
             "protocol",
@@ -70,7 +79,7 @@ def protocol_records():
     ]
 
 
-def assignments():
+def assignments() -> list[dict[str, Any]]:
     return [
         {
             "partition_id": "p",
@@ -83,7 +92,7 @@ def assignments():
     ]
 
 
-def impact():
+def impact() -> dict[str, Any]:
     anchor = {"object_sha256": "a" * 64, "record_locator": "reviewed caps row"}
     return {
         "target": {
@@ -113,7 +122,9 @@ def impact():
 
 
 class LedgerTests(unittest.TestCase):
-    def validated(self, incoming, inherited=()):
+    def validated(
+        self, incoming: list[dict[str, Any]], inherited: Iterable[dict[str, Any]] = ()
+    ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
         return validate_records(inherited, incoming, partition_ids={"p"}, snapshot_ids={"snapshot"})
 
     def test_append_resume_reordering_conflicts_and_missing_refs(self) -> None:

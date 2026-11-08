@@ -70,7 +70,7 @@ class ArchiveTests(unittest.TestCase):
         body: bytes | None = None,
         config: ParseConfig | None = None,
     ) -> tuple[Path, list[Any], list[Any]]:
-        self.source.write_bytes(body if body is not None else archive_bytes(members))
+        self.source.write_bytes(body if body is not None else archive_bytes(members or ()))
         path, hit = parse_object(self.source, self.store, config=config)
         return path, rows(path, "events.jsonl"), rows(path, "issues.jsonl")
 

@@ -7,6 +7,7 @@ import threading
 import unittest
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 from election_audit.dashboard_data import AuditDataset, publish_dataset
 
@@ -39,7 +40,12 @@ class DashboardDataTests(unittest.TestCase):
         csv, metadata = d.csv("coverage", filters={"uf": "ac"})
         self.assertIn("ac", csv)
         self.assertEqual(metadata["release_id"], "fixture")
-        for kwargs in ({"limit": 10001}, {"offset": -1}, {"filters": {"SQL": "unsafe"}}):
+        cases: tuple[dict[str, Any], ...] = (
+            {"limit": 10001},
+            {"offset": -1},
+            {"filters": {"SQL": "unsafe"}},
+        )
+        for kwargs in cases:
             with self.assertRaises(ValueError):
                 d.page("coverage", **kwargs)
 
@@ -58,7 +64,7 @@ class DashboardDataTests(unittest.TestCase):
 
     def test_http_matches_local_and_cache_bound(self) -> None:
         class QuietHandler(http.server.SimpleHTTPRequestHandler):
-            def log_message(self, *args) -> None:
+            def log_message(self, format: str, *args: Any) -> None:
                 pass
 
         server = http.server.ThreadingHTTPServer(

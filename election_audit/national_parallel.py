@@ -26,7 +26,7 @@ from election_audit.types import JSON, Argv, Row
 
 FORMAT = "grouped-source-summary-shards-v3"
 _POLICY: JSON | None = None  # set in each worker process by worker_init
-_STOP = False
+_STOP: bool = False
 
 
 def encoded(value: Any) -> str:

@@ -12,6 +12,7 @@ import threading
 import unittest
 import zipfile
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from election_audit import bulk_acquisition as bulk
@@ -39,7 +40,7 @@ class Server:
         outer = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
-            def log_message(self, *args) -> None:
+            def log_message(self, format: str, *args: Any) -> None:
                 pass
 
             def _file(self):

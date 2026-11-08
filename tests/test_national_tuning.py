@@ -8,6 +8,7 @@ import time
 import unittest
 import zipfile
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from election_audit.national import LIMITS, _read_json
@@ -26,6 +27,13 @@ from election_audit.national_tuning import (
     winner,
 )
 from election_audit.source_inventory import digest
+
+
+def best(trials: list[dict[str, Any]]) -> dict[str, Any]:
+    """The recommended trial, which these cases always have."""
+    found = winner(trials)
+    assert found is not None
+    return found
 
 
 class TuningTests(unittest.TestCase):
@@ -54,10 +62,10 @@ class TuningTests(unittest.TestCase):
             ]
 
         values = trials(2048, [100, 102]) + trials(8192, [101, 103])
-        self.assertEqual(winner(values)["batch_rows"], 2048)
+        self.assertEqual(best(values)["batch_rows"], 2048)
         values += trials(32768, [125, 124])
         values += [{"state": "rejected", "batch_rows": 65536, "events_per_second": 9999}]
-        self.assertEqual(winner(values)["batch_rows"], 32768)
+        self.assertEqual(best(values)["batch_rows"], 32768)
         self.assertIsNone(winner(trials(2048, [100])))
 
     def test_resume_identity_and_completed_run_do_not_reprocess(self) -> None:
@@ -65,7 +73,7 @@ class TuningTests(unittest.TestCase):
             from election_audit.national import _write_json
 
             root = Path(tmp)
-            spec = {"code": code_pins(), "policy": limits()}
+            spec: dict[str, Any] = {"code": code_pins(), "policy": limits()}
             spec["spec_id"] = digest(spec)
             state = {"spec_id": spec["spec_id"], "state": "complete"}
             validate_state(spec, state)
@@ -181,7 +189,7 @@ class TuningTests(unittest.TestCase):
             from election_audit.national import _write_json
 
             root = Path(tmp)
-            spec = {"code": code_pins(), "policy": limits()}
+            spec: dict[str, Any] = {"code": code_pins(), "policy": limits()}
             spec["spec_id"] = digest(spec)
             state = {
                 "spec_id": spec["spec_id"],

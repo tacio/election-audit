@@ -2,6 +2,8 @@
 
 import copy
 import unittest
+from collections.abc import Sequence
+from typing import Any
 
 from test_electoral_imports import row
 
@@ -9,11 +11,11 @@ from election_audit.electoral_results import derive_electoral
 from election_audit.publication import PublicationError
 
 
-def anchor():
+def anchor() -> dict[str, str]:
     return {"object_sha256": "a" * 64, "record_locator": '{"line":1}'}
 
 
-def electoral_data():
+def electoral_data() -> dict[str, list[dict[str, Any]]]:
     data = {
         "election": [
             row(
@@ -124,7 +126,12 @@ def electoral_data():
     return data
 
 
-def add_version(data, vid, status="totalized", supersedes=()) -> None:
+def add_version(
+    data: dict[str, list[dict[str, Any]]],
+    vid: str,
+    status: str = "totalized",
+    supersedes: Sequence[str] = (),
+) -> None:
     for name in ("result_version", "section_contest_totals", "result_evidence"):
         r = copy.deepcopy(data[name][0])
         r["result_version_id"] = vid
@@ -281,7 +288,7 @@ class ElectoralTests(unittest.TestCase):
     def test_timing_negative_corrected_and_naive_unknown(self) -> None:
         data = electoral_data()
 
-        def event(eid, kind, time):
+        def event(eid: str, kind: str, time: str | None) -> dict[str, Any]:
             return row(
                 "processing_event",
                 processing_event_id=eid,
