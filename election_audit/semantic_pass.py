@@ -37,8 +37,10 @@ import threading
 import time
 import zipfile
 from collections import Counter
+from collections.abc import Collection, Iterable, Iterator, Sequence
 from datetime import date
 from pathlib import Path
+from typing import IO, Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -53,6 +55,9 @@ from election_audit.operational_review import (
     keeps_round,
     rules_for,
 )
+from election_audit.types import JSON, Argv, Row
+
+type Segment = tuple[str, int, int]
 
 VERSION = (
     "session-aggregates-v4"  # v2: int64 seconds; v3: device and clock columns; v4: sessions-v2
@@ -169,7 +174,7 @@ OBJECT_SCHEMA = pa.schema(
 _DATES = {}
 
 
-def reading_seconds(timestamp):
+def reading_seconds(timestamp: str) -> int | None:
     """Seconds since 0001-01-01 for a ``dd/mm/YYYY HH:MM:SS`` reading, or None."""
     if len(timestamp) != 19 or timestamp[2] != "/" or timestamp[5] != "/":
         return None
@@ -193,7 +198,7 @@ def reading_seconds(timestamp):
     return base + hour * 3600 + minute * 60 + second
 
 
-def iso_reading(seconds) -> str | None:
+def iso_reading(seconds: int | None) -> str | None:
     if seconds is None:
         return None
     day, rest = divmod(seconds, 86400)
@@ -204,11 +209,11 @@ def iso_reading(seconds) -> str | None:
     return f"{date.fromordinal(day).isoformat()}T{hour:02d}:{minute:02d}:{second:02d}"
 
 
-def log_members(path):  # path, or the object's bytes
+def log_members(path: str | Path | bytes) -> Iterator[tuple[Sequence[Segment], bytes]]:
     """Yield (segments, body) for every bounded logd.dat member of a ZIP or 7z object."""
     totals = {"members": 0, "expanded": 0}
 
-    def entries(handle):
+    def entries(handle: IO[bytes]) -> Iterator[tuple[int, str, bytes]]:
         """(index, original name, body) for each file entry; directories are skipped."""
         if handle.read(len(sevenzip.MAGIC)) == sevenzip.MAGIC:  # 2022 logs
             handle.seek(0)
@@ -229,7 +234,9 @@ def log_members(path):  # path, or the object's bytes
                 with z.open(entry) as f:
                     yield index, entry.orig_filename, f.read(MAX_MEMBER + 1)
 
-    def archive(handle, segments):
+    def archive(
+        handle: IO[bytes], segments: Sequence[Segment]
+    ) -> Iterator[tuple[Sequence[Segment], bytes]]:
         if len(segments) > MAX_DEPTH:
             raise ValueError("Nested archive bound exceeded")
         occurrences = Counter()
@@ -256,14 +263,14 @@ def log_members(path):  # path, or the object's bytes
         yield from archive(f, ())
 
 
-def member_path(segments):
+def member_path(segments: Iterable[Segment]) -> str:
     return "/".join(f"{name}#{occurrence}" for name, occurrence, _ in segments)
 
 
 # --------------------------------------------------------------------------- state
 
 
-def _gap_stats(gaps):
+def _gap_stats(gaps: Sequence[int]) -> tuple[int, int | None, float | None, int | None, int | None]:
     if not gaps:
         return 0, None, None, None, None
     gaps = sorted(gaps)
@@ -276,26 +283,39 @@ def _gap_stats(gaps):
 class ObjectSummary:
     """Mirror of ``operational_review.review_object``'s session/cycle machine."""
 
-    def __init__(self, object_sha256, round_number, year=2026) -> None:
+    def __init__(self, object_sha256: str, round_number: int, year: int = 2026) -> None:
         self.sha = object_sha256
         self.round = round_number
         self.rules = rules_for(year)
         self.election_day = date.fromisoformat(election_for_round(round_number, year).election_date)
         self.election_seconds = self.election_day.toordinal() * 86400
-        self.sessions, self.segments = [], []
+        self.sessions: list[dict[str, Any]] = []
+        self.segments: list[dict[str, Any]] = []
         self.kinds, self.vocabulary = Counter(), Counter()
         self.vocabulary_overflow = 0
         self.lines = self.events = self.malformed = self.members = 0
         self.orphans_without_session = 0
         self.stream_ordinal = -1
-        self.stream = self.session = self.pending = self.segment = None
-        self.phase = None
+        # Open stream, session, cycle and segment: plain dicts whose keys the methods below fix.
+        self.stream: tuple[Sequence[Segment], str] | None = None
+        self.session: dict[str, Any] | None = None
+        self.pending: dict[str, Any] | None = None
+        self.segment: dict[str, Any] | None = None
+        self.phase: Any = None
         self.software = False
-        self.clock = {"model": None, "adh": 0, "adh_shift": 0, "tz": 0, "tz_shift": 0, "dst": 0}
-        self._templates, self._classes = {}, {}
+        self.clock: dict[str, Any] = {
+            "model": None,
+            "adh": 0,
+            "adh_shift": 0,
+            "tz": 0,
+            "tz_shift": 0,
+            "dst": 0,
+        }
+        self._templates: dict[tuple[str, str], tuple[str, str]] = {}
+        self._classes: dict[tuple[str, str], tuple[str, Any]] = {}
 
     # ---- vocabulary and classification caches
-    def _template(self, application, message):
+    def _template(self, application: str, message: str) -> tuple[str, str]:
         key = (application, message)
         found = self._templates.get(key)
         if found is None:
@@ -304,7 +324,7 @@ class ObjectSummary:
                 self._templates[key] = found
         return found
 
-    def _classify(self, application, message):
+    def _classify(self, application: str, message: str) -> tuple[str, Any]:
         key = (application, message)
         found = self._classes.get(key)
         if found is None:
@@ -314,7 +334,7 @@ class ObjectSummary:
         return found
 
     # ---- segments (context blocks inside one stream)
-    def _open_segment(self, context, device, path) -> None:
+    def _open_segment(self, context: str | None, device: str, path: str) -> None:
         self._close_segment()
         self.segment = {
             "object_sha256": self.sha,
@@ -340,7 +360,7 @@ class ObjectSummary:
             self.segment = None
 
     # ---- sessions and cycles
-    def _finish_cycle(self, state) -> None:
+    def _finish_cycle(self, state: str) -> None:
         pending = self.pending
         if pending is None:
             if state == "completed" and self.session is not None:
@@ -354,7 +374,7 @@ class ObjectSummary:
             session["completed_interrupted"] += 1
         self.pending = None
 
-    def _finish_session(self, reason) -> None:
+    def _finish_session(self, reason: str) -> None:
         self._finish_cycle("unresolved")
         session = self.session
         if session is not None:
@@ -379,7 +399,7 @@ class ObjectSummary:
             self.sessions.append(session)
         self.session, self.software = None, False
 
-    def _device_clock(self, application, message, reading) -> None:
+    def _device_clock(self, application: str, message: str, reading: int) -> None:
         """Device model and clock settings of the current stream, as read before a session."""
         clock = self.clock
         if message.startswith(MODEL_PREFIX):
@@ -402,7 +422,7 @@ class ObjectSummary:
             if before is not None and after is not None:
                 clock["tz_shift"] += after - before
 
-    def _new_stream(self, key, device, path) -> None:
+    def _new_stream(self, key: tuple[Sequence[Segment], str], device: str, path: str) -> None:
         if self.stream is not None:
             self._finish_session("stream_end")
         self._close_segment()
@@ -413,7 +433,7 @@ class ObjectSummary:
         self._last_reading = None
         self._open_segment("initial", device, path)
 
-    def feed(self, segments, body) -> None:
+    def feed(self, segments: Sequence[Segment], body: bytes) -> None:
         """Process one logd.dat member body."""
         self.members += 1
         path = member_path(segments)
@@ -435,7 +455,16 @@ class ObjectSummary:
                 continue
             self._event(path, segments, line, reading, device, application, message)
 
-    def _event(self, path, segments, line, reading, device, application, message) -> None:
+    def _event(
+        self,
+        path: str,
+        segments: Sequence[Segment],
+        line: bytes,
+        reading: int,
+        device: str,
+        application: str,
+        message: str,
+    ) -> None:
         self.events += 1
         key = (segments, device)
         if key != self.stream:
@@ -463,6 +492,7 @@ class ObjectSummary:
                 path,
             )
         segment = self.segment
+        assert segment is not None  # feed() opens a segment before the first event
         line_sha = hashlib.sha256(line).hexdigest()
         segment["hash"].update(line)
         segment["lines"] += 1
@@ -511,7 +541,7 @@ class ObjectSummary:
                 "clock_tz_shift_s_before": self.clock["tz_shift"],
                 "clock_dst_before": self.clock["dst"],
                 "configured_close": None,
-                "segment_ordinal": self.segment["segment_ordinal"],
+                "segment_ordinal": segment["segment_ordinal"],
                 "started_before_election_day": False,
                 "_early": in_round and reading < self.election_seconds,
                 "_completions": [],
@@ -636,7 +666,9 @@ class ObjectSummary:
         self._close_segment()
 
 
-def summarize_object(source, object_sha256, round_number, year=2026):
+def summarize_object(
+    source: str | Path | bytes, object_sha256: str, round_number: int, year: int = 2026
+) -> ObjectSummary:
     """Summarize one log object given as a path or as its bytes."""
     summary = ObjectSummary(object_sha256, round_number, year)
     for segments, body in log_members(source):
@@ -648,12 +680,19 @@ def summarize_object(source, object_sha256, round_number, year=2026):
 # --------------------------------------------------------------------------- work list
 
 
-def load_exclusions(path):
+def load_exclusions(path: str | Path) -> tuple[set[tuple[str, ...]], str]:
     value = json.loads(Path(path).read_bytes())
     return {tuple(key) for key in value["section_keys"]}, sha(path)
 
 
-def work_list(staged_root, round_number, *, ufs=None, exclusions=frozenset(), limit=None):
+def work_list(
+    staged_root: str | Path,
+    round_number: int,
+    *,
+    ufs: Collection[str] | None = None,
+    exclusions: Collection[tuple[str, ...]] = frozenset(),
+    limit: int | None = None,
+) -> tuple[list[Row], int]:
     """Distinct log objects with their section witnesses; excluded sections removed."""
     manifest = Path(staged_root) / "manifest.sqlite"
     uri = manifest.resolve().as_uri() + "?mode=ro&immutable=1"
@@ -690,7 +729,9 @@ def work_list(staged_root, round_number, *, ufs=None, exclusions=frozenset(), li
     return items, len(excluded)
 
 
-def bulk_archives(bulk_root, year, round_number, ufs=None):
+def bulk_archives(
+    bulk_root: str | Path, year: int, round_number: int, ufs: Collection[str] | None = None
+) -> list[Row]:
     """Complete per-UF bulk archives of one round whose logs this pass may parse."""
     if year not in BULK_YEARS:
         raise ValueError(
@@ -699,7 +740,9 @@ def bulk_archives(bulk_root, year, round_number, ufs=None):
     return verified_bulk_archives(bulk_root, year, round_number, ufs)
 
 
-def verified_bulk_archives(bulk_root, year, round_number, ufs=None):
+def verified_bulk_archives(
+    bulk_root: str | Path, year: int, round_number: int, ufs: Collection[str] | None = None
+) -> list[Row]:
     """Complete per-UF bulk archives of one round, as recorded in the bulk manifest."""
     bulk_root = Path(bulk_root)
     uri = (bulk_root / "manifest.sqlite").resolve().as_uri() + "?mode=ro&immutable=1"
@@ -726,7 +769,14 @@ def verified_bulk_archives(bulk_root, year, round_number, ufs=None):
     return archives
 
 
-def bulk_work_list(bulk_root, archives, year, round_number, *, limit=None):
+def bulk_work_list(
+    bulk_root: str | Path,
+    archives: Sequence[Row],
+    year: int,
+    round_number: int,
+    *,
+    limit: int | None = None,
+) -> list[Row]:
     """Log members of the bulk archives in physical (header offset) order, with witnesses."""
     pleito = int(election_for_round(round_number, year).pleito_code)
     member = re.compile(rf"o0*{pleito}-(\d{{5}})(\d{{4}})(\d{{4}})\.logjez")
@@ -754,7 +804,7 @@ def bulk_work_list(bulk_root, archives, year, round_number, *, limit=None):
     return items[:limit] if limit is not None else items
 
 
-def bulk_bodies(bulk_root, items):
+def bulk_bodies(bulk_root: str | Path, items: Sequence[Row]) -> list[bytes]:
     """Read members sequentially; zipfile checks each member's CRC at end of stream."""
     bodies, current, handle = [], None, None
     try:
@@ -764,6 +814,7 @@ def bulk_bodies(bulk_root, items):
                     handle.close()
                 handle = zipfile.ZipFile(Path(bulk_root) / item["archive"])
                 current = item["archive"]
+            assert handle is not None  # opened for the first item's archive
             with handle.open(item["member"]) as f:
                 bodies.append(f.read(MAX_EXPANDED + 1))
     finally:
@@ -775,16 +826,19 @@ def bulk_bodies(bulk_root, items):
 # --------------------------------------------------------------------------- shards
 
 
-def _write(path, rows, schema) -> None:
+def _write(path: Path, rows: list[Row], schema: pa.Schema) -> None:
     table = pa.Table.from_pylist(rows, schema=schema)
     pq.write_table(table, path, compression="zstd")
 
 
-def run_shard(task):
+def run_shard(
+    task: tuple[str | None, int, str, int, list[Row], list[bytes] | None, int],
+) -> tuple[int, int, int]:
     staged_root, round_number, shard_dir, index, items, bodies, year = task
     sessions, segments, objects, vocabulary = [], [], [], Counter()
     for position, item in enumerate(items):
         if bodies is None:
+            assert staged_root is not None  # staged shards carry their root
             source, digest = Path(staged_root) / item["path"], item["sha256"]
         else:  # bulk members arrive as bytes read in physical order by the parent
             source = bodies[position]
@@ -840,24 +894,24 @@ def _init_worker() -> None:
         os.environ[name] = "1"
 
 
-def _rules_sha(year):
+def _rules_sha(year: int) -> str:
     return hashlib.sha256(json.dumps(rules_for(year), sort_keys=True).encode()).hexdigest()
 
 
 def run_pass(
-    staged_root,
-    round_number,
-    output,
+    staged_root: str | Path | None,
+    round_number: int,
+    output: str | Path,
     *,
-    exclusions_path=None,
-    workers=4,
-    ufs=None,
-    limit=None,
-    resume=False,
-    shard_objects=SHARD_OBJECTS,
-    bulk_root=None,
-    year=2026,
-):
+    exclusions_path: str | Path | None = None,
+    workers: int = 4,
+    ufs: Collection[str] | None = None,
+    limit: int | None = None,
+    resume: bool = False,
+    shard_objects: int = SHARD_OBJECTS,
+    bulk_root: str | Path | None = None,
+    year: int = 2026,
+) -> JSON:
     """Sharded pass over a certified 2026 staging, or over the 2022 bulk archives."""
     output = Path(output).expanduser().absolute()
     if workers < 1 or workers > max(1, (os.cpu_count() or 2) // 2):
@@ -867,6 +921,7 @@ def run_pass(
     if bulk_root is None:
         if year != 2026 or exclusions_path is None:
             raise ValueError("A staged 2026 pass requires the protection exclusions")
+        assert staged_root is not None  # exactly one root, checked above
         staged_root = Path(staged_root).expanduser().absolute()
         staging_certificate = json.loads((staged_root / "staging-certificate.json").read_bytes())
         if staging_certificate.get("round") != round_number:
@@ -917,6 +972,7 @@ def run_pass(
     shard_dir = output / "shards"
     shard_dir.mkdir(exist_ok=True)
     if bulk_root is None:
+        assert staged_root is not None  # exactly one root, checked above
         items, excluded = work_list(
             staged_root,
             round_number,
@@ -933,7 +989,7 @@ def run_pass(
     # workers + 2 shards of bytes are in flight at once.
     gate = threading.BoundedSemaphore(workers + 2)
 
-    def tasks():
+    def tasks() -> Iterator[tuple[str | None, int, str, int, list[Row], list[bytes] | None, int]]:
         for i in todo:
             if bulk_root is None:
                 yield (str(staged_root), round_number, str(shard_dir), i, shards[i], None, year)
@@ -947,7 +1003,7 @@ def run_pass(
     completed_objects = sum(len(shards[i]) for i in done if i < len(shards))
     errors = 0
 
-    def report(stage, **extra) -> None:
+    def report(stage: str, **extra: Any) -> None:
         elapsed = time.monotonic() - started
         atomic(
             status,
@@ -990,7 +1046,7 @@ def run_pass(
     return result
 
 
-def merge(output, shards, binding, excluded):
+def merge(output: Path, shards: Sequence[Sequence[Row]], binding: JSON, excluded: int) -> JSON:
     """Concatenate shards into the release tables and write a checksummed manifest."""
     release = output / "release"
     shutil.rmtree(release, ignore_errors=True)
@@ -1056,7 +1112,9 @@ def merge(output, shards, binding, excluded):
 # --------------------------------------------------------------------------- equivalence
 
 
-def adapter_signatures(original, scratch, round_number, year=2026):
+def adapter_signatures(
+    original: Path, scratch: str | Path, round_number: int, year: int = 2026
+) -> tuple[list[JSON], JSON]:
     """Run the Phase 13 event-level adapter on one object and reduce it to signatures."""
     from election_audit.archive_parsing import inspect_artifact, parse_object
     from election_audit.national import _compact_jsonl, _write_json
@@ -1087,7 +1145,7 @@ def adapter_signatures(original, scratch, round_number, year=2026):
         structural, original, scratch / "review", round_number=round_number, year=year
     )
 
-    def rows(name):
+    def rows(name: str) -> list[Row]:
         table = pq.read_table(result / f"{name}.parquet").column(0).to_pylist()
         return [json.loads(r) for r in table]
 
@@ -1122,7 +1180,7 @@ def adapter_signatures(original, scratch, round_number, year=2026):
     return signatures, counts
 
 
-def pass_signatures(summary):
+def pass_signatures(summary: ObjectSummary) -> list[JSON]:
     signatures = []
     for session in summary.sessions:
         cycles = {
@@ -1146,17 +1204,17 @@ def pass_signatures(summary):
 
 
 def equivalence(
-    staged_root,
-    round_number,
-    output,
+    staged_root: str | Path | None,
+    round_number: int,
+    output: str | Path,
     *,
-    exclusions_path=None,
-    ufs,
-    sample,
-    seed=21,
-    bulk_root=None,
-    year=2026,
-):
+    exclusions_path: str | Path | None = None,
+    ufs: Collection[str],
+    sample: int,
+    seed: int = 21,
+    bulk_root: str | Path | None = None,
+    year: int = 2026,
+) -> JSON:
     """Compare the streaming pass with the event-level adapter on sampled objects."""
     output = Path(output).expanduser().absolute()
     if output.exists():
@@ -1166,6 +1224,7 @@ def equivalence(
     if bulk_root is None:
         if year != 2026 or exclusions_path is None:
             raise ValueError("A staged 2026 comparison requires the protection exclusions")
+        assert staged_root is not None  # exactly one root, checked above
         staged_root = Path(staged_root).expanduser().absolute()
         exclusions, exclusions_sha = load_exclusions(exclusions_path)
         items, _ = work_list(staged_root, round_number, ufs=set(ufs), exclusions=exclusions)
@@ -1245,7 +1304,7 @@ def equivalence(
     return report
 
 
-def semantic_pass_main(argv=None) -> int:
+def semantic_pass_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit semantic-pass",
         description="Phase 21 streaming per-session aggregates from staged raw logs.",
