@@ -443,8 +443,14 @@ def _completed(s: Row) -> int:
     return sum(s[f"cycles_completed_{m}"] for m in METHODS)
 
 
-def section_operations(sessions: Sequence[Row]) -> JSON:
-    """Deduplicate copied sessions by block lineage and aggregate one section's sessions."""
+def distinct_sessions(sessions: Iterable[Row]) -> tuple[list[Row], int]:
+    """Copies of one physical session counted once, by block lineage.
+
+    Each copy group keeps the copy with the longest block, then the most completed cycles.
+    Returns the kept sessions in start order and the number of groups whose copies disagree
+    on completed cycles. Sessions need ``block_start``, ``block_lines`` and
+    ``rank_in_segment`` (see ``SESSIONS_SQL``).
+    """
     groups = defaultdict(list)
     for s in sessions:
         groups[_copy_key(s)].append(s)
@@ -463,6 +469,12 @@ def section_operations(sessions: Sequence[Row]) -> JSON:
             conflicts += 1
         kept.append(best)
     kept.sort(key=lambda s: (s["start_reading"] or "", s["object_sha256"], s["session_ordinal"]))
+    return kept, conflicts
+
+
+def section_operations(sessions: Sequence[Row]) -> JSON:
+    """Deduplicate copied sessions by block lineage and aggregate one section's sessions."""
+    kept, conflicts = distinct_sessions(sessions)
     out = {
         "official_sessions_raw": len(sessions),
         "official_sessions": len(kept),

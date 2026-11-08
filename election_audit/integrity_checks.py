@@ -44,6 +44,7 @@ import pyarrow.parquet as pq
 from election_audit import urn_pki
 from election_audit.elections import election_for_round
 from election_audit.national_migration import atomic, sha
+from election_audit.section_table import distinct_sessions
 from election_audit.semantic_pass import verified_bulk_archives
 from election_audit.types import JSON, Argv, Row, one
 
@@ -2107,7 +2108,7 @@ def run_correspondence(
 # --------------------------------------------------------------------------- I5–I7: logs
 
 
-LOGS_VERSION = "integrity-logs-v1"
+LOGS_VERSION = "integrity-logs-v2"
 CLOCK_RULES = {
     "R1": "at least one official voting session of the round",
     "R2": "the last official session has a closing reading",
@@ -2145,41 +2146,51 @@ def _witness_map(release: Path) -> dict[tuple[str, ...], list[Row]]:
     return mapping
 
 
+OFFICIAL_SQL = """
+WITH s AS (
+    SELECT {columns},
+           row_number() OVER (PARTITION BY object_sha256, stream_ordinal, segment_ordinal
+                              ORDER BY session_ordinal) AS rank_in_segment
+    FROM read_parquet($sessions)
+    WHERE session_kind = 'official_vota' AND session_round = $round
+)
+SELECT s.*, g.first_line_sha256 AS block_start, g.lines AS block_lines
+FROM s LEFT JOIN (SELECT object_sha256, stream_ordinal, segment_ordinal, first_line_sha256, lines
+                  FROM read_parquet($segments)) g
+     USING (object_sha256, stream_ordinal, segment_ordinal)
+"""
+OFFICIAL_COLUMNS = (
+    "object_sha256 stream_ordinal session_ordinal segment_ordinal device_id session_kind "
+    "session_round start_reading end_reading closing_reading reading_backsteps "
+    "orphan_completions cycles_completed_biometric cycles_completed_manual "
+    "cycles_completed_unknown cycles_unresolved_biometric cycles_unresolved_manual "
+    "cycles_unresolved_unknown"
+).split()
+
+
 def _official(
-    release: Path, digests: Collection[str], round_number: int
-) -> dict[tuple[str, ...], list[Row]]:
-    import pyarrow.compute as pc
+    release: Path, digests: Collection[str], round_number: int, memory_limit: str = "1GB"
+) -> dict[str, list[Row]]:
+    """Official sessions of the round per object, with the block each one starts in."""
+    import duckdb
 
-    columns = [
-        "object_sha256",
-        "stream_ordinal",
-        "session_ordinal",
-        "session_kind",
-        "session_round",
-        "start_reading",
-        "end_reading",
-        "closing_reading",
-        "reading_backsteps",
-        "orphan_completions",
-        "cycles_completed_biometric",
-        "cycles_completed_manual",
-        "cycles_completed_unknown",
-        "cycles_unresolved_biometric",
-        "cycles_unresolved_manual",
-        "cycles_unresolved_unknown",
-    ]
-    table = pq.read_table(release / "sessions.parquet", columns=columns)
-
-    table = table.filter(
-        pc.and_(  # ty: ignore[unresolved-attribute]  # generated at import
-            pc.equal(table["session_kind"], "official_vota"),  # ty: ignore[unresolved-attribute]
-            pc.equal(table["session_round"], round_number),  # ty: ignore[unresolved-attribute]
+    with duckdb.connect() as db:
+        db.execute(f"SET memory_limit = '{memory_limit}'")
+        db.execute("SET threads = 2")
+        cursor = db.execute(
+            OFFICIAL_SQL.format(columns=", ".join(OFFICIAL_COLUMNS)),
+            {
+                "sessions": str(release / "sessions.parquet"),
+                "segments": str(release / "segments.parquet"),
+                "round": round_number,
+            },
         )
-    )
-    sessions = defaultdict(list)
-    for s in table.to_pylist():
-        if s["object_sha256"] in digests:
-            sessions[s["object_sha256"]].append(s)
+        names = [d[0] for d in cursor.description]
+        sessions = defaultdict(list)
+        for values in cursor.fetchall():
+            s = dict(zip(names, values, strict=True))
+            if s["object_sha256"] in digests:
+                sessions[s["object_sha256"]].append(s)
     return sessions
 
 
@@ -2325,6 +2336,8 @@ def run_logs(
         "semantic_version": semantic_manifest["version"],
         "semantic_round1_manifest_sha256": sha(first / "manifest.json") if first else None,
         "rules": CLOCK_RULES,
+        "copies": "official sessions copied across memories of one urn (same device, block "
+        "start and rank in block) count once, as in the section table",
         "protected": "sections without a semantic-pass object (the 596 protected/stress logs, SA "
         "and unpublished logs) are reported as unavailable, never read",
     }
@@ -2369,7 +2382,8 @@ def run_logs(
             issues.append(
                 {"check": "I9", "kind": "several_log_objects", **base, "objects": len(objects)}
             )
-        found = [x for o in objects for x in official.get(o["object_sha256"], [])]
+        raw = [x for o in objects for x in official.get(o["object_sha256"], [])]
+        found, _ = distinct_sessions(raw)  # memory copies of one session count once
         completed = sum(
             x["cycles_completed_biometric"]
             + x["cycles_completed_manual"]
@@ -2406,6 +2420,7 @@ def run_logs(
                             "biometric": biometric,
                             "unresolved": unresolved,
                             "sessions": len(found),
+                            "copies_removed": len(raw) - len(found),
                         },
                         "bu": {"attended": bu["attended"], "biometric": bu["biometric"]},
                     }

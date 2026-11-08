@@ -772,6 +772,54 @@ class LogRuleTests(unittest.TestCase):
         ]
         self.assertEqual(clock_rules(last_open, "2026-10-25"), ["R2"])
 
+    def test_memory_copies_of_a_session_count_once(self) -> None:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        from election_audit.integrity_checks import OFFICIAL_COLUMNS, _official
+        from election_audit.section_table import distinct_sessions
+
+        def session(
+            stream: int, ordinal: int, device: str, start: str, done: int
+        ) -> dict[str, Any]:
+            values = dict.fromkeys(OFFICIAL_COLUMNS, 0) | {
+                "object_sha256": "obj",
+                "stream_ordinal": stream,
+                "session_ordinal": ordinal,
+                "segment_ordinal": 1,
+                "device_id": device,
+                "session_kind": "official_vota",
+                "session_round": 2,
+                "start_reading": start,
+                "end_reading": None,
+                "closing_reading": None,
+                "cycles_completed_manual": done,
+            }
+            return values
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            # Internal (MI) and external (ME) memories of one urn, the ME copy longer, then
+            # the replacement urn: the first urn's session counts once.
+            rows = [
+                session(0, 0, "u1", "2026-10-25T07:00:00", 64),
+                session(1, 1, "u1", "2026-10-25T07:00:00", 69),
+                session(2, 2, "u2", "2026-10-25T10:00:00", 155),
+            ]
+            pq.write_table(pa.Table.from_pylist(rows), root / "sessions.parquet")
+            segments = [
+                {"object_sha256": "obj", "stream_ordinal": s, "segment_ordinal": 1,
+                 "first_line_sha256": "b2" if s == 2 else "b1", "lines": 900 + s}
+                for s in range(3)
+            ]  # fmt: skip
+            pq.write_table(pa.Table.from_pylist(segments), root / "segments.parquet")
+            official = _official(root, {"obj"}, 2)
+            kept, conflicts = distinct_sessions(official["obj"])
+            self.assertEqual(len(official["obj"]), 3)
+            self.assertEqual([s["cycles_completed_manual"] for s in kept], [69, 155])
+            self.assertEqual(conflicts, 0)  # the kept, longer copy also has the most cycles
+            self.assertEqual(_official(root, {"other"}, 2), {})
+
     def test_round1_blocks_are_compared_block_by_block(self) -> None:
         import pyarrow as pa
         import pyarrow.parquet as pq
