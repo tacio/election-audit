@@ -226,6 +226,50 @@ class SessionMachineTests(unittest.TestCase):
         self.assertEqual(summary.markers[0]["reading"], "2026-10-25T08:00:03")
         self.assertEqual({m["segment_ordinal"] for m in summary.markers}, {1})
 
+    def test_package_checks_are_counted_and_failures_located(self) -> None:
+        load = "Verificação de assinatura de aplicação por etapa [1] - [Pacote: /bin/avbin.vst]"
+        body = timed_body(
+            [
+                ("25/10/2026", 0, "SCUE", f"{load} - [Arquivo: avbin] - [SUCESSO]"),
+                ("25/10/2026", 1, "SCUE", "Identificação do Modelo de Urna: UE2020"),
+                (
+                    "25/10/2026",
+                    2,
+                    "GAP",
+                    "Verificação de assinatura - Etapa [3] - [/lib/avlib.vst] - [ERRO]",
+                ),
+                (
+                    "25/10/2026",
+                    3,
+                    "GAP",
+                    "Verificação de assinatura - Etapa [4] - [/dsk/fi/estatico/o00407ac-ce.vsc] - [SUCESSO]",
+                ),
+                (
+                    "25/10/2026",
+                    4,
+                    "GAP",
+                    "Verificação de assinatura - Etapa [4] - [/dsk/fi/estatico/o00407ac-ce.vsc] - [SUCESSO]",
+                ),
+                ("25/10/2026", 5, "GAP", "Erro na verificação de assinatura do arquivo - vota.vsu"),
+            ]
+        )
+        with tempfile.TemporaryDirectory() as d:
+            original = Path(d) / "x.jez"
+            original.write_bytes(jez(body))
+            summary = sp.summarize_object(original, "x", 2)
+        self.assertEqual(
+            summary.packages,
+            {
+                ("UE2020", "SCUE", "aplicação", "/bin/avbin.vst", "avbin", "SUCESSO"): 1,
+                ("UE2020", "GAP", "startup", "/lib/avlib.vst", None, "ERRO"): 1,
+                ("UE2020", "GAP", "startup", "/dsk/fi/estatico/o#ac-ce.vsc", None, "SUCESSO"): 2,
+            },
+        )
+        self.assertEqual(
+            [(m["kind"], m["line"]) for m in summary.markers],
+            [("signature_error", 3), ("signature_error", 6)],
+        )
+
     def test_readings_are_validated_exactly(self) -> None:
         self.assertIsNone(sp.reading_seconds("31/02/2026 10:00:00"))
         self.assertIsNone(sp.reading_seconds("25/10/2026 24:00:00"))
@@ -294,7 +338,10 @@ class PassTests(unittest.TestCase):
         files = json.loads((self.output / "release" / "manifest.json").read_text())["files"]
         self.assertEqual(
             set(files),
-            {f"{n}.parquet" for n in ("objects", "sessions", "segments", "markers", "vocabulary")},
+            {
+                f"{n}.parquet"
+                for n in ("objects", "sessions", "segments", "markers", "packages", "vocabulary")
+            },
         )
         with self.assertRaises(FileExistsError):
             self.run_pass(shard_objects=2)

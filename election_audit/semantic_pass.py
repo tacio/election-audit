@@ -161,6 +161,25 @@ MARKERS = {
     ("VOTA", "Urna pronta para receber votos"): "ready",
     ("SA", "Imprimindo relatório [ZERÉSIMA DE APURAÇÃO]"): "sa_zeresima",
 }
+# Signature or integrity failures (any application), kept as markers to locate them.
+SIGNATURE_WORDS, FAILURE_WORDS = ("assinatura", "integridade"), ("erro", "falha", "inconsistente")
+# Package signature verification lines: SCUE at load, GAP at every start-up.
+PACKAGE_CHECK = re.compile(
+    r"Verificação de assinatura (?:de (aplicação|dado) por etapa|- Etapa) \[\d+\] - "
+    r"\[(?:Pacote: )?([^\]]+)\](?: - \[Arquivo: ([^\]]*)\])? - \[([A-Z]+)\]"
+)
+PACKAGE_SCHEMA = pa.schema(
+    [
+        ("model", pa.string()),  # urn model the stream reports, or null
+        ("application", pa.string()),
+        ("stage", pa.string()),  # aplicação | dado (load, SCUE) | startup (GAP)
+        ("path", pa.string()),  # exact, except digits masked in data (.vsc) names
+        ("file", pa.string()),
+        ("result", pa.string()),
+        ("events", pa.int64()),
+        ("objects", pa.int64()),
+    ]
+)
 MARKER_SCHEMA = pa.schema(
     [
         ("object_sha256", pa.string()),
@@ -168,7 +187,7 @@ MARKER_SCHEMA = pa.schema(
         ("segment_ordinal", pa.int32()),
         ("session_ordinal", pa.int32()),  # null outside a session
         ("device_id", pa.string()),
-        ("kind", pa.string()),  # MARKERS values, or "other" for any other zerésima template
+        ("kind", pa.string()),  # MARKERS values, "other" (zerésima) or "signature_error"
         ("template", pa.string()),  # digit-masked
         ("line", pa.int64()),  # line number in the object (file order)
         ("reading", pa.string()),
@@ -323,6 +342,8 @@ class ObjectSummary:
         self.segment_completions = 0
         self.kinds, self.vocabulary = Counter(), Counter()
         self.vocabulary_overflow = 0
+        self.packages: Counter[tuple[str | None, str, str, str, str | None, str]] = Counter()
+        self._stream_packages: Counter[tuple[str, str, str, str | None, str]] = Counter()
         self.lines = self.events = self.malformed = self.members = 0
         self.orphans_without_session = 0
         self.stream_ordinal = -1
@@ -453,9 +474,17 @@ class ObjectSummary:
             if before is not None and after is not None:
                 clock["tz_shift"] += after - before
 
+    def _flush_packages(self) -> None:
+        """A stream is one urn: its package checks take the model it reports (SCUE logs the
+        checks before the model line)."""
+        for key, count in self._stream_packages.items():
+            self.packages[(self.clock["model"], *key)] += count
+        self._stream_packages.clear()
+
     def _new_stream(self, key: tuple[Sequence[Segment], str], device: str, path: str) -> None:
         if self.stream is not None:
             self._finish_session("stream_end")
+        self._flush_packages()
         self._close_segment()
         self.stream, self.phase = key, None
         self.clock = {"model": None, "adh": 0, "adh_shift": 0, "tz": 0, "tz_shift": 0, "dst": 0}
@@ -580,7 +609,25 @@ class ObjectSummary:
             self._last_reading = None
         session = self.session
         marker = MARKERS.get(template)
-        if marker is not None or "zerésima" in template[1].lower():
+        lowered = template[1].lower()
+        if marker is None and "zerésima" in lowered:
+            marker = "other"
+        elif (
+            marker is None
+            and any(w in lowered for w in SIGNATURE_WORDS)
+            and any(w in lowered for w in FAILURE_WORDS)
+        ):
+            marker = "signature_error"
+        if message.startswith("Verificação de assinatura") and (
+            found := PACKAGE_CHECK.match(message)
+        ):
+            path, file = found[2], found[3]
+            if path.endswith(".vsc") or found[1] == "dado":
+                path = DIGITS.sub("#", path)
+                file = DIGITS.sub("#", file) if file is not None else None
+            stage = found[1] or "startup"
+            self._stream_packages[(application, stage, path, file, found[4])] += 1
+        if marker is not None:
             self.markers.append(
                 {
                     "object_sha256": self.sha,
@@ -588,7 +635,7 @@ class ObjectSummary:
                     "segment_ordinal": segment["segment_ordinal"],
                     "session_ordinal": None if session is None else session["session_ordinal"],
                     "device_id": device,
-                    "kind": marker or "other",
+                    "kind": marker,
                     "template": template[1],
                     "line": self.lines,
                     "reading": iso_reading(reading),
@@ -711,6 +758,7 @@ class ObjectSummary:
     def finish(self) -> None:
         if self.stream is not None:
             self._finish_session("stream_end")
+        self._flush_packages()
         self._close_segment()
 
 
@@ -884,6 +932,8 @@ def run_shard(
 ) -> tuple[int, int, int]:
     staged_root, round_number, shard_dir, index, items, bodies, year = task
     sessions, segments, markers, objects, vocabulary = [], [], [], [], Counter()
+    packages: Counter[tuple[Any, ...]] = Counter()
+    package_objects: Counter[tuple[Any, ...]] = Counter()
     for position, item in enumerate(items):
         if bodies is None:
             assert staged_root is not None  # staged shards carry their root
@@ -908,6 +958,8 @@ def run_shard(
         sessions.extend(summary.sessions)
         segments.extend(summary.segments)
         markers.extend(summary.markers)
+        packages.update(summary.packages)
+        package_objects.update(summary.packages.keys())
         for (application, template), count in summary.vocabulary.items():
             vocabulary[(application, template)] += count
         row.update(
@@ -933,6 +985,9 @@ def run_shard(
     _write(temporary / "objects.parquet", objects, OBJECT_SCHEMA)
     (temporary / "vocabulary.json").write_text(
         json.dumps(sorted([a, t, c] for (a, t), c in vocabulary.items()))
+    )
+    (temporary / "packages.json").write_text(
+        json.dumps(sorted([*k, packages[k], package_objects[k]] for k in packages), default=str)
     )
     final = Path(shard_dir) / f"{index:05d}"
     os.replace(temporary, final)
@@ -1137,6 +1192,20 @@ def merge(output: Path, shards: Sequence[Sequence[Row]], binding: JSON, excluded
         temporary / "vocabulary.parquet",
         compression="zstd",
     )
+    packages: Counter[tuple[Any, ...]] = Counter()
+    package_objects: Counter[tuple[Any, ...]] = Counter()
+    for index in range(len(shards)):
+        for *key, events, objects_ in json.loads(
+            (output / "shards" / f"{index:05d}" / "packages.json").read_text()
+        ):
+            packages[tuple(key)] += events
+            package_objects[tuple(key)] += objects_
+    names = ("model", "application", "stage", "path", "file", "result")
+    package_rows = [
+        {**dict(zip(names, k, strict=True)), "events": packages[k], "objects": package_objects[k]}
+        for k in sorted(packages, key=lambda k: tuple("" if v is None else v for v in k))
+    ]
+    _write(temporary / "packages.parquet", package_rows, PACKAGE_SCHEMA)
     objects = pq.read_table(temporary / "objects.parquet", columns=["status"]).column(0)
     errors = sum(1 for value in objects.to_pylist() if value != "complete")
     files = {
@@ -1150,6 +1219,7 @@ def merge(output: Path, shards: Sequence[Sequence[Row]], binding: JSON, excluded
         "sessions": counts["sessions"],
         "segments": counts["segments"],
         "markers": counts["markers"],
+        "package_rows": len(package_rows),
         "vocabulary_templates": len(rows),
         "files": files,
         "readings": "local urn clock readings; not normalized times",
