@@ -35,9 +35,11 @@ import shutil
 import sqlite3
 import zipfile
 from collections import Counter, defaultdict
+from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from functools import lru_cache
 from importlib.resources import files
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import pyarrow as pa
 import pyarrow.csv as pacsv
@@ -47,7 +49,11 @@ from election_audit.elections import election_for_round
 from election_audit.features import verified_member_sections
 from election_audit.national_migration import atomic, sha
 from election_audit.source_inventory import digest
-from election_audit.types import one
+from election_audit.types import JSON, Argv, Row, one
+
+if TYPE_CHECKING:
+    import duckdb
+type Connection = duckdb.DuckDBPyConnection
 
 VERSION = "section-features-v4"
 SESSIONS_VERSION = "session-aggregates-v4"
@@ -91,7 +97,7 @@ SCHOOLING = range(1, 9)  # 1 illiterate ... 8 higher education complete; others 
 # --------------------------------------------------------------------------- inputs
 
 
-def _manifest_files(root, pattern):
+def _manifest_files(root: str | Path, pattern: re.Pattern[str]) -> list[Row]:
     """Complete files of an input root matching ``pattern``, size-checked."""
     root = Path(root)
     uri = (root / "manifest.sqlite").resolve().as_uri() + "?mode=ro&immutable=1"
@@ -111,7 +117,12 @@ def _manifest_files(root, pattern):
     return found
 
 
-def _stream_csv(archive, member, columns, rename=None):
+def _stream_csv(
+    archive: str | Path,
+    member: str,
+    columns: Sequence[str],
+    rename: Mapping[str, str] | None = None,
+) -> Iterator[pa.Table]:
     """Yield arrow batches of selected string columns of one CSV member."""
     with zipfile.ZipFile(archive) as z, z.open(member) as stream:
         reader = pacsv.open_csv(
@@ -130,7 +141,7 @@ def _stream_csv(archive, member, columns, rename=None):
             yield table
 
 
-def _csv_members(archive, exclude=()):
+def _csv_members(archive: str | Path, exclude: Collection[str] = ()) -> list[str]:
     with zipfile.ZipFile(archive) as z:
         return [
             n
@@ -139,7 +150,7 @@ def _csv_members(archive, exclude=()):
         ]
 
 
-def _insert(db, table, name) -> None:
+def _insert(db: Connection, table: str, name: str) -> None:
     db.register("batch", table)
     db.execute(f"INSERT INTO {name} SELECT * FROM batch")
     db.unregister("batch")
@@ -157,7 +168,9 @@ BWEB_YEAR_FIELDS = {
 }
 
 
-def load_bweb(db, root, year, round_number, ufs):
+def load_bweb(
+    db: Connection, root: str | Path, year: int, round_number: int, ufs: Collection[str] | None
+) -> list[Row]:
     files = [
         f
         for f in _manifest_files(root, BWEB_FILE)
@@ -180,19 +193,19 @@ def load_bweb(db, root, year, round_number, ufs):
     return [{k: f[k] for k in ("path", "sha256", "bytes")} for f in files]
 
 
-def _when(column) -> str:
+def _when(column: str) -> str:
     return (
         f"strftime(coalesce(try_strptime({column}, '%Y-%m-%d %H:%M:%S'), "
         f"try_strptime({column}, '%d/%m/%Y %H:%M:%S')), '%Y-%m-%dT%H:%M:%S')"
     )
 
 
-def _single(expression) -> str:
+def _single(expression: str) -> str:
     """The value when all rows agree, else NULL (variants are counted separately)."""
     return f"CASE WHEN count(DISTINCT {expression}) = 1 THEN min({expression}) END"
 
 
-def results_sql(round_number) -> str:
+def results_sql(round_number: int) -> str:
     k = (
         "lower(SG_UF) AS uf, lpad(CD_MUNICIPIO, 5, '0') AS municipality, "
         "lpad(NR_ZONA, 4, '0') AS zone, lpad(NR_SECAO, 4, '0') AS section"
@@ -242,7 +255,7 @@ def results_sql(round_number) -> str:
     """
 
 
-def compositions(db, round_number):
+def compositions(db: Connection, round_number: int) -> int:
     """Member sections of each principal, from the BWEB composition text."""
     rows, errors = [], 0
     for uf, municipality, zone, section, raw in db.execute(
@@ -271,7 +284,9 @@ PROFILE_FIELDS = {
 }
 
 
-def load_profile(db, root, year, ufs):
+def load_profile(
+    db: Connection, root: str | Path, year: int, ufs: Collection[str] | None
+) -> list[Row]:
     files = [
         f
         for f in _manifest_files(root, PROFILE_FILE)
@@ -348,7 +363,9 @@ PLACE_FIELDS = (
 ).split()
 
 
-def load_places(db, root, year, ufs):
+def load_places(
+    db: Connection, root: str | Path, year: int, ufs: Collection[str] | None
+) -> list[Row]:
     files = [f for f in _manifest_files(root, PLACES_FILE) if int(f["match"][1]) == year]
     if len(files) != 1:
         raise ValueError(f"Expected one polling-place archive for {year}, found {len(files)}")
@@ -415,18 +432,18 @@ LEFT JOIN (SELECT object_sha256, stream_ordinal, segment_ordinal, first_line_sha
 """
 
 
-def _copy_key(s):
+def _copy_key(s: Row) -> tuple[Any, ...]:
     """Copies of one physical session: same device, same block start, same rank in block."""
     if s["block_start"] is None:
         return ("unlinked", s["object_sha256"], s["stream_ordinal"], s["session_ordinal"])
     return (s["device_id"], s["block_start"], s["rank_in_segment"])
 
 
-def _completed(s):
+def _completed(s: Row) -> int:
     return sum(s[f"cycles_completed_{m}"] for m in METHODS)
 
 
-def section_operations(sessions):
+def section_operations(sessions: Sequence[Row]) -> JSON:
     """Deduplicate copied sessions by block lineage and aggregate one section's sessions."""
     groups = defaultdict(list)
     for s in sessions:
@@ -505,12 +522,12 @@ def section_operations(sessions):
     return out
 
 
-def _seconds(reading):
+def _seconds(reading: str) -> int:
     """Seconds of day for an ISO reading (sessions never cross midnight once on-day)."""
     return int(reading[11:13]) * 3600 + int(reading[14:16]) * 60 + int(reading[17:19])
 
 
-def load_operations(db, release, round_number):
+def load_operations(db: Connection, release: str | Path, round_number: int) -> JSON:
     """Witness and official-session tables of one round (kept in DuckDB)."""
     release = Path(release) / "release"
     manifest = json.loads((release / "manifest.json").read_text())
@@ -544,7 +561,9 @@ def load_operations(db, release, round_number):
     }
 
 
-def uf_operations(db, round_number, uf, municipalities):
+def uf_operations(
+    db: Connection, round_number: int, uf: str, municipalities: Sequence[str]
+) -> tuple[dict[tuple[str, ...], Any], dict[tuple[str, ...], JSON]]:
     """Witness statuses and deduplicated operations of some of one UF's municipalities."""
     witnessed = defaultdict(set)
     for municipality, zone, section, status in db.execute(
@@ -577,13 +596,15 @@ def uf_operations(db, round_number, uf, municipalities):
 
 
 @lru_cache(maxsize=1)
-def am_acre_time():
+def am_acre_time() -> frozenset[str]:
     """TSE codes of the Amazonas municipalities on Acre time (UTC-5), per TRE-AM."""
     raw = files("election_audit").joinpath("resources/am-acre-time-municipalities.json")
     return frozenset(json.loads(raw.read_bytes())["municipalities"])
 
 
-def close_rules(sections, municipality_names):
+def close_rules(
+    sections: Iterable[Row], municipality_names: Mapping[tuple[str, str], str]
+) -> dict[tuple[str, str], tuple[str, str | None]]:
     """Expected closing hour (local clock) per (uf, municipality), with the rule used."""
     observed = defaultdict(set)
     for row in sections:
@@ -611,7 +632,7 @@ def close_rules(sections, municipality_names):
     return rules
 
 
-def clock_state(operations, expected, election_date) -> str:
+def clock_state(operations: JSON | None, expected: str | None, election_date: str) -> str:
     """Classify a section's clock evidence; time-of-day measures need ok or adjusted."""
     if operations is None or not operations["official_sessions"]:
         return "no_sessions"
@@ -652,7 +673,7 @@ INTEGRITY_COLUMNS = (
 )
 
 
-def load_integrity(db, roots, round_number):
+def load_integrity(db: Connection, roots: Mapping[str, str | Path], round_number: int) -> JSON:
     """Phase 20 per-section status and BU-side device fields (2026), one table per round."""
     sections = Path(roots["sections"]) / "release" / "sections.parquet"
     logs = Path(roots["logs"]) / "release" / "sections.parquet"
@@ -691,17 +712,19 @@ def load_integrity(db, roots, round_number):
 # --------------------------------------------------------------------------- build
 
 
-def _rows(db, sql, parameters=None):
+def _rows(db: Connection, sql: str, parameters: Sequence[Any] | None = None) -> list[Row]:
     cursor = db.execute(sql, parameters or [])
     names = [d[0] for d in cursor.description]
     return [dict(zip(names, r)) for r in cursor.fetchall()]
 
 
-def _keyed(rows):
+def _keyed(rows: Iterable[Row]) -> dict[tuple[Any, ...], Row]:
     return {tuple(r[k] for k in KEY): r for r in rows}
 
 
-def _state(ready, reason=None, partial=False):
+def _state(
+    ready: object, reason: str | None = None, partial: bool = False
+) -> tuple[str, str | None]:
     if ready:
         return ("partial" if partial else "ready"), None
     return "unavailable", reason
@@ -713,7 +736,9 @@ CHUNK_SECTIONS = 10000
 CHUNK = "uf = ? AND list_contains(?, municipality)"
 
 
-def _chunks(sizes, ufs, limit):
+def _chunks(
+    sizes: Iterable[tuple[Any, ...]], ufs: Collection[str] | None, limit: int
+) -> Iterator[tuple[Any, list[Any]]]:
     """(uf, [municipality, ...]) groups of whole municipalities, in UF and municipality order."""
     current, municipalities, total = None, [], 0
     for uf, municipality, n in sizes:
@@ -730,18 +755,18 @@ def _chunks(sizes, ufs, limit):
 
 
 def build(
-    year,
-    bweb_root,
-    electorate_root,
-    semantic,
-    output,
+    year: int,
+    bweb_root: str | Path,
+    electorate_root: str | Path,
+    semantic: Mapping[int, str | Path],
+    output: str | Path,
     *,
-    integrity=None,
-    exclusions_path=None,
-    ufs=None,
-    memory_limit="1GB",
-    chunk_sections=CHUNK_SECTIONS,
-):
+    integrity: Mapping[int, Mapping[str, str | Path]] | None = None,
+    exclusions_path: str | Path | None = None,
+    ufs: Collection[str] | None = None,
+    memory_limit: str = "1GB",
+    chunk_sections: int = CHUNK_SECTIONS,
+) -> JSON:
     import duckdb
 
     output = Path(output).expanduser().absolute()
@@ -815,7 +840,15 @@ def build(
     return _publish(output, work, binding, totals, composition_errors)
 
 
-def uf_rows(db, uf, year, protected, place_rounds, with_integrity, municipalities):
+def uf_rows(
+    db: Connection,
+    uf: str,
+    year: int,
+    protected: Collection[tuple[str, ...]],
+    place_rounds: Mapping[Any, Any],
+    with_integrity: bool,
+    municipalities: Sequence[str],
+) -> tuple[list[Row], list[Row], list[Row]]:
     """Section rows of both rounds, their restricted measures and units, for some of one UF's
     municipalities. Close rules and harmonized units never cross a municipality."""
     chunk = [uf, municipalities]
@@ -885,22 +918,22 @@ def uf_rows(db, uf, year, protected, place_rounds, with_integrity, municipalitie
 
 
 def _section_row(
-    key,
-    year,
-    round_number,
-    election_date,
-    result,
-    place,
-    place_round,
-    member_list,
-    unknown_composition,
-    profile,
-    witness,
-    ops,
-    is_protected,
-    checks,
-):
-    row = dict(zip(KEY, key))
+    key: tuple[str, ...],
+    year: int,
+    round_number: int,
+    election_date: str,
+    result: Row | None,
+    place: Row | None,
+    place_round: Any,
+    member_list: Sequence[str] | None,
+    unknown_composition: bool,
+    profile: Mapping[tuple[str, ...], Row],
+    witness: Any,
+    ops: JSON | None,
+    is_protected: bool,
+    checks: Row,
+) -> Row:
+    row: Row = dict(zip(KEY, key))
     row.update(year=year, round=round_number)
     member_list = sorted(member_list or [key[3]])
     row["members_json"] = json.dumps(member_list)
@@ -929,9 +962,10 @@ def _section_row(
     row["bweb_metadata_variants"] = (result or {}).get("metadata_variants")
     # Covariates: the members' voter profile summed into the principal, all or nothing.
     found = [profile.get((key[0], key[1], key[2], m)) for m in member_list]
-    complete = all(p is not None for p in found)
+    present = [p for p in found if p is not None]
+    complete = len(present) == len(found)
     for name in PROFILE_COLUMNS:
-        row[f"profile_{name}"] = sum(p[name] or 0 for p in found) if complete else None
+        row[f"profile_{name}"] = sum(p[name] or 0 for p in present) if complete else None
     row["profile_members_missing"] = sum(1 for p in found if p is None)
     row["profile_state"], row["profile_reason"] = _state(complete, "missing_input")
     if is_protected:
@@ -985,7 +1019,7 @@ OPERATION_FIELDS = (
 )
 
 
-def _finish(row, rule, expected):
+def _finish(row: Row, rule: str, expected: str | None) -> Row:
     """Close rule, clock state and availability; returns the restricted measures."""
     ops, result = row.pop("_ops"), row.pop("_result")
     election_date = row.pop("_election_date")
@@ -1017,7 +1051,7 @@ def _finish(row, rule, expected):
     return _restricted(row, result, ops, expected if timed else None)
 
 
-def _restricted(row, result, ops, expected):
+def _restricted(row: Row, result: Row | None, ops: JSON | None, expected: str | None) -> Row:
     out = {k: row[k] for k in (*KEY, "year", "round")}
     for name in (
         "eligible",
@@ -1060,18 +1094,18 @@ def _restricted(row, result, ops, expected):
 # --------------------------------------------------------------------------- crosswalk
 
 
-def harmonize(section_rows, restricted_rows, year):
+def harmonize(section_rows: Sequence[Row], restricted_rows: Sequence[Row], year: int) -> list[Row]:
     """Connected components of (registered section) - (principal, round) links."""
     parent = {}
 
-    def find(x):
+    def find(x: tuple[Any, ...]) -> tuple[Any, ...]:
         parent.setdefault(x, x)
         while parent[x] != x:
             parent[x] = parent[parent[x]]
             x = parent[x]
         return x
 
-    def union(a, b) -> None:
+    def union(a: tuple[Any, ...], b: tuple[Any, ...]) -> None:
         ra, rb = find(a), find(b)
         if ra != rb:
             parent[max(ra, rb)] = min(ra, rb)
@@ -1129,7 +1163,7 @@ def harmonize(section_rows, restricted_rows, year):
 # --------------------------------------------------------------------------- publish
 
 
-def _table(rows):
+def _table(rows: Sequence[Row]) -> pa.Table:
     names = list(rows[0])
     return pa.Table.from_pylist([{k: r.get(k) for k in names} for r in rows])
 
@@ -1137,7 +1171,7 @@ def _table(rows):
 LEDGER_FAMILIES = ("results", "profile", "device", "operations", "timing")
 
 
-def ledger(db, sections, units):
+def ledger(db: Connection, sections: Path, units: Path) -> JSON:
     """Population counts by round and UF: availability, log status, clock state, model."""
     out = {}
     for name in (
@@ -1169,7 +1203,13 @@ def ledger(db, sections, units):
     return out
 
 
-def _publish(output, work, binding, totals, composition_errors):
+def _publish(
+    output: Path,
+    work: Path,
+    binding: JSON,
+    totals: Mapping[str, int],
+    composition_errors: dict[int, int],
+) -> JSON:
     import duckdb
 
     release = output / ".release.tmp"
@@ -1237,7 +1277,7 @@ def _publish(output, work, binding, totals, composition_errors):
 # --------------------------------------------------------------------------- CLI
 
 
-def section_table_main(argv=None) -> int:
+def section_table_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit section-table", description=__doc__.splitlines()[0]
     )
