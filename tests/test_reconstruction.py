@@ -7,6 +7,7 @@ import shutil
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from test_archive_parsing import archive_bytes, log_line
@@ -31,20 +32,22 @@ from election_audit.reconstruction import (
 from election_audit.snapshots import create_snapshot
 from election_audit.source_inventory import identity
 
+type Event = dict[str, Any]
+
 
 def event(
-    line,
-    kind="authorization_message",
+    line: int,
+    kind: str = "authorization_message",
     *,
-    member="logd.dat",
-    source="a",
-    time="08:00:00",
-    date="25/10/2026",
-    device="1234",
-    physical=None,
-    observation="obs",
-    package="pkg",
-):
+    member: str = "logd.dat",
+    source: str = "a",
+    time: str = "08:00:00",
+    date: str = "25/10/2026",
+    device: str | None = "1234",
+    physical: str | None = None,
+    observation: str = "obs",
+    package: str = "pkg",
+) -> Event:
     sha = hashlib.sha256(source.encode()).hexdigest()
     raw = physical or f"{date} {time}\tINFO\t{device}\tVOTA\t{kind}\t\n"
     return {
@@ -68,7 +71,7 @@ def event(
     }
 
 
-def document():
+def document() -> dict[str, Any]:
     return {
         "snapshot_id": "snap",
         "context_tables": {
@@ -78,7 +81,7 @@ def document():
     }
 
 
-def claim(events, **values):
+def claim(events: list[Event], **values: Any) -> dict[str, Any]:
     return {
         "rule_id": "fixture-reviewed-v1",
         "review_state": "reviewed",
@@ -90,11 +93,11 @@ def claim(events, **values):
     }
 
 
-def evidence(**values):
+def evidence(**values: Any) -> dict[str, Any]:
     return {"version": EVIDENCE_VERSION, **values}
 
 
-def official(events, **values):
+def official(events: list[Event], **values: Any) -> dict[str, Any]:
     return claim(
         events,
         event_ids=[e["event_id"] for e in events],
@@ -198,12 +201,14 @@ class SessionTests(unittest.TestCase):
 
 
 class CycleTests(unittest.TestCase):
-    def cycles(self, source, rules=None):
+    def cycles(
+        self, source: list[Event], rules: list[dict[str, Any]] | None = None
+    ) -> dict[str, Any]:
         return reconstruct_cycles(
             reconstruct_sessions(document(), source, evidence=evidence(semantics=rules or []))
         )
 
-    def semantic(self, source, kind):
+    def semantic(self, source: Event, kind: str) -> dict[str, Any]:
         return claim([source], event_id=source["event_id"], kind=kind)
 
     def test_baseline_and_repeated_authorizations_completion_orphans(self) -> None:
@@ -283,7 +288,7 @@ class CycleTests(unittest.TestCase):
         self.assertIn("unsupported_intervening_event", cycles[0]["uncertainty"]["reasons"])
 
 
-def clock_rule(source, **values):
+def clock_rule(source: list[Event], **values: Any) -> dict[str, Any]:
     return claim(
         source,
         event_ids=[e["event_id"] for e in source],
@@ -294,7 +299,12 @@ def clock_rule(source, **values):
     )
 
 
-def timed_bundle(source, *, clock=None, semantics=None):
+def timed_bundle(
+    source: list[Event],
+    *,
+    clock: list[dict[str, Any]] | None = None,
+    semantics: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     rules = evidence(segments=[official(source)], clocks=clock or [], semantics=semantics or [])
     bundle = reconstruct_cycles(reconstruct_sessions(document(), source, evidence=rules))
     return normalize_clocks(bundle, document())
@@ -445,7 +455,7 @@ class SummaryTests(unittest.TestCase):
 
 
 class PublicationTests(SourceFixture):
-    def frozen_parse(self):
+    def frozen_parse(self) -> tuple[Path, Path, Path]:
         self.record_section()
         self.advertise()
         self.save_index([{"ns": "0001"}])

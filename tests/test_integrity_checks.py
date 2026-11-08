@@ -9,11 +9,13 @@ import sqlite3
 import tempfile
 import unittest
 import zipfile
+from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
+from typing import Any
 
 FIXTURE = Path(__file__).parent / "fixtures/integrity-2026"
 PREFIX = "o03221ac0101500020088"
-ITEM = {
+ITEM: dict[str, Any] = {
     "archive": "files/bu_imgbu_logjez_rdv_vscmr_2026_2t_AC.zip",
     "key": ["ac", "01015", "0002", "0088"],
     "members": {
@@ -43,7 +45,9 @@ class SectionCheckTests(unittest.TestCase):
             for k in ITEM["members"]
         }
 
-    def check(self, blobs=None, published=None):
+    def check(
+        self, blobs: dict[str, bytes] | None = None, published: dict[str, bytes] | None = None
+    ) -> tuple[Any, ...]:
         return self.ic.check_section(ITEM, blobs or self.blobs, published or self.published, 3221)
 
     def test_real_section_passes_every_check(self) -> None:
@@ -106,7 +110,7 @@ class SectionCheckTests(unittest.TestCase):
         self.assertEqual((row["bu_status"], row["rdv_status"], row["vsc_status"]), ("error",) * 3)
         self.assertEqual(contests, [])
 
-    def ecdsa_vsc(self, files, tamper=False):
+    def ecdsa_vsc(self, files: Mapping[str, bytes], tamper: bool = False) -> bytes:
         """A signature file in the observed 2026 layout, signed with a fresh P-521 key."""
         import datetime
 
@@ -128,7 +132,7 @@ class SectionCheckTests(unittest.TestCase):
             .sign(key, hashes.SHA512())
         )
 
-        def signed(digest):
+        def signed(digest: bytes) -> dict[str, Any]:
             return {
                 "tamanho": 1,
                 "hash": digest,
@@ -149,7 +153,7 @@ class SectionCheckTests(unittest.TestCase):
         if tamper:
             auto["assinatura"] = key.sign(b"other", ec.ECDSA(hashes.SHA512()))
 
-        def side(algorithm, certificate=None):
+        def side(algorithm: str, certificate: Any = None) -> dict[str, Any]:
             part = {
                 "dataHoraCriacao": "20261025T150320",
                 "versao": 2,
@@ -186,6 +190,7 @@ class SectionCheckTests(unittest.TestCase):
         files = {"o1-bu.dat": b"bu bytes", "o1-log.jez": b"log bytes"}
         published = {n: hashlib.sha512(b).digest() for n, b in files.items()}
         row, verify = self.ic.check_signatures(self.ecdsa_vsc(files), published, "2026-10-25")
+        assert verify is not None
         self.assertEqual((row["i1_signature_math"], row["i1_file_signatures_ok"]), ("verified", 2))
         self.assertEqual((row["cert_issuer"], row["cert_valid_at_election"]), ("AC URNA", True))
         self.assertTrue(verify(published["o1-bu.dat"], b"\x30\x00") is False)
@@ -252,7 +257,7 @@ class Ed521Tests(unittest.TestCase):
 class Ed521rsParityTests(unittest.TestCase):
     """``ed521rs`` (used by the section pass) gives ``election_audit.ed521``'s verdicts."""
 
-    def cases(self):
+    def cases(self) -> Iterator[tuple[bytes, bytes, bytes]]:
         import random
 
         from election_audit import ed521
@@ -322,9 +327,11 @@ class UrnEd521Tests(unittest.TestCase):
             "assinaturaHW"
         ]
         certificate = x509.load_pem_x509_certificate(self.hardware["informacaoChave"][1])
-        self.key = ed521.certificate_public_key(certificate.public_bytes(Encoding.DER))
+        key = ed521.certificate_public_key(certificate.public_bytes(Encoding.DER))
+        assert key is not None
+        self.key = key
 
-    def signed(self, digest, signature):
+    def signed(self, digest: bytes, signature: bytes) -> bool:
         return self.ed521.verify(self.key, signature, hashlib.sha512(digest).digest())
 
     def test_self_and_file_signatures_verify(self) -> None:
@@ -360,9 +367,10 @@ class UrnEd521Tests(unittest.TestCase):
         row, _ = self.ic.check_signatures(codec.encode(self.ic.SIGNATURE_TYPE, entity), {})
         self.assertEqual(row["i1_signature_math"], "failed")
         row, verify = self.ic.check_signatures(self.raw, {})
+        assert verify is not None
         self.assertEqual(row["i1_signature_math"], "verified")
         self.assertEqual(row["ed521_ecpy_disagreements"], 0)
-        self.assertFalse(verify(b"\x00" * 64, signature))
+        self.assertFalse(verify(b"\x00" * 64, bytes(signature)))
 
     def test_other_key_types_have_no_ed521_key(self) -> None:
         from cryptography import x509
@@ -405,7 +413,7 @@ class SectionPassTests(unittest.TestCase):
             db.commit()
         self.output = Path(self.temp.name) / "out"
 
-    def run_pass(self, **options):
+    def run_pass(self, **options: Any) -> dict[str, Any]:
         from election_audit.integrity_checks import run_sections
 
         return run_sections(
@@ -446,7 +454,9 @@ class SectionPassTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Duplicate bu"):
             section_work_list(self.bulk, [archive], 2026, 2)
 
-    def write_bweb(self, root, change=None):
+    def write_bweb(
+        self, root: Path, change: Callable[[list[dict[str, Any]]], None] | None = None
+    ) -> Path:
         """A BWEB archive built from the fixture BU, optionally with one value changed."""
         import csv
         import io
@@ -461,10 +471,10 @@ class SectionPassTests(unittest.TestCase):
         envelope = codec().decode("EntidadeEnvelopeGenerico", raw)
         contests = bu_contests(codec().decode("EntidadeBoletimUrna", envelope["conteudo"]))
 
-        def stamp(v) -> str:
+        def stamp(v: str) -> str:
             return f"{v[:4]}-{v[4:6]}-{v[6:8]} {v[9:11]}:{v[11:13]}:{v[13:15]}"
 
-        rows = []
+        rows: list[dict[str, Any]] = []
         for (election, cargo), contest in contests.items():
             for (cls, number), count in sorted(contest["entries"].items()):
                 rows.append(
@@ -529,7 +539,7 @@ class SectionPassTests(unittest.TestCase):
         self.assertEqual(same["summary"]["i2"], {"equal": 2})
         self.assertEqual(same["discrepancy_kinds"], {})
 
-        def change(rows) -> None:
+        def change(rows: list[dict[str, Any]]) -> None:
             rows[0]["QT_VOTOS"] = str(int(rows[0]["QT_VOTOS"]) + 1)
             for row in rows:
                 row["CD_FLASHCARD_URNA_EFETIVADA"] = "00000000"
@@ -553,7 +563,7 @@ class SectionPassTests(unittest.TestCase):
                 self.output, Path(self.temp.name) / "bweb", Path(self.temp.name) / "i2", ufs=["ac"]
             )
 
-    def write_ea20(self, root, bump=0, voided=None):
+    def write_ea20(self, root: Path, bump: int = 0, voided: int | None = None) -> Path:
         """A one-municipality EA20 tree whose totals come from the fixture BU."""
         from election_audit.binary_bu import codec
         from election_audit.integrity_checks import bu_contests
@@ -628,7 +638,7 @@ class SectionPassTests(unittest.TestCase):
         self.run_pass()
         section = pq.read_table(self.output / "release/sections.parquet").to_pylist()[0]
 
-        def write(root, serial):
+        def write(root: Path, serial: str) -> Path:
             row = {
                 "CD_PLEITO": "3221",
                 "SG_UF": "AC",
@@ -684,7 +694,7 @@ class RdvBlockTests(unittest.TestCase):
     def test_repeated_contest_blocks_are_summed(self) -> None:
         from election_audit.integrity_checks import rdv_contests
 
-        def block(votes, choices=1):
+        def block(votes: list[Any], choices: int = 1) -> dict[str, Any]:
             return {
                 "idCargo": ("cargoConstitucional", "presidente"),
                 "quantidadeEscolhas": choices,
@@ -717,7 +727,7 @@ class RdvBlockTests(unittest.TestCase):
 
 
 class LogRuleTests(unittest.TestCase):
-    def session(self, **values):
+    def session(self, **values: Any) -> dict[str, Any]:
         base = {
             "stream_ordinal": 0,
             "session_ordinal": 0,
@@ -769,7 +779,7 @@ class LogRuleTests(unittest.TestCase):
         from election_audit.integrity_checks import round1_statuses
         from election_audit.semantic_pass import OBJECT_SCHEMA, SEGMENT_SCHEMA
 
-        def release(root, objects, segments):
+        def release(root: Path, objects: list[Any], segments: list[Any]) -> Path:
             root.mkdir(parents=True)
             pq.write_table(
                 pa.Table.from_pylist(

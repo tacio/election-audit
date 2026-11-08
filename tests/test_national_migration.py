@@ -11,6 +11,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from election_audit import national_migration as migration
@@ -42,7 +43,7 @@ class MigrationTests(unittest.TestCase):
         source.parent.mkdir(parents=True)
         source.write_bytes(body)
         shutil.copytree(self.old, self.new)
-        self.row = {
+        self.row: dict[str, Any] = {
             "source_root": str(self.old),
             "sha256": object_sha,
             "path": relative,
@@ -83,7 +84,7 @@ class MigrationTests(unittest.TestCase):
                 db.close()
         relocation._CACHE = None
 
-    def accept(self):
+    def accept(self) -> tuple[dict[str, Any], Path]:
         certificate = migration.verify_round(self.item, self.state, lambda *a: None, lambda: None)
         registry = self.state / "relocation.json"
         migration.atomic(
@@ -324,11 +325,13 @@ class MigrationTests(unittest.TestCase):
         config_path = fixture.root / "overnight-config.json"
         migration.atomic(config_path, config)
 
-        def prepare_tuning(sample, report, directory, *args, **kwargs) -> None:
+        def prepare_tuning(
+            sample: Any, report: Any, directory: Path, *args: Any, **kwargs: Any
+        ) -> None:
             directory.mkdir()
             _write_json(directory / "recommended.json", _read_json(fixture.reco))
 
-        def run_tranche(command, **kwargs):
+        def run_tranche(command: Any, **kwargs: Any) -> dict[str, Any]:
             from election_audit.national_workload import run
 
             return run(Path(config["workspace"]) / "production", max_objects=25)
