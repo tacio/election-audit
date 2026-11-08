@@ -475,9 +475,7 @@ def reconstruct_cycles(bundle: Bundle) -> Bundle:
         sessions[event["session_id"]].append(event)
     details = {}
     for sid, events in sessions.items():
-        # The open cycle's state, or None. Any: ty does not narrow variables that nested
-        # functions rebind with nonlocal.
-        active: Any = None
+        active: dict[str, Any] | None = None  # the open cycle's state
         sequence = 0
 
         def begin(
@@ -497,6 +495,7 @@ def reconstruct_cycles(bundle: Bundle) -> Bundle:
 
         def finish(state: str, end: Row | None = None, reason: str | None = None) -> None:
             nonlocal active, sequence
+            assert active is not None  # only an open cycle is finished
             if reason:
                 active["reasons"].append(reason)
             ids = list(dict.fromkeys(e["event_id"] for e in active["events"]))
@@ -590,8 +589,8 @@ def reconstruct_cycles(bundle: Bundle) -> Bundle:
                     active["authorization_event_id"] = event["event_id"]
             elif kind == "completion_message":
                 if active is None:
-                    active = begin(event)
-                    active["start"] = None
+                    active = opened = begin(event)
+                    opened["start"] = None
                     finish("unresolved", event, "orphan_completion")
                 else:
                     active["events"].append(event)
@@ -611,15 +610,15 @@ def reconstruct_cycles(bundle: Bundle) -> Bundle:
                 "authorization_failed",
             }:
                 orphan = active is None
+                current = active = begin(event) if active is None else active
                 if orphan:
-                    active = begin(event)
-                    active["start"] = None
-                    active["reasons"].append("orphan_transition")
+                    current["start"] = None
+                    current["reasons"].append("orphan_transition")
                 else:
-                    active["events"].append(event)
+                    current["events"].append(event)
                 if kind.startswith("suspension_"):
-                    active["suspension_kind"] = kind.removeprefix("suspension_")
-                    active["suspended"] = True
+                    current["suspension_kind"] = kind.removeprefix("suspension_")
+                    current["suspended"] = True
                 if kind == "suspension_partial" and not orphan:
                     continue
                 state = "suspended" if kind.startswith("suspension_") else "cancelled"
@@ -631,8 +630,8 @@ def reconstruct_cycles(bundle: Bundle) -> Bundle:
                 else:
                     if active:
                         finish("unresolved", reason="unexpected_resumption")
-                    active = begin(event)
-                    active["start"] = None
+                    active = opened = begin(event)
+                    opened["start"] = None
                     finish("unresolved", event, "orphan_resumption")
             elif active:
                 active["events"].append(event)
