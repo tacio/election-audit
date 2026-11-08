@@ -1,6 +1,6 @@
 # Streaming semantic pass (Phase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 5 · Language: en
+Document-ID: EA-SEMANTIC-PASS · Revision: 6 · Language: en
 
 [Português](../pt-BR/semantic-pass.md) · [Implementation index](implementation-index.md)
 
@@ -127,6 +127,38 @@ segment and object row, both ways. The roots are
 official sessions (`10.23.0.0 - Praia da Barra do Cahy` in 2026,
 `8.26.0.0 - Onça-pintada` in 2022). A few sessions have no version line: 1 in
 2026 round 1, 8 in 2022 round 1, 1 in 2022 round 2.
+
+## Version 4 (Phase 20b)
+
+`session-aggregates-v4` applies session rules `sessions-v2`, shared with the
+event-level adapter:
+
+- A `GAP` restart line that names the round in effect keeps that round's context.
+  The urn does not repeat the official-round marker after a mid-day restart, so
+  version 3 closed the context there and lost every later vote of the day.
+- A session of the round's context that started before election day (an urn
+  switched on early and left running) becomes official at its first voting event
+  on election day, and is flagged `started_before_election_day`. Version 3 left
+  these sessions unresolved.
+
+Sessions are the same rows as in version 3; segments are fewer because restarts no
+longer split the context. The equivalence check against the adapter passed on 200 of
+200 sampled AC objects in each year and round (2026: 45003 and 39683 completed
+cycles; 2022: 43707 and 40360).
+
+| Year | Round | Objects | Sessions | Segments | Official sessions added | Started before election day | Wall time | CPU time | Peak memory | Release |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026 | 1 | 498580 | 1704924 | 3312661 | 1742 | 1569 | 1:53:15 | 39767 s | 0.96 GB | 545 MB |
+| 2026 | 2 | 498581 | 3393756 | 5518787 | 1506 | 1361 | 3:03:41 | 64676 s | 1.00 GB | 838 MB |
+| 2022 | 1 | 471859 | 1805887 | 3396296 | 1440 | 871 | 1:45:28 | 39053 s | 1.01 GB | 533 MB |
+| 2022 | 2 | 471983 | 3570943 | 5726472 | 1284 | 835 | 2:52:30 | 63535 s | 1.08 GB | 830 MB |
+
+All four ran on 7–8 November 2026 with 6 workers and no object errors, into
+`~/data/election-audit-stage/phase20b-sessions/v4-national-r{1,2}-20261107/` and
+`v4-national-2022-r{1,2}-20261107/`. Peak memory is the largest single process. Each
+sample equivalence took 3:10 to 5:41, almost all of it in the adapter. Sections with
+no official session of the round fall from 1636 and 1449 to 12 and 4 in 2026, and
+from 1013 and 1007 to 15 and 12 in 2022 ([section table](section-table.md#national-results)).
 
 ## Contingency counting (SA) logs
 
@@ -277,4 +309,5 @@ SHA-256; these are urn clock events for Phase 22, not corruption.
   that ends earlier in one log than in the other will not match and needs a
   prefix comparison.
 - Sessions with several official runs per object (urn replacement or restarts)
-  are kept as observed; grouping them is Phase 22 work.
+  are kept as observed, and so are copies of one session in several memories of an
+  urn. The section table and I5–I7 count such copies once by block lineage.

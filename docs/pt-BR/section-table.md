@@ -1,6 +1,6 @@
-# Tabela de atributos por seção v3 (Fases 22 e 20b)
+# Tabela de atributos por seção v4 (Fases 22 e 20b)
 
-Document-ID: EA-SECTION-TABLE · Revision: 3 · Language: pt-BR
+Document-ID: EA-SECTION-TABLE · Revision: 4 · Language: pt-BR
 
 [English](../en/section-table.md) · [Índice de implementação](implementation-index.md)
 
@@ -28,11 +28,13 @@ covariáveis, campos de urna, relógio e disponibilidade, e contagens.
 | --- | --- | --- |
 | BWEB, linhas de presidente, dois turnos | Fase 19 `resultados-<year>-boletim-de-urna` | Resultados, composição (seções agregadas), metadados do BU |
 | Perfil do eleitorado por seção, locais de votação | Fase 19 `eleitorado-<year>` | Covariáveis, chaves de local, coordenadas |
-| Passagem semântica `session-aggregates-v3`, dois turnos | `semantic-pass run` | Medidas operacionais, modelo, software, evidência de relógio |
+| Passagem semântica `session-aggregates-v4`, dois turnos | `semantic-pass run` | Medidas operacionais, modelo, software, evidência de relógio |
 | Releases da Fase 20 (só 2026) | `integrity-check` | Situação I1–I9, modelo e software do lado do BU |
 | Exclusões de proteção (2026) | `data/national/phase11-protection-2026-10-31/exclusions.json` | As 596 seções protegidas ficam `outside_scope` |
 
-`session-aggregates-v3` acrescenta nove colunas por sessão e não muda mais nada.
+A versão 4 da tabela (`section-features-v4`, `session-aggregates-v4`) lê a passada
+semântica com as regras de sessão `sessions-v2`; suas regras não mudam.
+`session-aggregates-v3` acrescentou nove colunas por sessão e não mudou mais nada.
 No país todo, nos dois anos e turnos, toda coluna em comum com a versão anterior é
 igual em cada linha de sessão, segmento e objeto
 ([passada semântica](semantic-pass.md#versão-3-fase-22)). As colunas novas:
@@ -149,12 +151,12 @@ unidade e turno.
 just section-table build --year 2026 \
   --bweb-root ~/data/election-audit-stage/inputs/resultados-2026-boletim-de-urna \
   --electorate-root ~/data/election-audit-stage/inputs/eleitorado-2026 \
-  --semantic-r1 ~/data/election-audit-stage/phase22/v3-national-r1-20261105 \
-  --semantic-r2 ~/data/election-audit-stage/phase22/v3-national-r2-20261105 \
-  --integrity-r1 "$(cat ~/data/election-audit-stage/phase22/integrity-v3-r1.json)" \
-  --integrity-r2 "$(cat ~/data/election-audit-stage/phase22/integrity-v3-r2.json)" \
+  --semantic-r1 ~/data/election-audit-stage/phase20b-sessions/v4-national-r1-20261107 \
+  --semantic-r2 ~/data/election-audit-stage/phase20b-sessions/v4-national-r2-20261107 \
+  --integrity-r1 "$(cat ~/data/election-audit-stage/phase20b-sessions/integrity-v4c-r1.json)" \
+  --integrity-r2 "$(cat ~/data/election-audit-stage/phase20b-sessions/integrity-v4c-r2.json)" \
   --exclusions data/national/phase11-protection-2026-10-31/exclusions.json \
-  --output ~/data/election-audit-stage/phase22/table-2026-v3-20261107
+  --output ~/data/election-audit-stage/phase20b-sessions/table-2026-v4-20261108c
 ```
 
 `--integrity-r1`/`--integrity-r2` recebem um objeto JSON com as raízes da Fase 20 do
@@ -162,7 +164,11 @@ turno (`sections`, `logs`, `bweb`, `correspondence`). Para 2022, omita as opçõ
 integridade e de exclusão. A construção roda em um só processo com duas threads do
 DuckDB e `--memory-limit` (1 GB por padrão). Ela guarda linhas em Python para um
 bloco por vez: municípios inteiros de uma UF, cerca de 10000 seções, porque regras
-de encerramento e unidades nunca cruzam um município. No país todo, a versão 3 levou 47 e 78 minutos (2026, 2022), com pico de 3.7 e 3.0 GB.
+de encerramento e unidades nunca cruzam um município. No país todo, a versão 3 levou 47 e 78 minutos (2026, 2022), com pico de 3.7 e 3.0 GB;
+a versão 4 levou 45 e 42 minutos, com pico de 3,7 e 3,1 GB, e cada release tem cerca
+de 190 MB. Uma primeira construção de 2026 sobre os logs v2 da Fase 20b
+(`table-2026-v4-20261108b/`, 49 minutos) difere da final só no I5 e no I7 das 8 e 9
+seções cujas cópias de memória eram contadas duas vezes.
 Testes de unidade:
 `tests/test_section_table.py`.
 
@@ -186,22 +192,31 @@ marcam a hora local.
 
 ## Resultados nacionais
 
-Versão 3, construída em 6–7 de novembro de 2026 em
-`~/data/election-audit-stage/phase22/table-2026-v3-20261107/` (sobre as seções de
-integridade v3 da Fase 20b) e `table-2022-v3-20261106/` (só contagens; resultados e
-valores operacionais ficam sem leitura):
+Versão 4, construída em 8 de novembro de 2026 em
+`~/data/election-audit-stage/phase20b-sessions/table-2026-v4-20261108c/` (sobre as
+seções de integridade v4 e os logs v3 da Fase 20b) e `table-2022-v4-20261108b/` (só
+contagens; resultados e valores operacionais ficam sem leitura):
 
 | | 2026 r1 | 2026 r2 | 2022 r1 | 2022 r2 |
 | --- | --- | --- | --- | --- |
 | Seções | 499248 | 499248 | 472693 | 472693 |
 | Resultados prontos | 499206 | 499205 | 472028 | 472028 |
 | Perfil pronto | 498858 | 498858 | 472349 | 472349 |
-| Com sessões / sem sessão oficial / sem log | 496944 / 1636 / 72 | 497132 / 1449 / 71 | 470846 / 1013 / 834 | 470976 / 1007 / 710 |
+| Com sessões / sem sessão oficial / sem log | 498568 / 12 / 72 | 498577 / 4 / 71 | 471844 / 15 / 834 | 471971 / 12 / 710 |
 | Protegidas (logs não lidos) | 596 | 596 | 0 | 0 |
-| Operações prontas / parciais / indisponíveis | 332276 / 164668 / 2304 | 357986 / 139146 / 2116 | 260753 / 210092 / 1848 | 299891 / 171085 / 1717 |
-| Relógio `ok` / `adjusted` | 495435 / 1451 | 495465 / 1651 | 469563 / 1201 | 469521 / 1436 |
-| Relógio `backstep` / `overlap` / `no_close_rule` | 34 / 24 / 0 | 9 / 7 / 0 | 23 / 59 / 0 | 4 / 15 / 0 |
-| Modelo do log concorda / difere do BU | 496936 / 8 | 497132 / 0 | — | — |
+| Operações prontas / parciais / indisponíveis | 333365 / 165203 / 680 | 359069 / 139508 / 671 | 261283 / 210560 / 850 | 300549 / 171422 / 722 |
+| Relógio `ok` / `adjusted` | 495490 / 1451 | 495549 / 1651 | 469688 / 1202 | 469678 / 1439 |
+| Relógio `backstep` / `overlap` / `no_close_rule` | 34 / 24 / 0 | 9 / 7 / 0 | 23 / 60 / 0 | 4 / 15 / 0 |
+| Modelo do log concorda / difere do BU | 498560 / 8 | 498577 / 0 | — | — |
+
+Em relação à versão 3 (`~/data/election-audit-stage/phase22/table-2026-v3-20261107/`
+e `table-2022-v3-20261106/`), só mudam campos derivados dos logs. Em 3069 seções
+(2026) e 1993 (2022) o turno agora tem sessão oficial: urnas deixadas ligadas durante
+a noite ou reiniciadas no meio do dia ([passada semântica](semantic-pass.md#versão-4-fase-20b)).
+Com isso mudam seus campos de situação do log, modelo, operações, relógio e cópias. Em
+2026 o campo do I3 muda nas duas seções SA de MG, e o I5–I7 e o I6 vêm dos releases da
+Fase 20b. Os arquivos de resultados e de unidades são idênticos, assim como as regras
+de encerramento.
 
 Toda unidade é `same_principal` nos dois anos: 499248 unidades em 2026 (499205
 comparáveis) e 472693 em 2022 (472028 comparáveis). As unidades não comparáveis
@@ -234,7 +249,7 @@ Observações:
   616). A versão 2 as deixava `unresolved`, e versões anteriores desta página davam a
   causa errada (mais de um encerramento impresso). Nenhum encerramento impresso
   contradiz a lista em nenhum dos anos.
-- Em relação à versão 2, só mudam as regras de encerramento do Amazonas e seus
+- Versão 3, em relação à versão 2: só mudam as regras de encerramento do Amazonas e seus
   estados de relógio e de horário e, em 2026, os campos de integridade da Fase 20b:
   `i1_signature` passa a `verified` em toda seção Ed521 e o tipo de urna
   `reservaSecao` passa a `contingenciaSecao`. Os arquivos de resultados e de
@@ -242,8 +257,9 @@ Observações:
 
 ## Limites
 
-- A linhagem pelo início do bloco identifica cópias; a igualdade das cópias como
-  prefixos não é verificada (Fase 20b).
+- A linhagem pelo início do bloco identifica cópias, e a cópia mais longa é mantida;
+  cópias que terminam em linhas diferentes (uma seção, [O16](observations.md#operação))
+  não são comparadas linha a linha.
 - Votos concluídos após o encerramento são contados por hora cheia. Isso só é exato
   porque todo horário legal de encerramento cai em hora cheia.
 - O perfil do eleitorado é um retrato anterior à eleição (julho de 2026, agosto de

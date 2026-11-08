@@ -1,6 +1,6 @@
 # Auditoria estatística da eleição presidencial de 2026: protocolo do estudo
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 6 · Language: pt-BR
+Document-ID: EA-ANALYSIS-PLAN · Revision: 7 · Language: pt-BR
 
 [English](analysis-plan.md) · [Plano de conclusão](completion-plan.pt-BR.md) · [Trabalhos relacionados](related-work.pt-BR.md)
 
@@ -83,7 +83,11 @@ escrevê-lo. Nesta revisão:
   BU, as sessões dos seus logs e as linhas brutas do dia da eleição desses logs,
   comparados caso a caso com o DataUrnas-BR; os blocos do RDV das duas seções de MG
   que falharam no I3. Contagens nacionais de sessões iniciadas antes do dia da
-  eleição, sem suas medidas.
+  eleição, sem suas medidas. Na conciliação de 8 de novembro de 2026: as contagens de
+  log por seção do 1º turno do DataUrnas-BR para essas seções, o comparecimento no BU
+  de es/57932/0009/0112 (cujo log da urna está no pacote da seção 0085) e o total
+  nacional de ciclos concluídos em sessões oficiais por execução da passada
+  semântica, comparado entre as versões 3 e 4 e não relatado.
 - **Não visto:** resultados eleitorais ou medidas operacionais por seção fora do AC,
   além das contagens e das linhas discordantes acima; o conteúdo dos 596 logs
   protegidos/de estresse do segundo turno.

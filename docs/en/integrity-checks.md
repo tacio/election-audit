@@ -1,6 +1,6 @@
 # Tier 1 integrity checks (Phase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 5 · Language: en
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 6 · Language: en
 
 [Português](../pt-BR/integrity-checks.md) · [Implementation index](implementation-index.md)
 
@@ -121,7 +121,8 @@ sections not installed (`sni`, with no BU); principal sections are compared with
 
 **I5, attendance.** Completed vote cycles in the round's official sessions (summed
 over restarts) must equal BU attendance, and biometric cycles the BU's biometric
-authorizations.
+authorizations. Since `integrity-logs-v2`, a session copied in several memories of
+one urn counts once, by block lineage, as in the section table.
 
 **I6, round-1 blocks.** Every round-1 block of a runoff log must equal the block that
 starts with the same line on the same urn in the round-1 log. The last round-1 block
@@ -129,7 +130,7 @@ continues in the runoff log after the round-1 log was written, so it can only ma
 as a prefix; Phase 21 kept whole-segment fingerprints, so that block is reported as
 `open_prefix_unverified`.
 
-**I7, clock and session rules** (`integrity-logs-v1`): R1 at least one official
+**I7, clock and session rules** (`integrity-logs-v1`, `integrity-logs-v2`): R1 at least one official
 session of the round; R2 the last one has a closing reading; R3 no backward clock
 step inside official sessions; R4 no completion outside a cycle; R5 every official
 session starts on the election date; R6 official sessions do not overlap.
@@ -212,7 +213,8 @@ Runs of 5 November 2026, both rounds, 499207 sections each, into
   cycles than BU attendance, all with several sessions (one ES round-2 section has
   612 = 2 × 306), which points at re-run sessions summed twice. In 78 and 33 they hold
   fewer, 51 and 17 of them in a single session; unresolved cycles explain only 4 and
-  2. Grouping multi-run sessions is Phase 22 work.
+  2. Grouping multi-run sessions is Phase 22 work. Phase 20b reconciled them: see
+  [session rules v2 and the I3/I5 reconciliation](#phase-20b-session-rules-v2-and-the-i3i5-reconciliation).
 - I6 (round 2): 493122 sections are equal in every closed round-1 block with the last
   block open. 3645 more are equal except that they also hold round-1 blocks absent
   from the round-1 log (3553 with the open block, 92 without); 1464 have no round-1 block; 162 are another
@@ -348,6 +350,111 @@ different urn and 2 no round-1 log, as before.
 Six workers; the peak is the planning process, which holds the block pairs in
 DuckDB and Python. The release is 36 MB, the per-chunk shards 198 MB.
 
+## Phase 20b: session rules v2 and the I3/I5 reconciliation
+
+Runs of 7–8 November 2026. `integrity-sections-v4` sums an RDV's blocks for one
+contest ([O5](observations.md#operations)): I3 is now equal in all 2490805 and
+539817 contests. The release differs from v3 only in the rows of the two MG SA
+sections (their 10 contests); round 2 is identical. The semantic pass was
+rerun with session rules `sessions-v2` (`session-aggregates-v4`,
+[semantic pass](semantic-pass.md#version-4-phase-20b)). I5–I7 then ran twice: on
+the new passes (`logs-v2`, code `integrity-logs-v1`), and with memory copies of a
+session counted once (`logs-v3`, code `integrity-logs-v2`,
+[O16](observations.md#operations)). The final roots are
+`~/data/election-audit-stage/phase20/national-r{1,2}-logs-v3-20261108/`.
+
+```sh
+just integrity-check logs \
+  --sections ~/data/election-audit-stage/phase20/national-r2-sections-v4-20261107 \
+  --semantic ~/data/election-audit-stage/phase20b-sessions/v4-national-r2-20261107 \
+  --semantic-round1 ~/data/election-audit-stage/phase20b-sessions/v4-national-r1-20261107 \
+  --output ~/data/election-audit-stage/phase20/national-r2-logs-v3-20261108
+```
+
+| Check | Phase 20, round 1 | Phase 20b, round 1 | Phase 20, round 2 | Phase 20b, round 2 |
+| --- | --- | --- | --- | --- |
+| I3 RDV recount equal | 2490795 of 2490805 | 2490805 of 2490805 | 539817 of 539817 | 539817 of 539817 |
+| I5 equal / differ / unavailable | 496859 / 85 / 2263 | 498558 / 10 / 639 | 497096 / 36 / 2075 | 498570 / 7 / 630 |
+| I5 biometric equal / differ | — | 497277 / 10 | — | 497290 / 6 |
+| I7 R1 (no official session) | 1636 | 12 | 1449 | 4 |
+| I7 R2 (no closing reading) | 438 | 434 | 349 | 347 |
+| I7 R3 (backward clock step) | 34 | 34 | 9 | 9 |
+| I7 R5 (session started before election day) | 0 | 1569 | 0 | 1361 |
+| I7 R6 (overlapping sessions) | 31 | 24 | 9 | 7 |
+
+R4 fails in one round-1 section in both runs. The unavailable sections are the 627
+and 626 without a semantic-pass log plus those with no official session. R1 falls
+and R5 rises for the same reason: an urn switched on before election day and left
+running now has an official session, flagged `started_before_election_day`. R5
+fails in exactly the sections that have such a session, one per object.
+
+Of the 85 and 36 Phase 20 differences, the `sessions-v2` rules resolve 69 and 27
+(mid-day restarts that lost later votes, urns left on overnight), and counting
+memory copies once resolves 6 and 2 more. No section differs that did not differ in
+Phase 20. Each of the 17 that remain was read session by session:
+
+| Cause | Round 1 | Round 2 |
+| --- | --- | --- |
+| Log short by no more than its unresolved cycles (1 or 2) | 7 | 3 |
+| Log one cycle short beyond its unresolved cycle | 0 | 1 (rs/89060/0017/0191) |
+| Package holds another section's urn ([O13](observations.md#operations)) | 0 | 1 (es/57932/0009/0085) |
+| Broken stream ([O15](observations.md#operations)) | 1 (rj/60011/0008/0061) | 0 |
+| Log covers only part of election day ([O17](observations.md#operations)) | 2 | 2 |
+
+The seven round-1 sections short by their unresolved cycles are es/56995/0053/0211,
+rj/58971/0087/0184, rn/16039/0029/0028, rs/89036/0083/0044, sp/64254/0291/0346,
+sp/71072/0260/0037 and sp/63614/0227/0305; the three round-2 sections are
+ba/34711/0021/0178, pb/21750/0002/0254 and pi/11533/0003/0216. In no remaining
+section does the log hold more completed cycles than BU attendance, except
+es/57932/0009/0085, whose package carries two urns. None of the 17 has a printed BU
+copy (I8).
+
+**DataUrnas-BR.** Its round-1 per-section log table (commit `f5e8005`, frozen in
+`inputs/dataurnas-br-f5e8005-20261108/`) covers all 499207 sections and flags 40
+whose log votes differ from attendance: 31 SA sections, which have no urn log, and
+9 others. Those 9 are our round-1 sections other than rj/60011/0008/0061, with the
+same log count in every one. For rj/60011/0008/0061 it counts 311, equal to
+attendance, because it does not split the stream on the urn identifier
+([O15](observations.md#operations)). In the sections where we counted memory copies
+twice, its count equals attendance (rs/89036/0083/0044: one short, as ours now):
+it counts identical lines repeated across a package's files once. Its round-2
+section table has no log counts, so round 2 was not compared. Its RDV recount
+reports no divergence in either round, which agrees with I3 v4. Only these
+sections and DataUrnas-BR's national counts were read.
+
+**I6 rerun.** `integrity-check prefix` ran again on `logs-v2` and the v4 passes into
+`~/data/election-audit-stage/phase20b-i6/national-v2-20261107/` (same code,
+`integrity-round1-prefix-v1`). The new block limits change the pairs: 497032 block
+pairs, 496999 objects read, no object or rebuild error.
+
+| Round-1 block pairs | v1 | v2 |
+| --- | --- | --- |
+| Last round-1 block, runoff longer, first N lines equal (`prefix_open`) | 496793 | 496911 |
+| Runoff block a prefix of the round-1 block (`runoff_prefix_of_round1`) | 6 | 6 |
+| Still differs, closed block | 110 | 110 |
+| Still differs, last block | 3 | 5 |
+
+The 115 pairs that still differ are in 101 sections. 110 differ only by restart
+lines ([O14](observations.md#operations)): in 99 the runoff copy lacks them, in 11
+the round-1 copy does. 4 are the two memory copies of mg/44458/0103/0221
+([O16](observations.md#operations)) paired across each other, which end at
+different lines. The last is rj/60011/0008/0061 ([O15](observations.md#operations)).
+493160 sections are now `equal_open_prefix_equal` (493125 in v1). Blocks present
+only in the runoff log (7079, of which 5809 start after the round-1 log ends), 1464
+sections without a round-1 block, 162 with another urn and 2 without a round-1 log
+are unchanged.
+
+| Run | Wall time | CPU time | Peak memory | Release |
+| --- | --- | --- | --- | --- |
+| Sections v4, round 1 (6 workers) | 1:10:48 | 10838 s | 4.7 GB | 266 MB |
+| Sections v4, round 2 (6 workers) | 1:02:15 | 5650 s | 4.1 GB | 118 MB |
+| Logs v2, round 1 / round 2 | 0:27 / 0:51 | — | 2.7 / 3.2 GB | 1 / 2 MB |
+| Logs v3, round 1 / round 2 | 0:22 / 0:41 | — | 2.6 / 3.3 GB | 1 / 2 MB |
+| Prefix v2 (6 workers) | 1:08:02 | 22707 s | 3.6 GB | 36 MB (+199 MB shards) |
+
+The logs runs are one process; their peak is the session table held in DuckDB and
+Python.
+
 ## Phase 20b: I8 printed BUs
 
 `integrity-check printed` (`printed-bu-v1`, module `printed_bu`) follows TSE's 2026
@@ -424,7 +531,9 @@ open at a time). The release (`printed.parquet` and its manifest) is 140 kB.
   nothing about other sections.
 - The ten municipal elections held with the runoff are not in the national BWEB, so
   I2 does not cover them.
-- I5 has open differences (85/36 sections); one round-1 difference is the broken
-  stream of rj/60011/0008/0061 (O15).
+- I5 differs in 10 and 7 sections. All but one have a known cause (unresolved
+  cycles, another section's urn, a broken stream, a log covering part of the day);
+  rs/89060/0017/0191 is one cycle short beyond its unresolved cycle. Four logs cover
+  only part of election day (O17), so their measures are partial.
 - Agreement among artifacts of the same software chain shows consistency, not voter
   intent.

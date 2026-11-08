@@ -1,6 +1,6 @@
 # Verificações de integridade de nível 1 (Fase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 5 · Language: pt-BR
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 6 · Language: pt-BR
 
 [English](../en/integrity-checks.md) · [Índice de implementação](implementation-index.md)
 
@@ -128,7 +128,9 @@ comparadas com `si`.
 
 **I5, comparecimento.** Os ciclos de voto concluídos nas sessões oficiais do turno
 (somados entre reinícios) precisam ser iguais ao comparecimento do BU, e os ciclos
-biométricos às habilitações biométricas do BU.
+biométricos às habilitações biométricas do BU. Desde o `integrity-logs-v2`, uma sessão
+copiada em várias memórias de uma urna conta uma vez, pela linhagem do bloco, como na
+tabela por seção.
 
 **I6, blocos do primeiro turno.** Todo bloco do primeiro turno de um log do segundo
 turno precisa ser igual ao bloco que começa com a mesma linha, na mesma urna, no log
@@ -137,7 +139,7 @@ depois de o log do primeiro turno ter sido gravado, então só pode coincidir co
 prefixo; a Fase 21 guardou impressões digitais de segmentos inteiros, então esse
 bloco aparece como `open_prefix_unverified`.
 
-**I7, regras de relógio e sessão** (`integrity-logs-v1`): R1 ao menos uma sessão
+**I7, regras de relógio e sessão** (`integrity-logs-v1`, `integrity-logs-v2`): R1 ao menos uma sessão
 oficial do turno; R2 a última tem leitura de encerramento; R3 nenhum recuo do relógio
 dentro das sessões oficiais; R4 nenhuma conclusão fora de um ciclo; R5 toda sessão
 oficial começa na data da eleição; R6 as sessões oficiais não se sobrepõem.
@@ -226,7 +228,8 @@ levou 64 e 59 minutos com seis workers.
   segundo turno tem 612 = 2 × 306), o que aponta para sessões reexecutadas somadas
   duas vezes. Em 78 e 33 têm menos, 51 e 17 delas numa única sessão; ciclos não
   resolvidos explicam só 4 e 2. Agrupar sessões de várias execuções é trabalho da
-  Fase 22.
+  Fase 22. A Fase 20b as reconciliou: veja
+  [regras de sessão v2 e a reconciliação do I3/I5](#fase-20b-regras-de-sessão-v2-e-a-reconciliação-do-i3i5).
 - I6 (segundo turno): 493122 seções são iguais em todo bloco fechado do primeiro
   turno, com o último bloco aberto. Outras 3645 são iguais, exceto por terem também
   blocos do primeiro turno ausentes do log do primeiro turno (3553 com o bloco aberto,
@@ -365,6 +368,114 @@ segundo turno, 162 têm outra urna e 2 não têm log do 1º turno, como antes.
 Seis processos; o pico é o processo de planejamento, que mantém os pares de blocos no
 DuckDB e no Python. A versão tem 36 MB e os fragmentos por lote 198 MB.
 
+## Fase 20b: regras de sessão v2 e a reconciliação do I3/I5
+
+Execuções de 7–8 de novembro de 2026. O `integrity-sections-v4` soma os blocos do
+RDV de uma disputa ([O5](observations.md#operação)): o I3 agora é igual em todas as
+2490805 e 539817 disputas. O release difere do v3 só nas linhas das duas seções SA de MG (suas
+10 disputas); o 2º turno é idêntico. A passagem
+semântica foi refeita com as regras de sessão `sessions-v2`
+(`session-aggregates-v4`, [passada semântica](semantic-pass.md#versão-4-fase-20b)).
+O I5–I7 rodou então duas vezes: sobre as novas passadas (`logs-v2`, código
+`integrity-logs-v1`) e com as cópias de memória de uma sessão contadas uma vez
+(`logs-v3`, código `integrity-logs-v2`, [O16](observations.md#operação)). As raízes
+finais são `~/data/election-audit-stage/phase20/national-r{1,2}-logs-v3-20261108/`.
+
+```sh
+just integrity-check logs \
+  --sections ~/data/election-audit-stage/phase20/national-r2-sections-v4-20261107 \
+  --semantic ~/data/election-audit-stage/phase20b-sessions/v4-national-r2-20261107 \
+  --semantic-round1 ~/data/election-audit-stage/phase20b-sessions/v4-national-r1-20261107 \
+  --output ~/data/election-audit-stage/phase20/national-r2-logs-v3-20261108
+```
+
+| Verificação | Fase 20, 1º turno | Fase 20b, 1º turno | Fase 20, 2º turno | Fase 20b, 2º turno |
+| --- | --- | --- | --- | --- |
+| I3 recontagem do RDV igual | 2490795 de 2490805 | 2490805 de 2490805 | 539817 de 539817 | 539817 de 539817 |
+| I5 iguais / diferem / indisponíveis | 496859 / 85 / 2263 | 498558 / 10 / 639 | 497096 / 36 / 2075 | 498570 / 7 / 630 |
+| I5 biométrico iguais / diferem | — | 497277 / 10 | — | 497290 / 6 |
+| I7 R1 (nenhuma sessão oficial) | 1636 | 12 | 1449 | 4 |
+| I7 R2 (sem leitura de encerramento) | 438 | 434 | 349 | 347 |
+| I7 R3 (passo de relógio para trás) | 34 | 34 | 9 | 9 |
+| I7 R5 (sessão iniciada antes do dia da eleição) | 0 | 1569 | 0 | 1361 |
+| I7 R6 (sessões sobrepostas) | 31 | 24 | 9 | 7 |
+
+O R4 falha numa seção do 1º turno nas duas execuções. As seções indisponíveis são as
+627 e 626 sem log na passada semântica mais as que não têm sessão oficial. O R1 cai
+e o R5 sobe pelo mesmo motivo: uma urna ligada antes do dia da eleição e deixada
+ligada agora tem sessão oficial, marcada `started_before_election_day`. O R5 falha
+exatamente nas seções que têm uma sessão assim, uma por objeto.
+
+Das 85 e 36 diferenças da Fase 20, as regras `sessions-v2` resolvem 69 e 27
+(reinícios no meio do dia que perdiam os votos seguintes, urnas deixadas ligadas
+durante a noite), e contar uma vez as cópias de memória resolve mais 6 e 2. Nenhuma
+seção difere sem ter diferido na Fase 20. Cada uma das 17 restantes foi lida sessão
+a sessão:
+
+| Causa | 1º turno | 2º turno |
+| --- | --- | --- |
+| Log abaixo por no máximo seus ciclos não resolvidos (1 ou 2) | 7 | 3 |
+| Log um ciclo abaixo além do seu ciclo não resolvido | 0 | 1 (rs/89060/0017/0191) |
+| Pacote traz a urna de outra seção ([O13](observations.md#operação)) | 0 | 1 (es/57932/0009/0085) |
+| Fluxo quebrado ([O15](observations.md#operação)) | 1 (rj/60011/0008/0061) | 0 |
+| Log cobre só parte do dia de eleição ([O17](observations.md#operação)) | 2 | 2 |
+
+As sete seções do 1º turno abaixo por seus ciclos não resolvidos são
+es/56995/0053/0211, rj/58971/0087/0184, rn/16039/0029/0028, rs/89036/0083/0044,
+sp/64254/0291/0346, sp/71072/0260/0037 e sp/63614/0227/0305; as três do 2º turno são
+ba/34711/0021/0178, pb/21750/0002/0254 e pi/11533/0003/0216. Em nenhuma seção
+restante o log tem mais ciclos concluídos que o comparecimento do BU, salvo
+es/57932/0009/0085, cujo pacote traz duas urnas. Nenhuma das 17 tem cópia impressa
+do BU (I8).
+
+**DataUrnas-BR.** Sua tabela de log por seção do 1º turno (commit `f5e8005`,
+congelada em `inputs/dataurnas-br-f5e8005-20261108/`) cobre as 499207 seções e marca
+40 cujos votos no log diferem do comparecimento: 31 seções SA, que não têm log de
+urna, e 9 outras. Essas 9 são as nossas seções do 1º turno exceto rj/60011/0008/0061,
+com a mesma contagem de log em cada uma. Em rj/60011/0008/0061 ele conta 311, igual
+ao comparecimento, porque não divide o fluxo pelo identificador da urna
+([O15](observations.md#operação)). Nas seções em que contávamos as cópias de memória
+duas vezes, sua contagem é igual ao comparecimento (rs/89036/0083/0044: um abaixo,
+como a nossa agora): ele conta uma vez as linhas idênticas repetidas entre os
+arquivos de um pacote. Sua tabela de seções do 2º turno não tem contagens de log,
+então o 2º turno não foi comparado. Sua recontagem do RDV não relata divergência em
+nenhum turno, o que concorda com o I3 v4. Só essas seções e as contagens nacionais do
+DataUrnas-BR foram lidas.
+
+**Nova execução do I6.** O `integrity-check prefix` rodou de novo sobre o `logs-v2` e
+as passadas v4 em `~/data/election-audit-stage/phase20b-i6/national-v2-20261107/`
+(mesmo código, `integrity-round1-prefix-v1`). Os novos limites de bloco mudam os
+pares: 497032 pares de blocos, 496999 objetos lidos, nenhum erro de objeto ou de
+reconstrução.
+
+| Pares de blocos do 1º turno | v1 | v2 |
+| --- | --- | --- |
+| Último bloco do 1º turno, segundo turno mais longo, primeiras N linhas iguais (`prefix_open`) | 496793 | 496911 |
+| Bloco do segundo turno é prefixo do bloco do 1º turno (`runoff_prefix_of_round1`) | 6 | 6 |
+| Ainda difere, bloco fechado | 110 | 110 |
+| Ainda difere, último bloco | 3 | 5 |
+
+Os 115 pares que ainda diferem estão em 101 seções. 110 diferem só por linhas de
+reinício ([O14](observations.md#operação)): em 99 a cópia do segundo turno não as
+tem, em 11 é a cópia do 1º turno. 4 são as duas cópias de memória de
+mg/44458/0103/0221 ([O16](observations.md#operação)) pareadas entre si, que terminam
+em linhas diferentes. O último é rj/60011/0008/0061 ([O15](observations.md#operação)).
+493160 seções agora são `equal_open_prefix_equal` (493125 no v1). Os blocos presentes
+só no log do segundo turno (7079, dos quais 5809 começam depois do fim do log do 1º
+turno), as 1464 seções sem bloco do 1º turno, as 162 com outra urna e as 2 sem log do
+1º turno não mudam.
+
+| Execução | Tempo de relógio | Tempo de CPU | Memória de pico | Release |
+| --- | --- | --- | --- | --- |
+| Seções v4, 1º turno (6 workers) | 1:10:48 | 10838 s | 4,7 GB | 266 MB |
+| Seções v4, 2º turno (6 workers) | 1:02:15 | 5650 s | 4,1 GB | 118 MB |
+| Logs v2, 1º turno / 2º turno | 0:27 / 0:51 | — | 2,7 / 3,2 GB | 1 / 2 MB |
+| Logs v3, 1º turno / 2º turno | 0:22 / 0:41 | — | 2,6 / 3,3 GB | 1 / 2 MB |
+| Prefixo v2 (6 workers) | 1:08:02 | 22707 s | 3,6 GB | 36 MB (+199 MB de shards) |
+
+As execuções de logs são um processo; o pico é a tabela de sessões mantida no DuckDB e
+no Python.
+
 ## Fase 20b: BUs impressos do I8
 
 `integrity-check printed` (`printed-bu-v1`, módulo `printed_bu`) segue o manual de
@@ -441,7 +552,10 @@ arquivo aberto por vez). O release (`printed.parquet` e seu manifesto) tem 140 k
   nada sobre outras seções.
 - As dez eleições municipais realizadas com o segundo turno não estão no BWEB nacional,
   então o I2 não as cobre.
-- O I5 tem diferenças em aberto (85/36 seções); uma diferença do 1º turno é o fluxo
-  quebrado de rj/60011/0008/0061 (O15).
+- O I5 difere em 10 e 7 seções. Todas menos uma têm causa conhecida (ciclos não
+  resolvidos, a urna de outra seção, um fluxo quebrado, um log que cobre parte do
+  dia); rs/89060/0017/0191 fica um ciclo abaixo além do seu ciclo não resolvido.
+  Quatro logs cobrem só parte do dia de eleição (O17), então suas medidas são
+  parciais.
 - A concordância entre artefatos da mesma cadeia de software mostra consistência, não
   a intenção do eleitor.

@@ -1,6 +1,6 @@
 # Statistical audit of the 2026 presidential election: study protocol
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 6 · Language: en
+Document-ID: EA-ANALYSIS-PLAN · Revision: 7 · Language: en
 
 [Português](analysis-plan.pt-BR.md) · [Completion plan](completion-plan.md) · [Related work](related-work.md)
 
@@ -76,7 +76,11 @@ writing it. As of this revision:
   the 121 sections that failed I5, their BU attendance, their log sessions and the
   raw election-day lines of their logs, compared case by case with DataUrnas-BR; the
   RDV blocks of the two MG sections that failed I3. National counts of sessions
-  started before election day, without their measures.
+  started before election day, without their measures. In the 8 November 2026
+  reconciliation: DataUrnas-BR's round-1 per-section log counts for those sections,
+  the BU attendance of es/57932/0009/0112 (whose urn's log is in the package of
+  section 0085), and the national total of completed cycles in official sessions
+  per semantic-pass run, compared between versions 3 and 4 and not reported.
 - **Not seen:** section-level electoral results or operational measures outside AC,
   beyond the counts and disagreeing rows above; the contents of the 596
   protected/stress runoff logs.

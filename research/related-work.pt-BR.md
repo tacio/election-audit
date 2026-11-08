@@ -1,6 +1,6 @@
 # Trabalhos relacionados
 
-Document-ID: EA-RELATED-WORK · Revision: 4 · Language: pt-BR
+Document-ID: EA-RELATED-WORK · Revision: 5 · Language: pt-BR
 
 [English](related-work.md) · [Protocolo de pesquisa](analysis-plan.pt-BR.md) · [README](../README.pt-BR.md)
 
@@ -95,11 +95,17 @@ controla uma família confirmatória fixa, relata a manipulação mínima detect
 lado de todo resultado nulo e não emite veredicto
 ([protocolo do estudo](analysis-plan.pt-BR.md)). Suas medidas de log vêm de regras
 revisadas sobre todos os logs, com históricos copiados removidos pela linhagem dos
-blocos e o desconhecido separado do zero. Dois resultados precisam ser
-conciliados: no 1º turno, o DataUrnas-BR não relata divergência na recontagem do
-RDV, enquanto nosso I3 encontrou dez disputas diferentes em duas seções de
-contingência (SA); e sua amostra de logs de 2.997 seções encontrou votos no log
-iguais ao comparecimento, enquanto nosso I5 nacional lista 85 e 36 diferenças. Sua
+blocos e o desconhecido separado do zero. Dois resultados foram conciliados na Fase
+20b ([verificações de integridade](../docs/pt-BR/integrity-checks.md#fase-20b-regras-de-sessão-v2-e-a-reconciliação-do-i3i5)).
+Nosso I3 tinha encontrado dez disputas diferentes em duas seções de contingência
+(SA), onde o DataUrnas-BR não relata nenhuma: o RDV traz ali dois blocos por disputa,
+e mantínhamos só o último. Somados, concordam. Nosso I5 listava 85 e 36 seções com
+votos no log diferentes do comparecimento. Depois das nossas regras de sessão para
+reinícios no meio do dia e urnas ligadas durante a noite, e contando uma vez as
+cópias de memória de uma sessão, restam 10 e 7. A tabela nacional de logs do 1º turno
+do DataUrnas-BR (commit `f5e8005`) marca as mesmas seções do 1º turno com as mesmas
+contagens, salvo uma cujo fluxo quebrado ele lê inteiro; ele não publica contagens
+de log do 2º turno. Sua
 implementação de Ed521 e seus três certificados de AC, idênticos byte a byte aos
 embutidos no pacote de formatos de 2026 do TSE, são referências independentes para
 as nossas (Fase 20b do [plano de conclusão](completion-plan.pt-BR.md)).
@@ -183,7 +189,7 @@ comprovadamente exclusiva nem um detector superior.
 | ETL eleitoral com esquema explícito | Turicas | Adaptador oficial AC BWEB fixado; contratos de importação normalizada. |
 | Versões de publicação e denominadores | INEMA | Entradas congeladas e derivadas imutáveis; populações derivadas parciais. |
 | Reconciliação hierárquica | Multiverso Digital; AnaliseEleicoes | Aritmética das linhas publicadas e totais da UF do AC conferem; reconciliação nacional BR/UF/municipal/ZZ pendente. |
-| Integração de BU binário/log/assinatura | DataUrnas-BR | I1–I9 nacionais para 2026 (Fase 20); Ed521, cadeias de certificados, JWS, zerésima, GEDAI e listas de hashes na Fase 20b; diferenças de I3/I5 com o DataUrnas-BR a conciliar. |
+| Integração de BU binário/log/assinatura | DataUrnas-BR | I1–I9 nacionais para 2026 (Fase 20); Ed521, cadeias de certificados, JWS, zerésima, GEDAI e listas de hashes na Fase 20b; diferenças de I3/I5 com o DataUrnas-BR conciliadas. |
 | Escolhas omitidas com zero votos | Cota | Desconhecidos explícitos; normalização esparsa para completa com evidências pendente. |
 | Triagem estatística condicional | Klimek et al.; Kobak et al.; Rozenas; Mebane; Meinshausen; Bates et al. | Rascunho do protocolo do estudo com mapa de ameaças, família confirmatória e estudo de poder; um ajuste de desenvolvimento de comparecimento no AC; sem modelo nacional ou inferência validada de fraude. |
 

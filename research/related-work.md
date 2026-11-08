@@ -1,6 +1,6 @@
 # Related work
 
-Document-ID: EA-RELATED-WORK · Revision: 4 · Language: en
+Document-ID: EA-RELATED-WORK · Revision: 5 · Language: en
 
 [Português](related-work.pt-BR.md) · [Research protocol](analysis-plan.md) · [README](../README.md)
 
@@ -88,10 +88,17 @@ test, withholds a sealed holdout, controls a fixed confirmatory family, reports 
 minimum detectable manipulation beside every null result and issues no verdict
 ([study protocol](analysis-plan.md)). Its log measures come from reviewed rules
 over every log, with copied histories removed by block lineage and unknown kept
-apart from zero. Two results are to be reconciled: for round 1, DataUrnas-BR
-reports no RDV recount divergence where our I3 found ten differing contests in two
-contingency (SA) sections, and its 2,997-section log sample found log votes equal
-to attendance where our national I5 lists 85 and 36 differences. Its Ed521
+apart from zero. Two results were reconciled in Phase 20b
+([integrity checks](../docs/en/integrity-checks.md#phase-20b-session-rules-v2-and-the-i3i5-reconciliation)).
+Our I3 had found ten differing contests in two contingency (SA) sections, where
+DataUrnas-BR reports none: the RDV holds two blocks per contest there, and we had
+kept only the last. Summed, they agree. Our I5 had listed 85 and 36 sections whose
+log votes differ from attendance. After our session rules for mid-day restarts and
+overnight urns, and counting memory copies of a session once, 10 and 7 remain.
+DataUrnas-BR's national round-1 log table (commit `f5e8005`) flags the same
+round-1 sections with the same counts, except one whose broken stream it reads
+whole; it publishes no round-2 log counts. Its
+Ed521
 implementation and its three CA certificates, which match byte for byte those
 embedded in TSE's 2026 format package, are independent references for our own
 (Phase 20b of the [completion plan](completion-plan.md)).
@@ -171,7 +178,7 @@ to the reviewed work, not a demonstrated unique feature or superior detector.
 | Schema-aware electoral ETL | Turicas | Pinned official AC BWEB adapter; normalized import contracts. |
 | Publication versions and denominators | INEMA | Frozen inputs and immutable derivatives; partial derived populations. |
 | Hierarchical result reconciliation | Multiverso Digital; AnaliseEleicoes | AC published-row arithmetic and UF totals match; national BR/UF/municipal/ZZ reconciliation pending. |
-| Binary BU/log/signature integration | DataUrnas-BR | I1–I9 national for 2026 (Phase 20); Ed521, certificate chains, JWS, zerésima, GEDAI and hash lists in Phase 20b; I3/I5 differences with DataUrnas-BR to reconcile. |
+| Binary BU/log/signature integration | DataUrnas-BR | I1–I9 national for 2026 (Phase 20); Ed521, certificate chains, JWS, zerésima, GEDAI and hash lists in Phase 20b; I3/I5 differences with DataUrnas-BR reconciled. |
 | Omitted zero-vote choices | Cota | Explicit unknowns; evidence-backed sparse-to-complete normalization pending. |
 | Conditional statistical screening | Klimek et al.; Kobak et al.; Rozenas; Mebane; Meinshausen; Bates et al. | Draft study protocol with a threat map, confirmatory family and power study; one AC development turnout fit; no national model or validated fraud inference. |
 

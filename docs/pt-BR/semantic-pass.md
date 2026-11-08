@@ -1,6 +1,6 @@
 # Passada semântica em fluxo (Fase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 5 · Language: pt-BR
+Document-ID: EA-SEMANTIC-PASS · Revision: 6 · Language: pt-BR
 
 [English](../en/semantic-pass.md) · [Índice de implementação](implementation-index.md)
 
@@ -131,6 +131,38 @@ sessões, segmentos e objetos, nos dois sentidos. As raízes são
 nas sessões oficiais (`10.23.0.0 - Praia da Barra do Cahy` em 2026,
 `8.26.0.0 - Onça-pintada` em 2022). Algumas sessões não têm linha de versão: 1 no
 1º turno de 2026, 8 no 1º turno de 2022, 1 no 2º turno de 2022.
+
+## Versão 4 (Fase 20b)
+
+`session-aggregates-v4` aplica as regras de sessão `sessions-v2`, compartilhadas com
+o adaptador por evento:
+
+- Uma linha de reinício do `GAP` que nomeia o turno em vigor mantém o contexto desse
+  turno. A urna não repete o marcador de turno oficial depois de um reinício no meio
+  do dia, então a versão 3 fechava o contexto ali e perdia todo voto seguinte do dia.
+- Uma sessão do contexto do turno iniciada antes do dia da eleição (urna ligada cedo
+  e deixada ligada) torna-se oficial no seu primeiro evento de votação do dia da
+  eleição e é marcada `started_before_election_day`. A versão 3 deixava essas
+  sessões não resolvidas.
+
+As sessões são as mesmas linhas da versão 3; os segmentos são menos porque os
+reinícios não dividem mais o contexto. A verificação de equivalência contra o
+adaptador passou em 200 de 200 objetos do AC sorteados em cada ano e turno (2026:
+45003 e 39683 ciclos concluídos; 2022: 43707 e 40360).
+
+| Ano | Turno | Objetos | Sessões | Segmentos | Sessões oficiais acrescidas | Iniciadas antes do dia da eleição | Tempo de relógio | Tempo de CPU | Memória de pico | Release |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026 | 1 | 498580 | 1704924 | 3312661 | 1742 | 1569 | 1:53:15 | 39767 s | 0,96 GB | 545 MB |
+| 2026 | 2 | 498581 | 3393756 | 5518787 | 1506 | 1361 | 3:03:41 | 64676 s | 1,00 GB | 838 MB |
+| 2022 | 1 | 471859 | 1805887 | 3396296 | 1440 | 871 | 1:45:28 | 39053 s | 1,01 GB | 533 MB |
+| 2022 | 2 | 471983 | 3570943 | 5726472 | 1284 | 835 | 2:52:30 | 63535 s | 1,08 GB | 830 MB |
+
+As quatro rodaram em 7–8 de novembro de 2026 com 6 workers e sem erros de objeto, em
+`~/data/election-audit-stage/phase20b-sessions/v4-national-r{1,2}-20261107/` e
+`v4-national-2022-r{1,2}-20261107/`. A memória de pico é a do maior processo. Cada
+equivalência por amostra levou de 3:10 a 5:41, quase tudo no adaptador. As seções sem
+sessão oficial do turno caem de 1636 e 1449 para 12 e 4 em 2026, e de 1013 e 1007
+para 15 e 12 em 2022 ([tabela por seção](section-table.md#resultados-nacionais)).
 
 ## Logs de apuração de contingência (SA)
 
@@ -285,4 +317,6 @@ corrupção.
   primeiro turno que termina antes num log do que no outro não coincide e precisa
   de comparação por prefixo.
 - Sessões com várias execuções oficiais por objeto (troca de urna ou reinícios)
-  ficam como observadas; agrupá-las é trabalho da Fase 22.
+  ficam como observadas, assim como cópias de uma sessão em várias memórias de uma
+  urna. A tabela por seção e o I5–I7 contam essas cópias uma vez pela linhagem do
+  bloco.
