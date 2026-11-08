@@ -13,16 +13,19 @@ import json
 import sqlite3
 import zipfile
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 if __package__:
     from .download_tse_logs import manifest_path
 else:
-    from download_tse_logs import manifest_path
+    # Run as a file, the script directory is on sys.path; ty only sees the package.
+    from download_tse_logs import manifest_path  # ty: ignore[unresolved-import]
 
 
-def inspect_member(lines):
+def inspect_member(lines: Iterable[str]) -> dict[str, Any]:
     dates = Counter()
     cycles = Counter()
     authorizations = Counter()

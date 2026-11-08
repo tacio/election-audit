@@ -7,6 +7,7 @@ from pathlib import Path
 
 from election_audit.derivatives import release_layers
 from election_audit.publication import PublicationError, open_release
+from election_audit.types import JSON
 
 SQL = {
     "features": "SELECT feature_id,readiness_state,count(*) AS components,count(value) AS numeric_values FROM audit_features GROUP BY feature_id,readiness_state ORDER BY feature_id,readiness_state",
@@ -15,7 +16,7 @@ SQL = {
     "test_access": "SELECT access_state,count(*) AS locations FROM test_partition_status GROUP BY access_state ORDER BY access_state",
     "impact": "SELECT record_id,json_extract_string(payload,'$.availability') AS availability,json_extract(payload,'$.corrected_margin_bounds') AS conditional_margin_bounds FROM impact_scenario ORDER BY record_id",
 }
-TEXT = {
+TEXT: dict[str, JSON] = {
     "en": {
         "title": "Analysis foundation report",
         "features": "Feature availability",
@@ -43,7 +44,9 @@ TEXT = {
 }
 
 
-def report_analysis(path, output, document, *, language="both"):
+def report_analysis(
+    path: Path, output: str | Path, document: JSON, *, language: str = "both"
+) -> list[Path]:
     from election_audit.archive_parsing import _read_checked
     from election_audit.release_tools import _query_connection, _restrict_query, validate_release
 
@@ -70,7 +73,7 @@ def report_analysis(path, output, document, *, language="both"):
     with open_release(path, _verified_document=document) as db:
         _restrict_query(db, path, document)
         calculations = {key: _query_connection(db, value, 1000) for key, value in sql.items()}
-    findings = {
+    findings: JSON = {
         "release_id": path.name,
         "national_status": "partial_national",
         "electoral_validation": document["electoral_validation"],

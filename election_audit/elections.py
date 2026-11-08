@@ -6,6 +6,7 @@ reviewed rules.
 """
 
 from dataclasses import asdict, dataclass
+from typing import Any
 
 # (year, round) -> (pleito, election, election date)
 ELECTIONS = {
@@ -24,7 +25,7 @@ class ElectionDescriptor:
     round: int
     election_date: str
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         key = (self.year, self.round)
         if type(self.round) is not int or type(self.year) is not int or key not in ELECTIONS:
             raise ValueError("Only 2026 and 2022 presidential rounds 1 and 2 are supported")
@@ -35,11 +36,11 @@ class ElectionDescriptor:
     def phase(self) -> str:
         return "o"
 
-    def as_dict(self):
+    def as_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
-def election_for_round(round_number=2, year=2026):
+def election_for_round(round_number: int = 2, year: int = 2026) -> ElectionDescriptor:
     if type(round_number) is not int or round_number not in (1, 2):
         raise ValueError("Round must be 1 or 2")
     if (year, round_number) not in ELECTIONS:
@@ -48,7 +49,7 @@ def election_for_round(round_number=2, year=2026):
     return ElectionDescriptor(year, pleito, election, round_number, date)
 
 
-def coerce_election(value=None):
+def coerce_election(value: ElectionDescriptor | dict[str, Any] | None = None) -> ElectionDescriptor:
     if value is None:
         return election_for_round()
     if isinstance(value, ElectionDescriptor):

@@ -3,12 +3,19 @@
 import hashlib
 from functools import lru_cache
 from importlib.resources import files
+from typing import TYPE_CHECKING
+
+from election_audit.elections import ElectionDescriptor
+from election_audit.types import Row
+
+if TYPE_CHECKING:
+    from asn1tools.compiler import Specification
 
 SCHEMA_SHA = "e53e28e9812bb7e19cc4bcc77b6ce48f25c413f62a60369a91c4f269e19b7ed6"
 
 
 @lru_cache(maxsize=1)
-def codec():
+def codec() -> Specification:
     import asn1tools
 
     raw = files("election_audit").joinpath("resources/bu-2026-mirrored.asn1").read_bytes()
@@ -17,7 +24,7 @@ def codec():
     return asn1tools.compile_string(raw.decode(), codec="ber")
 
 
-def decode_bu(raw, election):
+def decode_bu(raw: bytes, election: ElectionDescriptor) -> Row:
     if not raw or len(raw) > 4 * 1024**2:
         raise ValueError("BU byte bound")
     parser = codec()

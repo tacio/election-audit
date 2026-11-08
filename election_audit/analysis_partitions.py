@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import math
 
+import duckdb
+
 from election_audit.electoral_results import _anchor
 from election_audit.publication import PublicationError
 from election_audit.source_inventory import digest
+from election_audit.types import JSON, Row
 
 VERSION = "location-partition-v1"
 SCHEMAS = {
@@ -24,7 +27,7 @@ SCHEMAS = {
 }
 
 
-def assign_partitions(population, specification):
+def assign_partitions(population: list[Row], specification: JSON) -> tuple[list[Row], list[Row]]:
     """Only reviewed stable identity links group observations across elections/rounds."""
     if not isinstance(specification, dict) or set(specification) != {
         "version",
@@ -163,7 +166,9 @@ def assign_partitions(population, specification):
     return [plan], rows
 
 
-def partition_tables(db, specification, limit):
+def partition_tables(
+    db: duckdb.DuckDBPyConnection, specification: JSON, limit: int
+) -> tuple[list[Row], list[Row]]:
     sql = """SELECT c.snapshot_id,c.principal_section_id,c.location_id,s.election_id,s.uf,s.municipality_tse
         FROM section_composition c JOIN section s ON s.section_id=c.principal_section_id
         WHERE c.member_section_id=c.principal_section_id

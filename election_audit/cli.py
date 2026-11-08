@@ -7,6 +7,8 @@ import sqlite3
 import sys
 from importlib import import_module, metadata
 
+from election_audit.types import Argv
+
 
 def doctor() -> int:
     """Report local runtime readiness without opening acquisition data."""
@@ -26,7 +28,7 @@ def doctor() -> int:
     return 0 if ready else 1
 
 
-def main(argv=None):
+def main(argv: Argv = None) -> int | None:
     """Forward script options unchanged, including each script's --help."""
     args = list(sys.argv[1:] if argv is None else argv)
     extension_commands = {

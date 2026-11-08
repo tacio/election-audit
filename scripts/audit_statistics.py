@@ -7,9 +7,12 @@ by these functions. Impact bounds are conditional arithmetic scenarios.
 
 import math
 from bisect import bisect_left
+from collections.abc import Iterable
 
 
-def conformal_tail_pvalues(calibration_scores, test_scores):
+def conformal_tail_pvalues(
+    calibration_scores: Iterable[float], test_scores: Iterable[float]
+) -> list[float]:
     """Conservative upper-tail ranks, counting ties against rejection.
 
     Scores must be computed by the same frozen scoring function. Shared
@@ -24,7 +27,7 @@ def conformal_tail_pvalues(calibration_scores, test_scores):
     return [(1 + n - bisect_left(calibration, s)) / (n + 1) for s in scores]
 
 
-def by_adjusted_pvalues(pvalues):
+def by_adjusted_pvalues(pvalues: Iterable[float]) -> list[float]:
     """Benjamini–Yekutieli adjusted p-values, in the input order.
 
     Valid null p-values are required even though arbitrary dependence between
@@ -47,13 +50,15 @@ def by_adjusted_pvalues(pvalues):
     return adjusted
 
 
-def nonnegative_count(value, name):
+def nonnegative_count(value: int, name: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < 0:
         raise ValueError(f"{name} must be a nonnegative integer")
     return value
 
 
-def removal_contribution_bounds(a, b, other, affected, *, at_most=False):
+def removal_contribution_bounds(
+    a: int, b: int, other: int, affected: int, *, at_most: bool = False
+) -> tuple[int, int]:
     """Sharp A-minus-B contribution bounds for an anonymous removed subset.
 
     Exactly `affected` ballots are removed unless `at_most` is true. `other`
@@ -72,7 +77,7 @@ def removal_contribution_bounds(a, b, other, affected, *, at_most=False):
     return lower, upper
 
 
-def switches_to_reverse(margin):
+def switches_to_reverse(margin: int) -> int:
     """Minimum A-to-B switches for a strict B win when A currently leads."""
     nonnegative_count(margin, "margin")
     if margin == 0:
@@ -80,7 +85,7 @@ def switches_to_reverse(margin):
     return margin // 2 + 1
 
 
-def maximum_switch_margin_change(winner_votes, affected_cap):
+def maximum_switch_margin_change(winner_votes: int, affected_cap: int) -> int:
     """Adverse change from switching at most q currently A ballots to B.
 
     Covers only that mechanism; it does not bound suppression, additions,

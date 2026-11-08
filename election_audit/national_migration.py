@@ -15,10 +15,15 @@ import sqlite3
 import stat
 import subprocess
 import time
+from collections.abc import Callable, Collection, Iterable, Iterator
 from pathlib import Path
+from typing import Any
+
+type Stat = tuple[int, int, int, int, int]
+type Report = Callable[..., None]
 
 
-def sha(path):
+def sha(path: str | Path) -> str:
     h = hashlib.sha256()
     with Path(path).open("rb") as stream:
         for block in iter(lambda: stream.read(1024**2), b""):
@@ -26,7 +31,7 @@ def sha(path):
     return h.hexdigest()
 
 
-def atomic(path, value) -> None:
+def atomic(path: str | Path, value: Any) -> None:
     path = Path(path)
     body = (json.dumps(value, sort_keys=True, indent=2) + "\n").encode()
     temporary = path.with_name(path.name + ".new")
@@ -42,7 +47,7 @@ def atomic(path, value) -> None:
         os.close(fd)
 
 
-def process(pid):
+def process(pid: int | str) -> dict[str, Any] | None:
     try:
         root = Path("/proc") / str(pid)
         fields = (root / "stat").read_text().rsplit(")", 1)[1].split()
@@ -58,7 +63,7 @@ def process(pid):
         return None
 
 
-def processes():
+def processes() -> Iterator[dict[str, Any]]:
     for path in Path("/proc").iterdir():
         if path.name.isdigit():
             try:
@@ -69,11 +74,11 @@ def processes():
                 yield value
 
 
-def transfer_alive(expected, current):
+def transfer_alive(expected: dict[str, Any], current: dict[str, Any] | None) -> bool:
     return bool(current and current["start"] == expected["start"] and current["state"] != "Z")
 
 
-def writers(roots, *, allowed=()) -> None:
+def writers(roots: Iterable[str | Path], *, allowed: Collection[int] = ()) -> None:
     """Detect other transfer processes and writable file descriptors in these roots."""
     roots = [str(Path(p)).rstrip("/") for p in roots]
     for proc in processes():
@@ -130,9 +135,9 @@ def writers(roots, *, allowed=()) -> None:
                 raise RuntimeError("Cannot inspect same-user destination writers") from exc
 
 
-def wait_transfers(plan, report):
+def wait_transfers(plan: dict[str, Any], report: Report) -> dict[str, dict[str, int | None]]:
     expected = plan["transfers"]
-    outcomes = {}
+    outcomes: dict[str, dict[str, int | None]] = {}
     roots = [r[k] for r in plan["rounds"] for k in ("new_root", "old_root")]
     while True:
         alive = []
@@ -159,7 +164,7 @@ def wait_transfers(plan, report):
         time.sleep(plan.get("poll_seconds", 20))
 
 
-def relative_object(relative, expected_sha):
+def relative_object(relative: str | Path, expected_sha: str) -> Path:
     p = Path(relative)
     if (
         p.is_absolute()
@@ -173,7 +178,7 @@ def relative_object(relative, expected_sha):
     return p
 
 
-def file_stat(root, relative):
+def file_stat(root: str | Path, relative: str | Path) -> Stat:
     target = Path(root)
     if any(p.is_symlink() for p in (target, *target.parents)):
         raise ValueError("Symlink in copied source root")
@@ -187,7 +192,7 @@ def file_stat(root, relative):
     return (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns, value.st_ctime_ns)
 
 
-def verify_file(root, relative, expected_sha, size):
+def verify_file(root: str | Path, relative: str | Path, expected_sha: str, size: int) -> Stat:
     relative_object(relative, expected_sha)
     before = file_stat(root, relative)
     if before[2] != size:
@@ -214,7 +219,7 @@ def verify_file(root, relative, expected_sha, size):
     return before
 
 
-def manifest_identity(db, pleito):
+def manifest_identity(db: sqlite3.Connection, pleito: str | int) -> dict[str, Any]:
     run = db.execute(
         "SELECT id,started_at,finished_at,status FROM runs ORDER BY started_at DESC LIMIT 1"
     ).fetchone()
@@ -251,7 +256,9 @@ def manifest_identity(db, pleito):
     }
 
 
-def verify_round(item, state, report, guard):
+def verify_round(
+    item: dict[str, Any], state: str | Path, report: Report, guard: Callable[[], None]
+) -> dict[str, Any]:
     state = Path(state)
     snapshot = state / f"manifest-r{item['round']}.sqlite"
     source = Path(item["manifest"])
@@ -363,7 +370,7 @@ def verify_round(item, state, report, guard):
         return certificate
 
 
-def execute(plan_path) -> None:
+def execute(plan_path: str | Path) -> None:
     plan_path = Path(plan_path).resolve()
     plan = json.loads(plan_path.read_text())
     state = Path(plan["state"])
@@ -372,7 +379,7 @@ def execute(plan_path) -> None:
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     started = time.time()
 
-    def report(stage, extra=None) -> None:
+    def report(stage: str, extra: dict[str, Any] | None = None) -> None:
         value = {
             "stage": stage,
             "pid": os.getpid(),

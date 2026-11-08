@@ -20,25 +20,32 @@ import json
 from datetime import UTC, datetime
 from functools import lru_cache
 from importlib.resources import files
+from typing import TYPE_CHECKING, Any, cast
 
 from election_audit import ed521
+from election_audit.types import JSON, Row
+
+if TYPE_CHECKING:
+    import ed521rs
+    from cryptography import x509
+    from cryptography.hazmat.primitives.asymmetric import ec
 
 VERSION = "urn-pki-v2"
 CA_FILES = {"AC URNA": "acurna", "AC UE2020": "acue2020", "AC UE2022": "acue2022"}
 ED521_SIGNATURE_OID = "1.3.6.1.4.1.44588.2.1"
 
 
-def _resource(name):
+def _resource(name: str) -> bytes:
     raw = files("election_audit").joinpath(f"resources/pki/{name}").read_bytes()
     return raw
 
 
 @lru_cache(maxsize=1)
-def provenance():
+def provenance() -> JSON:
     return json.loads(_resource("pki.json"))
 
 
-def _pinned(name):
+def _pinned(name: str) -> bytes:
     raw = _resource(name)
     section = "certificates" if name.endswith(".der") else "revocation_lists"
     if hashlib.sha256(raw).hexdigest() != provenance()[section][name]["sha256"]:
@@ -46,14 +53,19 @@ def _pinned(name):
     return raw
 
 
-def _cn(name):
+def _cn(name: x509.Name) -> str:
     from cryptography.x509.oid import NameOID
 
     values = name.get_attributes_for_oid(NameOID.COMMON_NAME)
-    return values[0].value if values else name.rfc4514_string()
+    # A common name is a string attribute; only some other attribute types hold bytes.
+    return cast(str, values[0].value) if values else name.rfc4514_string()
 
 
-def _signed_by(certificate_or_list, key, tbs):
+def _signed_by(
+    certificate_or_list: x509.Certificate | x509.CertificateRevocationList,
+    key: ec.EllipticCurvePublicKey | ed521rs.VerifyingKey | Any,
+    tbs: bytes,
+) -> bool:
     """True when the CA ``key`` (an ECDSA key or an ``ed521rs.VerifyingKey``) signed ``tbs``."""
     import ed521rs
     from cryptography.exceptions import InvalidSignature
@@ -72,7 +84,7 @@ def _signed_by(certificate_or_list, key, tbs):
 
 
 class Authority:
-    def __init__(self, name) -> None:
+    def __init__(self, name: str) -> None:
         from cryptography import x509
         from cryptography.hazmat.primitives.serialization import Encoding
 
@@ -95,12 +107,12 @@ class Authority:
         self.crl = crl
         self.revoked = {entry.serial_number for entry in crl}
 
-    def valid_on(self, day):
+    def valid_on(self, day: datetime) -> bool:
         c = self.certificate
         return c.not_valid_before_utc <= day <= c.not_valid_after_utc
 
-    def summary(self):
-        c = self.certificate
+    def summary(self) -> JSON:
+        c, next_update = self.certificate, self.crl.next_update_utc
         return {
             "certificate": self.file,
             "serial": c.serial_number,
@@ -108,17 +120,19 @@ class Authority:
             "not_before": c.not_valid_before_utc.isoformat(),
             "not_after": c.not_valid_after_utc.isoformat(),
             "crl_this_update": self.crl.last_update_utc.isoformat(),
-            "crl_next_update": self.crl.next_update_utc.isoformat(),
+            "crl_next_update": next_update.isoformat() if next_update else None,
             "revoked_serials": sorted(self.revoked),
         }
 
 
 @lru_cache(maxsize=1)
-def authorities():
+def authorities() -> dict[str, Authority]:
     return {name: Authority(name) for name in CA_FILES}
 
 
-def check_certificate(certificate, election_date=None):
+def check_certificate(
+    certificate: x509.Certificate | None, election_date: str | None = None
+) -> Row:
     """PKI columns for a parsed urn certificate (``cryptography`` x509 object or None)."""
     row = {
         "cert_serial": None,
@@ -142,7 +156,7 @@ def check_certificate(certificate, election_date=None):
     return row
 
 
-def manifest():
+def manifest() -> JSON:
     """What the run's manifest records about the trust anchors."""
     return {
         "version": VERSION,

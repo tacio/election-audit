@@ -9,10 +9,12 @@ from pathlib import Path
 
 from election_audit.national_migration import file_stat, sha
 
-_CACHE = None
+type Roots = dict[str, tuple[Path, sqlite3.Connection]]
+
+_CACHE: tuple[tuple[str, str | None], Roots] | None = None
 
 
-def configure(path, expected_sha) -> None:
+def configure(path: str | Path, expected_sha: str) -> None:
     path = str(Path(path).absolute())
     if Path(path).is_symlink() or sha(path) != expected_sha:
         raise ValueError("Verified relocation registry checksum mismatch")
@@ -20,7 +22,7 @@ def configure(path, expected_sha) -> None:
     os.environ["ELECTION_AUDIT_RELOCATION_SHA256"] = expected_sha
 
 
-def _load():
+def _load() -> Roots | None:
     global _CACHE
     path = os.environ.get("ELECTION_AUDIT_RELOCATION")
     if not path:
@@ -74,7 +76,7 @@ def _load():
     return roots
 
 
-def relocated_root(root, relative, object_sha, size):
+def relocated_root(root: str | Path, relative: str | Path, object_sha: str, size: int) -> Path:
     """Resolve old or new roots before touching their filesystem, with no fallback."""
     roots = _load()
     if roots is None:

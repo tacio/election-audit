@@ -10,6 +10,7 @@ from pathlib import Path
 import duckdb
 
 from election_audit.cli import main as cli_main
+from election_audit.types import Argv
 from scripts.check_docs import FENCES, ROOT, document_paths
 
 CLI_COMMANDS = {
@@ -35,7 +36,7 @@ CLI_COMMANDS = {
 }
 
 
-def help_flags(command):
+def help_flags(command: str) -> set[str]:
     """Only this fixed --help invocation can run; example tokens never execute."""
     if command == "doctor":
         return {"--help"}
@@ -49,7 +50,7 @@ def help_flags(command):
     return set(re.findall(r"--[a-z][a-z0-9-]*", stream.getvalue()))
 
 
-def check_commands(root=ROOT):
+def check_commands(root: Path | str = ROOT) -> tuple[list[str], dict[str, int]]:
     root = Path(root)
     recipes = set(
         re.findall(r"^([a-z][a-z-]*)\b[^\n]*:\s*$", (root / "justfile").read_text(), re.M)
@@ -125,7 +126,7 @@ def check_commands(root=ROOT):
     return errors, counts
 
 
-def main(argv=None):
+def main(argv: Argv = None) -> bool:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     args = parser.parse_args(argv)

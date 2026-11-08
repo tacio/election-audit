@@ -7,6 +7,7 @@ from pathlib import Path
 
 from election_audit.derivatives import release_layers
 from election_audit.publication import PublicationError, open_release
+from election_audit.types import JSON
 
 SQL = {
     "selection": "SELECT selection_state, count(*) AS results FROM canonical_result GROUP BY selection_state ORDER BY selection_state",
@@ -16,7 +17,7 @@ SQL = {
     "timing": "SELECT interval_type, count(*) FILTER (WHERE json_extract_string(payload, '$.availability')='known_pair') AS known_pairs, count(*) FILTER (WHERE json_extract(payload, '$.negative')::BOOLEAN) AS negative_pairs, count(*) FILTER (WHERE json_extract(payload, '$.repeated_or_corrected')::BOOLEAN) AS repeated_pairs, count(*) FILTER (WHERE json_extract_string(payload, '$.availability')<>'known_pair') AS unavailable FROM result_timing GROUP BY interval_type ORDER BY interval_type",
     "rounds": "SELECT json_extract_string(payload, '$.availability') AS availability, count(*) AS populations FROM round_comparison GROUP BY availability ORDER BY availability",
 }
-TEXT = {
+TEXT: dict[str, JSON] = {
     "en": {
         "title": "Electoral reconciliation report",
         "scope": "Partial national population. Available operational inputs cover AC–RJ 2026 presidential runoff logs; explicitly imported results do not establish national completeness.",
@@ -54,7 +55,9 @@ TEXT = {
 }
 
 
-def report_electoral(path, output, document, *, language="both"):
+def report_electoral(
+    path: Path, output: str | Path, document: JSON, *, language: str = "both"
+) -> list[Path]:
     from election_audit.release_tools import _query_connection, _restrict_query, validate_release
 
     output = Path(output).resolve()
@@ -76,7 +79,7 @@ def report_electoral(path, output, document, *, language="both"):
         }
         for root, doc in release_layers(path, document)
     ]
-    findings = {
+    findings: JSON = {
         "release_id": path.name,
         "national_status": "partial_national",
         "electoral_validation": document["electoral_validation"],

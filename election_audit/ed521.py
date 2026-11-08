@@ -23,6 +23,8 @@ Pure Python, with no external dependencies. ``sign`` exists only so tests can ma
 
 import hashlib
 
+type Point = tuple[int, int, int, int]
+
 P = 2**521 - 1
 D = -376014 % P
 L = int(
@@ -41,7 +43,7 @@ _IDENTITY = (0, 1, 1, 0)
 BASE = (BASE_X, BASE_Y, 1, BASE_X * BASE_Y % P)
 
 
-def _add(p, q):
+def _add(p: Point, q: Point) -> Point:
     """Extended-coordinate addition for a = 1 (Hisil et al. 2008, add-2008-hwcd)."""
     x1, y1, z1, t1 = p
     x2, y2, z2, t2 = q
@@ -52,7 +54,7 @@ def _add(p, q):
     return e * f % P, g * h % P, f * g % P, e * h % P
 
 
-def _double(p):
+def _double(p: Point) -> Point:
     """Extended-coordinate doubling for a = 1 (Hisil et al. 2008, dbl-2008-hwcd)."""
     x, y, z, _ = p
     a, b = x * x % P, y * y % P
@@ -63,7 +65,7 @@ def _double(p):
     return e * f % P, g * h % P, f * g % P, e * h % P
 
 
-def _multiply(scalar, point):
+def _multiply(scalar: int, point: Point) -> Point:
     """Reference double-and-add; ``_fast_multiply`` and ``_base_multiply`` must agree with it."""
     result = _IDENTITY
     while scalar:
@@ -77,7 +79,7 @@ def _multiply(scalar, point):
 WINDOW = 4
 
 
-def _fast_multiply(scalar, point):
+def _fast_multiply(scalar: int, point: Point) -> Point:
     """[scalar]point with a fixed 4-bit window and dedicated doubling."""
     table = [_IDENTITY, point]
     for _ in range(2, 1 << WINDOW):
@@ -95,7 +97,7 @@ def _fast_multiply(scalar, point):
 _BASE_TABLE = None
 
 
-def _base_multiply(scalar):
+def _base_multiply(scalar: int) -> Point:
     """[scalar]B from a table of j * 16^i * B (built once per process); scalar < L."""
     global _BASE_TABLE
     if _BASE_TABLE is None:
@@ -118,17 +120,17 @@ def _base_multiply(scalar):
     return result
 
 
-def _equal(p, q):
+def _equal(p: Point, q: Point) -> bool:
     return (p[0] * q[2] - q[0] * p[2]) % P == 0 and (p[1] * q[2] - q[1] * p[2]) % P == 0
 
 
-def encode(point):
+def encode(point: Point) -> bytes:
     inverse = pow(point[2], -1, P)
     x, y = point[0] * inverse % P, point[1] * inverse % P
     return (y | (x & 1) << 527).to_bytes(SIZE, "little")
 
 
-def decode(data):
+def decode(data: bytes) -> Point | None:
     """Point from its 66-byte encoding, or None when it is not a canonical curve point."""
     if len(data) != SIZE:
         return None
@@ -147,12 +149,12 @@ def decode(data):
     return x, y, 1, x * y % P
 
 
-def _h(data, phflag=0, context=b""):
+def _h(data: bytes, phflag: int = 0, context: bytes = b"") -> int:
     prefix = b"SigEd521" + bytes([phflag, len(context)]) + context
     return int.from_bytes(hashlib.shake_256(prefix + data).digest(2 * SIZE), "little")
 
 
-def verify(public_key, signature, message):
+def verify(public_key: bytes, signature: bytes, message: bytes) -> bool:
     """True when ``signature`` (R || S, 132 bytes) is a valid Ed521 signature of ``message``."""
     if len(signature) != 2 * SIZE:
         return False
@@ -164,18 +166,18 @@ def verify(public_key, signature, message):
     return _equal(_base_multiply(s), _add(r, _fast_multiply(k, a)))
 
 
-def _expand(seed):
+def _expand(seed: bytes) -> tuple[int, bytes]:
     digest = _h(seed).to_bytes(2 * SIZE, "little")
     scalar = int.from_bytes(digest[:SIZE], "little")
     scalar = (scalar & ((1 << 520) - 1) & ~3) | (1 << 520)  # c = 2, n = 520
     return scalar, digest[SIZE:]
 
 
-def public_key(seed):
+def public_key(seed: bytes) -> bytes:
     return encode(_multiply(_expand(seed)[0], BASE))
 
 
-def sign(seed, message):
+def sign(seed: bytes, message: bytes) -> bytes:
     """RFC 8032 signing from a 66-byte seed; for tests only (not constant time)."""
     scalar, prefix = _expand(seed)
     a = encode(_multiply(scalar, BASE))
@@ -185,7 +187,7 @@ def sign(seed, message):
     return encoded_r + s.to_bytes(SIZE, "little")
 
 
-def _tlv(data, offset):
+def _tlv(data: bytes, offset: int) -> tuple[int, int, int]:
     """(tag, content start, end) of the DER element at ``offset``."""
     tag, length = data[offset], data[offset + 1]
     start = offset + 2
@@ -196,7 +198,7 @@ def _tlv(data, offset):
     return tag, start, start + length
 
 
-def certificate_public_key(der):
+def certificate_public_key(der: bytes) -> bytes | None:
     """The 66-byte Ed521 subject key of a DER certificate, or None for any other key type."""
     try:
         _, start, _ = _tlv(der, 0)  # Certificate
