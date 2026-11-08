@@ -148,6 +148,10 @@ def check_certificate(
         row["pki_issuer_signature"] = "unknown_issuer"
         return row
     signed = _signed_by(certificate, authority.verifier, certificate.tbs_certificate_bytes)
+    if isinstance(authority.key, bytes):  # an Ed521 CA
+        ed521.observe(
+            "ca", authority.key, certificate.tbs_certificate_bytes, certificate.signature, signed
+        )
     row["pki_issuer_signature"] = "verified" if signed else "failed"
     row["pki_revoked"] = certificate.serial_number in authority.revoked
     if election_date:

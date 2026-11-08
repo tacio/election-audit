@@ -22,8 +22,14 @@ Pure Python, with no external dependencies. ``sign`` exists only so tests can ma
 """
 
 import hashlib
+from collections.abc import Callable
 
 type Point = tuple[int, int, int, int]
+type Observer = Callable[[str, bytes, bytes, bytes, bool], None]
+
+# Called with (kind, key, message, signature, verdict) for every Ed521 verdict the integrity
+# checks reach, when set; only the Ed521 cross-check pass sets it. Verdicts never depend on it.
+observer: Observer | None = None
 
 P = 2**521 - 1
 D = -376014 % P
@@ -217,3 +223,9 @@ def certificate_public_key(der: bytes) -> bytes | None:
         return der[key_start + 1 : key_end]
     except IndexError:
         return None
+
+
+def observe(kind: str, key: bytes, message: bytes, signature: bytes, verdict: bool) -> None:
+    """Hand one verdict to ``observer``, if set."""
+    if observer is not None:
+        observer(kind, key, message, signature, verdict)

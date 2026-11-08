@@ -323,7 +323,7 @@ class Ed521Verifier:
     def __init__(self, key: bytes) -> None:
         import ed521rs
 
-        self.keys = {}
+        self.key, self.keys = key, {}
         for mode in ("strict", "ecpy"):
             try:
                 self.keys[mode] = ed521rs.VerifyingKey(key, mode=mode)
@@ -339,6 +339,9 @@ class Ed521Verifier:
         message = hashlib.sha512(digest_).digest()
         verdict = self._verify("strict", signature, message)
         self.disagreements += verdict != self._verify("ecpy", signature, message)
+        from election_audit import ed521
+
+        ed521.observe("urn", self.key, message, signature, verdict)
         return verdict
 
 
@@ -2538,7 +2541,39 @@ def integrity_check_main(argv: Argv = None) -> int:
     printed.add_argument("--cmind", help="CMInd Totalização Paralela input root (raw/*.json).")
     printed.add_argument("--arvor", help="Arvor Totalização paralela input root.")
     printed.add_argument("--output", required=True, help="New output directory.")
+    cross = sub.add_parser(
+        "ed521-crosscheck", help="Our Ed521 verdicts against DataUrnas-BR's on the same signatures."
+    )
+    cross.add_argument(
+        "--bulk-root", required=True, help="Verified bulk archive root (bulk-download)."
+    )
+    cross.add_argument("--round", type=int, required=True, choices=(1, 2), help="Round.")
+    cross.add_argument("--reference", required=True, help="DataUrnas-BR's parsers/ed521.py.")
+    cross.add_argument("--reference-label", required=True, help="Its source, e.g. repo@commit.")
+    cross.add_argument("--vectors", required=True, help="ed521rs test-vector directory.")
+    cross.add_argument("--output", required=True, help="New output directory.")
+    cross.add_argument("--workers", type=int, default=4, help="Worker processes.")
+    cross.add_argument("--uf", action="append", help="Restrict to UF (repeatable; lower case).")
+    cross.add_argument("--limit", type=int, help="Process at most this many sections.")
+    cross.add_argument("--resume", action="store_true", help="Resume the same pass.")
     args = parser.parse_args(argv)
+    if args.command == "ed521-crosscheck":
+        from election_audit.ed521_crosscheck import run_crosscheck
+
+        result = run_crosscheck(
+            args.bulk_root,
+            args.round,
+            args.output,
+            reference=args.reference,
+            vectors=args.vectors,
+            reference_label=args.reference_label,
+            workers=args.workers,
+            ufs=[u.lower() for u in args.uf] if args.uf else None,
+            limit=args.limit,
+            resume=args.resume,
+        )
+        print(json.dumps(result["summary"]))
+        return 0
     if args.command == "printed":
         from election_audit.printed_bu import run_printed
 
