@@ -2572,7 +2572,19 @@ def integrity_check_main(argv: Argv = None) -> int:
     jws.add_argument("--signed-root", required=True, help="Finished fetch-signed root.")
     jws.add_argument("--key", required=True, help="Pinned JWS key file (JWK and certificates).")
     jws.add_argument("--output", required=True, help="New output directory.")
+    lists = sub.add_parser("hash-lists", help="H1-H2: logged package names against TSE hash lists.")
+    lists.add_argument(
+        "--semantic", action="append", required=True, help="Semantic-pass v5 root (repeatable)."
+    )
+    lists.add_argument("--lists", required=True, help="Directory with path1u13/15/20/22.zip.")
+    lists.add_argument("--output", required=True, help="New output directory.")
     args = parser.parse_args(argv)
+    if args.command == "hash-lists":
+        from election_audit.hash_lists import run_hash_lists
+
+        result = run_hash_lists(args.semantic, args.lists, args.output)
+        print(json.dumps(result["summary"]))
+        return 0
     if args.command == "jws":
         from election_audit.signed_results import run_verify
 
