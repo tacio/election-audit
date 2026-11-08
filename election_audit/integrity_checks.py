@@ -2561,7 +2561,25 @@ def integrity_check_main(argv: Argv = None) -> int:
     zer.add_argument("--semantic", required=True, help="Semantic-pass v5 root (same round).")
     zer.add_argument("--output", required=True, help="New output directory.")
     zer.add_argument("--memory-limit", default="2GB", help="DuckDB memory limit.")
+    gedai = sub.add_parser("gedai", help="G1-G3: BU urn loads against the GEDAI preparation logs.")
+    gedai.add_argument("--sections", required=True, help="Section-pass output root.")
+    gedai.add_argument(
+        "--gedai-root", action="append", required=True, help="GEDAI input root (repeatable)."
+    )
+    gedai.add_argument("--output", required=True, help="New output directory.")
+    gedai.add_argument("--uf", action="append", help="Restrict to UF (repeatable; lower case).")
     args = parser.parse_args(argv)
+    if args.command == "gedai":
+        from election_audit.gedai import run_gedai
+
+        result = run_gedai(
+            args.sections,
+            args.gedai_root,
+            args.output,
+            ufs=[u.lower() for u in args.uf] if args.uf else None,
+        )
+        print(json.dumps(result["summary"]))
+        return 0
     if args.command == "zeresima":
         from election_audit.zeresima import run_zeresima
 
