@@ -11,12 +11,15 @@ import hashlib
 import io
 import json
 import re
+from collections.abc import Iterator, Sequence
 from importlib.resources import files
 from pathlib import Path
+from typing import Any
 
 from election_audit.contracts import _valid_type, validate_rows
 from election_audit.publication import SCHEMA, PublicationError
 from election_audit.source_inventory import canonical, digest
+from election_audit.types import JSON, Row
 
 VERSION = "electoral-normalized-v1"
 CONTRACT_TABLES = (
@@ -86,7 +89,7 @@ EXTENSIONS = {
 }
 
 
-def table_schema(name):
+def table_schema(name: str) -> JSON:
     if name in SCHEMA:
         spec = SCHEMA[name]
         return {
@@ -98,7 +101,7 @@ def table_schema(name):
     return EXTENSIONS[name]
 
 
-def checked_path(root, locator):
+def checked_path(root: Path, locator: str) -> Path:
     """No absolute paths, traversal, symlinks, or platform-specific separators."""
     if not isinstance(locator, str) or "\\" in locator or ":" in locator:
         raise PublicationError("Unsafe import locator")
@@ -115,7 +118,7 @@ def checked_path(root, locator):
     return path
 
 
-def _pairs(pairs):
+def _pairs(pairs: Sequence[tuple[str, Any]]) -> dict[str, Any]:
     result = {}
     for key, value in pairs:
         if key in result:
@@ -124,7 +127,7 @@ def _pairs(pairs):
     return result
 
 
-def strict_json(text):
+def strict_json(text: str) -> Any:
     return json.loads(
         text,
         object_pairs_hook=_pairs,
@@ -134,7 +137,7 @@ def strict_json(text):
     )
 
 
-def _csv_value(token, kind):
+def _csv_value(token: str, kind: str) -> Any:
     if token == "\\N":
         return None
     if kind == "integer":
@@ -150,7 +153,7 @@ def _csv_value(token, kind):
     return token
 
 
-def _rows(data, spec, name):
+def _rows(data: bytes, spec: JSON, name: str) -> Iterator[tuple[Row, JSON]]:
     if spec["encoding"] != "utf-8":
         raise PublicationError("Normalized v1 encoding must be strict UTF-8")
     text = data.decode("utf-8", errors="strict")
@@ -181,7 +184,7 @@ def _rows(data, spec, name):
         raise PublicationError("Normalized format must be csv or jsonl")
 
 
-def validate_import_row(name, row, *, schema=None) -> None:
+def validate_import_row(name: str, row: Row, *, schema: JSON | None = None) -> None:
     if name in SCHEMA:
         errors = validate_rows(name, [row], schema=schema)
         if errors:
@@ -233,7 +236,9 @@ def validate_import_row(name, row, *, schema=None) -> None:
             raise PublicationError("Negative electoral count")
 
 
-def read_import(bundle, *, max_rows=100_000, max_bytes=64 * 1024**2):
+def read_import(
+    bundle: str | Path, *, max_rows: int = 100_000, max_bytes: int = 64 * 1024**2
+) -> JSON:
     """Read only explicitly listed files, preserve exact bytes and every row witness.
 
     A caller supplies the byte hash, source locator and observation time. Successful

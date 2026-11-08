@@ -16,6 +16,7 @@ import sys
 import time
 from contextlib import closing
 from pathlib import Path
+from typing import Any
 
 from election_audit import national_tuning as tuning
 from election_audit import national_workload as workload
@@ -24,9 +25,10 @@ from election_audit.national_migration import atomic, sha, writers
 from election_audit.national_relocation import configure
 from election_audit.national_storage import iter_compact, resolve_original
 from election_audit.source_inventory import hash_file
+from election_audit.types import JSON
 
 
-def checked_copy(source, destination):
+def checked_copy(source: str | Path, destination: str | Path) -> Path:
     """Copy a checkpoint without symlinks; accept only complete hash-equal bytes."""
     source, destination = Path(source), Path(destination)
     if source.is_symlink() or any(p.is_symlink() for p in source.parents):
@@ -83,7 +85,7 @@ def checked_copy(source, destination):
     return destination
 
 
-def verify_checkpoint(path, row):
+def verify_checkpoint(path: Path, row: JSON) -> JSON:
     doc = _read_json(Path(path) / "checkpoint.json")
     if doc["object_sha256"] != row["sha256"]:
         raise ValueError("Checkpoint content does not match eligible scope")
@@ -101,7 +103,7 @@ def verify_checkpoint(path, row):
     return doc
 
 
-def execute(config_path) -> None:
+def execute(config_path: str | Path) -> None:
     config_path = Path(config_path).resolve()
     config = json.loads(config_path.read_text())
     # Trial subprocesses use -m: bind their import search/cwd to this reviewed
@@ -128,7 +130,7 @@ def execute(config_path) -> None:
     budget = 256 * 1024**3
     workspace.mkdir(parents=True, exist_ok=True)
 
-    def report(stage, **extra) -> None:
+    def report(stage: str, **extra: Any) -> None:
         value = {
             "stage": stage,
             "pid": os.getpid(),

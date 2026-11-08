@@ -10,6 +10,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+from collections.abc import Iterator
 from contextlib import closing
 from pathlib import Path
 
@@ -17,9 +18,10 @@ from election_audit.national_migration import atomic, sha
 from election_audit.national_parallel import FORMAT, checked, encoded, load
 from election_audit.national_resources import cgroup_command
 from election_audit.national_summary import replay_lines
+from election_audit.types import JSON, Row
 
 
-def verify_shard(path, job_id):
+def verify_shard(path: Path, job_id: str) -> JSON:
     path = Path(path)
     doc = json.loads((path / "shard.json").read_text())
     expected = hashlib.sha256(encoded([job_id, sorted(doc["objects"])]).encode()).hexdigest()
@@ -37,7 +39,7 @@ def verify_shard(path, job_id):
     return doc
 
 
-def iter_table(directory, table="objects"):
+def iter_table(directory: str | Path, table: str = "objects") -> Iterator[Row]:
     """Checksum once per shard, then yield bounded typed rows, never all events."""
     if table not in ("objects", "members", "blocks", "anchors", "errors"):
         raise ValueError("Unknown summary relation")
@@ -79,7 +81,7 @@ def iter_table(directory, table="objects"):
                     yield value
 
 
-def iter_source_observations(directory):
+def iter_source_observations(directory: str | Path) -> Iterator[Row]:
     """Every witness survives, including protected, pending and failed unknowns."""
     spec = load(directory)
     if sha(spec["scope"]) != spec["scope_sha256"]:
@@ -103,7 +105,14 @@ def iter_source_observations(directory):
             yield value
 
 
-def replay(directory, object_sha, member, start, stop, development_sample):
+def replay(
+    directory: str | Path,
+    object_sha: str,
+    member: str,
+    start: int,
+    stop: int,
+    development_sample: str | Path,
+) -> Iterator[JSON]:
     spec = load(directory)
     if sha(spec["scope"]) != spec["scope_sha256"]:
         raise ValueError("Frozen scope changed")
@@ -128,13 +137,13 @@ def replay(directory, object_sha, member, start, stop, development_sample):
 
 
 def launch(
-    directory,
+    directory: str | Path,
     *,
-    unit="election-audit-summary",
-    use_cgroup=True,
-    max_objects=None,
-    analysis_output=None,
-):
+    unit: str = "election-audit-summary",
+    use_cgroup: bool = True,
+    max_objects: int | None = None,
+    analysis_output: str | Path | None = None,
+) -> JSON:
     directory = Path(directory).absolute()
     spec = load(directory)
     if not re.fullmatch(r"[a-zA-Z0-9_.-]{1,100}", unit):

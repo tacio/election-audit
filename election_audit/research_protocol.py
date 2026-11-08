@@ -8,10 +8,13 @@ import json
 import shutil
 import sqlite3
 import tempfile
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 from election_audit.source_inventory import canonical, digest, utc_now
+from election_audit.types import JSON, Argv
 
 VERSION = "research-protocol-v2"
 DEFAULT_DESIGN = {
@@ -63,7 +66,7 @@ DEFAULT_DESIGN = {
 }
 
 
-def hash_file(path):
+def hash_file(path: str | Path) -> str:
     h = hashlib.sha256()
     with Path(path).open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
@@ -72,7 +75,7 @@ def hash_file(path):
 
 
 @contextmanager
-def read_only(path):
+def read_only(path: str | Path) -> Generator[sqlite3.Connection]:
     db = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA query_only=ON")
@@ -82,7 +85,7 @@ def read_only(path):
         db.close()
 
 
-def valid_anchor(anchor):
+def valid_anchor(anchor: object) -> bool:
     return (
         isinstance(anchor, dict)
         and isinstance(anchor.get("object_sha256"), str)
@@ -93,7 +96,9 @@ def valid_anchor(anchor):
     )
 
 
-def record_inspection(registry, stable_location_id, *, reason, evidence):
+def record_inspection(
+    registry: str | Path, stable_location_id: str, *, reason: str, evidence: str
+) -> str:
     """An append-only registry survives reseeding and new source populations."""
     if (
         not isinstance(stable_location_id, str)
@@ -116,11 +121,11 @@ def record_inspection(registry, stable_location_id, *, reason, evidence):
     return key
 
 
-def _probability(seed, kind, identity):
+def _probability(seed: int | str, kind: str, identity: Any) -> float:
     return int(digest([VERSION, seed, kind, identity]), 16) / (1 << 256)
 
 
-def load_protocol(path):
+def load_protocol(path: str | Path) -> JSON:
     path = Path(path).resolve()
     document = json.loads((path / "protocol.json").read_text())
     if document.get("version") != VERSION or document.get("protocol_id") != digest(
@@ -134,7 +139,13 @@ def load_protocol(path):
     return document
 
 
-def publish_protocol(feature_release, output, *, inspected=None, seed=42):
+def publish_protocol(
+    feature_release: str | Path,
+    output: str | Path,
+    *,
+    inspected: str | Path | None = None,
+    seed: int = 42,
+) -> Path:
     """Stream units into an immutable population; no outcome values are loaded."""
     if type(seed) is not int:
         raise ValueError("Seed must be an integer")
@@ -270,7 +281,7 @@ def publish_protocol(feature_release, output, *, inspected=None, seed=42):
         raise
 
 
-def research_protocol_main(argv=None) -> int:
+def research_protocol_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("feature_release", type=Path)
     parser.add_argument("--output", type=Path, required=True)

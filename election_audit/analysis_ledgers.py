@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable, Set
 
 from election_audit.electoral_results import _anchor
 from election_audit.publication import PublicationError
 from election_audit.source_inventory import canonical, digest
+from election_audit.types import JSON, Row
 from scripts.audit_statistics import (
     maximum_switch_margin_change,
     nonnegative_count,
@@ -62,7 +64,7 @@ SCHEMAS = {
 }
 
 
-def conditional_impact(payload):
+def conditional_impact(payload: JSON) -> JSON:
     """Explicit conditional arithmetic. Overlapping populations are never summed."""
     unavailable = {
         "availability": "unavailable",
@@ -136,7 +138,13 @@ def conditional_impact(payload):
     }
 
 
-def validate_records(inherited, incoming, *, partition_ids, snapshot_ids):
+def validate_records(
+    inherited: Iterable[Row],
+    incoming: list[Row],
+    *,
+    partition_ids: Set[str],
+    snapshot_ids: Set[str],
+) -> tuple[list[Row], dict[str, Row]]:
     """Immutable IDs and explicit references; input order never controls validity."""
     if not isinstance(incoming, list):
         raise PublicationError("Analysis records must be a list")
@@ -331,7 +339,7 @@ def validate_records(inherited, incoming, *, partition_ids, snapshot_ids):
             conditional_impact(p)
 
     # Generic references must be acyclic, regardless of incoming ordering.
-    def visit(identifier, chain) -> None:
+    def visit(identifier: str, chain: set[str]) -> None:
         if identifier in chain:
             raise PublicationError("Cyclic analysis record references")
         for ref in records[identifier]["references"]:
@@ -342,7 +350,7 @@ def validate_records(inherited, incoming, *, partition_ids, snapshot_ids):
     return sorted(new.values(), key=lambda r: r["record_id"]), records
 
 
-def access_status(assignments, records):
+def access_status(assignments: Iterable[Row], records: dict[str, Row]) -> list[Row]:
     inspections = [r for r in records.values() if r["record_kind"] == "test_access"]
     accessed = {}
     for record in inspections:

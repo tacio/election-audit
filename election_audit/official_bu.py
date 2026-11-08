@@ -15,6 +15,8 @@ import re
 import zipfile
 from collections import defaultdict
 from importlib.resources import files
+from pathlib import Path
+from typing import Any, overload
 from urllib.parse import urlsplit
 
 from election_audit.contracts import _valid_type, load_contract
@@ -26,6 +28,7 @@ from election_audit.electoral_imports import (
 )
 from election_audit.publication import SCHEMA, PublicationError
 from election_audit.source_inventory import ALL_UFS, ELECTION, canonical, digest, identity
+from election_audit.types import JSON, Argv, Row
 
 VERSION = "tse-bweb-2026-v1"
 LAYOUT = strict_json(
@@ -35,7 +38,7 @@ CONTRACT = load_contract()
 SOURCE_FIELDS = {"path", "sha256", "official_url", "observed_at"}
 
 
-def _row(name, **values):
+def _row(name: str, **values: Any) -> Row:
     row = {key: values.get(key) for key in SCHEMA[name]["fields"]}
     states = {key: "unknown" for key, value in row.items() if value is None}
     if states:
@@ -43,7 +46,11 @@ def _row(name, **values):
     return row
 
 
-def _integer(token, *, width=None):
+@overload
+def _integer(token: str, *, width: None = None) -> int | None: ...
+@overload
+def _integer(token: str, *, width: int) -> str | None: ...
+def _integer(token: str, *, width: int | None = None) -> int | str | None:
     if token in LAYOUT["missing_values"]:
         return None
     if not re.fullmatch(r"0|[1-9][0-9]*", token):
@@ -55,14 +62,16 @@ def _integer(token, *, width=None):
     return int(token)
 
 
-def _required(token, *, width):
+def _required(token: str, *, width: int) -> str:
     value = _integer(token, width=width)
     if value is None:
         raise PublicationError("Missing BWEB geographic identifier")
     return value
 
 
-def read_official_bu(bundle, document, bundle_bytes, *, max_rows, max_bytes):
+def read_official_bu(
+    bundle: Path, document: JSON, bundle_bytes: bytes, *, max_rows: int, max_bytes: int
+) -> JSON:
     expected = {
         "adapter",
         "verification_status",
@@ -80,7 +89,7 @@ def read_official_bu(bundle, document, bundle_bytes, *, max_rows, max_bytes):
     originals, objects, observations, sources = {}, {}, {}, {}
     byte_count = 0
 
-    def source(data, spec, media, *, role):
+    def source(data: bytes, spec: JSON, media: str, *, role: str) -> tuple[str, str]:
         sha = hashlib.sha256(data).hexdigest()
         originals[sha] = data
         objects[sha] = {
@@ -217,7 +226,7 @@ def read_official_bu(bundle, document, bundle_bytes, *, max_rows, max_bytes):
         raise PublicationError("BWEB archive contains no target presidential records")
     tables, witnesses = defaultdict(dict), defaultdict(set)
 
-    def add(name, row, records) -> None:
+    def add(name: str, row: Row, records: list[Row]) -> None:
         validate_import_row(name, row, schema=CONTRACT)
         key = canonical([row[k] for k in table_schema(name)["key"]]).decode()
         if key not in tables[name] and sum(map(len, tables.values())) >= max_rows:
@@ -258,7 +267,7 @@ def read_official_bu(bundle, document, bundle_bytes, *, max_rows, max_bytes):
     candidate_numbers = sorted(
         {r["NR_VOTAVEL"] for g in groups.values() for r, _, _ in g if r["CD_TIPO_VOTAVEL"] == "1"}
     )
-    arithmetic = []
+    arithmetic: list[dict[str, Any]] = []
     retransmissions = 0
     choice_fields = {
         "NR_PARTIDO",
@@ -483,7 +492,7 @@ def read_official_bu(bundle, document, bundle_bytes, *, max_rows, max_bytes):
                 if attendance is not None
                 else None,
                 "electorate_difference": attendance + abstention - electorate
-                if None not in (attendance, abstention, electorate)
+                if attendance is not None and abstention is not None and electorate is not None
                 else None,
             }
         )
@@ -554,7 +563,7 @@ def read_official_bu(bundle, document, bundle_bytes, *, max_rows, max_bytes):
     }
 
 
-def main(argv=None) -> int:
+def main(argv: Argv = None) -> int:
     """Inspect an explicit local official bundle without acquisition or publication."""
     import argparse
     from pathlib import Path

@@ -7,7 +7,7 @@ import sqlite3
 from collections import Counter
 from pathlib import Path
 
-from election_audit.elections import election_for_round
+from election_audit.elections import ElectionDescriptor, election_for_round
 from election_audit.electoral_verification import (
     BASE,
     VERSION,
@@ -18,9 +18,10 @@ from election_audit.electoral_verification import (
     inspect_evidence,
 )
 from election_audit.source_inventory import ALL_UFS
+from election_audit.types import JSON, Argv
 
 
-def reference_metrics(ref):
+def reference_metrics(ref: JSON) -> JSON:
     return {
         "principals": int(ref["s"]["st"]),
         "eligible_electors": int(ref["e"]["te"]),
@@ -34,7 +35,9 @@ def reference_metrics(ref):
     }
 
 
-def final_reference(store, url, election, level, code):
+def final_reference(
+    store: Evidence, url: str, election: ElectionDescriptor, level: str, code: str
+) -> tuple[JSON, str]:
     body, sha = store.get(url, "EA20_" + level)
     ref = json.loads(body)
     _required(
@@ -49,7 +52,7 @@ def final_reference(store, url, election, level, code):
     return ref, sha
 
 
-def _publish(store, summary, filename="summary.json"):
+def _publish(store: Evidence, summary: JSON, filename: str = "summary.json") -> JSON:
     directory = store.directory
     (directory / filename).write_text(_json(summary) + "\n")
     store.db.close()
@@ -65,7 +68,9 @@ def _publish(store, summary, filename="summary.json"):
     return summary
 
 
-def national_references(output, *, round_number=2, download=False):
+def national_references(
+    output: str | Path, *, round_number: int = 2, download: bool = False
+) -> JSON:
     if (Path(output) / "artifact.json").exists():
         return inspect_evidence(output)
     election = election_for_round(round_number)
@@ -118,7 +123,7 @@ def national_references(output, *, round_number=2, download=False):
     return _publish(store, summary)
 
 
-def reconcile_hierarchy(parent, output, *, download=False):
+def reconcile_hierarchy(parent: str | Path, output: str | Path, *, download: bool = False) -> JSON:
     parent = Path(parent).resolve()
     checked = inspect_evidence(parent)
     if (Path(output) / "artifact.json").exists():
@@ -249,7 +254,7 @@ def reconcile_hierarchy(parent, output, *, download=False):
     )
 
 
-def references_main(argv=None) -> int:
+def references_main(argv: Argv = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("operation", choices=("national", "hierarchy"))
     p.add_argument("--output", required=True, type=Path)

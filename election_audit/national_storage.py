@@ -5,13 +5,16 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from collections.abc import Iterable, Iterator
 from pathlib import Path
+from typing import Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
 from election_audit.national import _read_json, _sync_dir, _write_json
 from election_audit.source_inventory import canonical, hash_file, identity
+from election_audit.types import JSON, Row
 
 FORMAT = "structural-events-compact-v1"
 FIELDS = {
@@ -40,7 +43,15 @@ SCHEMA = pa.schema(
 )
 
 
-def write_compact(rows, directory, *, object_sha256, parser_version, config, batch_rows=2048):
+def write_compact(
+    rows: Iterable[Row],
+    directory: str | Path,
+    *,
+    object_sha256: str,
+    parser_version: str,
+    config: JSON,
+    batch_rows: int = 2048,
+) -> Path:
     """Consume bounded rows, preserving every logical field and an exact stream digest."""
     if type(batch_rows) is not int or batch_rows < 1:
         raise ValueError("batch_rows must be positive")
@@ -135,7 +146,7 @@ def write_compact(rows, directory, *, object_sha256, parser_version, config, bat
     return directory
 
 
-def iter_compact(directory, *, batch_rows=2048):
+def iter_compact(directory: str | Path, *, batch_rows: int = 2048) -> Iterator[Row]:
     directory = Path(directory)
     doc = _read_json(directory / "compact.json")
     if doc["version"] != FORMAT:
@@ -180,13 +191,13 @@ def iter_compact(directory, *, batch_rows=2048):
         raise ValueError("Compact logical event digest mismatch")
 
 
-def payload_rows(path):
+def payload_rows(path: str | Path) -> Iterator[Row]:
     for batch in pq.ParquetFile(path).iter_batches(batch_size=2048, columns=["payload"]):
         for value in batch.column(0).to_pylist():
             yield json.loads(value)
 
 
-def registered_original(row):
+def registered_original(row: Row) -> JSON:
     """A verified external CAS dependency; explicitly not a self-contained snapshot."""
     from election_audit.national import _validate_row
     from election_audit.source_inventory import safe_source
@@ -221,7 +232,7 @@ def registered_original(row):
     }
 
 
-def resolve_original(reference):
+def resolve_original(reference: JSON) -> Path:
     if (
         reference.get("version") != "registered-collector-cas-v1"
         or reference.get("self_contained") is not False
@@ -238,7 +249,14 @@ def resolve_original(reference):
     return Path(verified["root"]) / verified["relative_path"]
 
 
-def process_compact_original(row, store, scratch, *, output_budget_bytes, batch_rows=16384):
+def process_compact_original(
+    row: Row,
+    store: str | Path,
+    scratch: str | Path,
+    *,
+    output_budget_bytes: int,
+    batch_rows: int = 16384,
+) -> Path:
     """Publish lossless compact facts while retaining the registered raw CAS in place."""
     import resource
     import shutil
@@ -299,7 +317,7 @@ def process_compact_original(row, store, scratch, *, output_budget_bytes, batch_
                 batch_rows=batch_rows,
             )
             issues = _compact_jsonl(work / "issues.jsonl", staging / "issues.parquet", 2048)
-            files = {
+            files: dict[str, dict[str, Any]] = {
                 str(f.relative_to(staging)): dict(
                     zip(("sha256", "bytes"), hash_file(f), strict=True)
                 )

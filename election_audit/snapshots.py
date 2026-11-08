@@ -17,6 +17,7 @@ import platform
 import shutil
 import sqlite3
 import tempfile
+from collections.abc import Collection
 from importlib import metadata
 from pathlib import Path
 
@@ -28,10 +29,11 @@ from election_audit.coverage import (
     SELECTION_VERSION,
     build_population,
 )
-from election_audit.elections import election_for_round
+from election_audit.elections import ElectionDescriptor, election_for_round
 from election_audit.source_inventory import (
     ALL_UFS,
     DEFAULT_UFS,
+    SectionKey,
     canonical,
     digest,
     hash_file,
@@ -40,6 +42,7 @@ from election_audit.source_inventory import (
     safe_source,
     utc_now,
 )
+from election_audit.types import JSON, Argv, Row
 
 SNAPSHOT_FORMAT = "election-audit-snapshot-v1"
 
@@ -48,7 +51,7 @@ class SnapshotError(ValueError):
     """Invalid or changing input, incomplete publication or damaged snapshot."""
 
 
-def runtime_provenance():
+def runtime_provenance() -> JSON:
     versions = {}
     for package in ("election-audit", "duckdb", "pyarrow"):
         try:
@@ -76,7 +79,7 @@ def runtime_provenance():
     }
 
 
-def _bind_tables(tables, snapshot_id):
+def _bind_tables(tables: dict[str, list[Row]], snapshot_id: str) -> dict[str, list[Row]]:
     tables = copy.deepcopy(tables)
     for name in ("section_composition", "coverage_ledger"):
         for row in tables[name]:
@@ -89,13 +92,13 @@ def _bind_tables(tables, snapshot_id):
     return tables
 
 
-def _identity_payload(payload):
+def _identity_payload(payload: JSON) -> JSON:
     value = copy.deepcopy(payload)
     value["tables"] = _bind_tables(value["tables"], PENDING_SNAPSHOT)
     return value
 
 
-def snapshot_tables(document):
+def snapshot_tables(document: JSON) -> dict[str, list[Row]]:
     """All emitted contract tables, including snapshot/membership wrapper rows."""
     return {
         **document["payload"]["tables"],
@@ -104,7 +107,7 @@ def snapshot_tables(document):
     }
 
 
-def _validate_document(document) -> None:
+def _validate_document(document: JSON) -> None:
     if document.get("format_version") != SNAPSHOT_FORMAT:
         raise SnapshotError("Unsupported snapshot format")
     snapshot = document["snapshot"]
@@ -139,7 +142,7 @@ def _validate_document(document) -> None:
         raise SnapshotError("; ".join(errors[:10]))
 
 
-def _fsync_directory(path) -> None:
+def _fsync_directory(path: str | Path) -> None:
     descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
     try:
         os.fsync(descriptor)
@@ -147,7 +150,7 @@ def _fsync_directory(path) -> None:
         os.close(descriptor)
 
 
-def _copy_verified(source, target, expected_digest, expected_bytes) -> None:
+def _copy_verified(source: Path, target: Path, expected_digest: str, expected_bytes: int) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     hasher, length = hashlib.sha256(), 0
     # Copy bytes rather than hard-linking: later raw replacement/corruption cannot
@@ -164,7 +167,9 @@ def _copy_verified(source, target, expected_digest, expected_bytes) -> None:
     _fsync_directory(target.parent)
 
 
-def publish_snapshot(inventory: dict, population: dict, store: Path, *, reserve_bytes=0) -> Path:
+def publish_snapshot(
+    inventory: JSON, population: JSON, store: Path, *, reserve_bytes: int = 0
+) -> Path:
     """Materialize one captured input idempotently; existing snapshots never change.
 
     Interrupted staging directories are ignored on restart, never treated as
@@ -266,12 +271,12 @@ def publish_snapshot(inventory: dict, population: dict, store: Path, *, reserve_
 def create_snapshot(
     root: Path,
     store: Path,
-    ufs=DEFAULT_UFS,
+    ufs: Collection[str] = DEFAULT_UFS,
     *,
-    section_keys=None,
-    reserve_bytes=0,
-    election=None,
-    source_manifest=None,
+    section_keys: Collection[SectionKey] | None = None,
+    reserve_bytes: int = 0,
+    election: ElectionDescriptor | dict | None = None,
+    source_manifest: Path | None = None,
 ) -> Path:
     inventory = inventory_sources(
         root, ufs, section_keys=section_keys, election=election, source_manifest=source_manifest
@@ -281,7 +286,7 @@ def create_snapshot(
     )
 
 
-def inspect_snapshot(path: Path, *, verify_objects=False) -> dict:
+def inspect_snapshot(path: Path, *, verify_objects: bool = False) -> JSON:
     """Load a complete snapshot; never resolve or reread its original raw root."""
     path = Path(path)
     if path.name == "snapshot.json":
@@ -303,7 +308,7 @@ def inspect_snapshot(path: Path, *, verify_objects=False) -> dict:
         raise SnapshotError(f"Incomplete or invalid snapshot: {exc}") from exc
 
 
-def snapshot_main(argv=None) -> int:
+def snapshot_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(
         description="Freeze selected local inputs without modifying acquisition"
     )
@@ -347,7 +352,7 @@ def snapshot_main(argv=None) -> int:
     return 0
 
 
-def inspect_main(argv=None) -> int:
+def inspect_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(
         description="Inspect a frozen snapshot, independently of live acquisition"
     )

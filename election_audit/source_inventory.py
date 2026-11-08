@@ -11,12 +11,18 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from collections.abc import Collection, Mapping
 from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
-from election_audit.elections import coerce_election
+from election_audit.elections import ElectionDescriptor, coerce_election
+from election_audit.types import JSON
 from scripts.download_tse_logs import BASE, manifest_path, validate_manifest_round
+
+type SectionKey = tuple[str, str, str, str]
+type ElectionLike = ElectionDescriptor | dict[str, Any] | None
 
 INVENTORY_VERSION = "legacy-manifest-inventory-v1"
 IDENTITY_VERSION = "canonical-json-sha256-v1"
@@ -27,17 +33,17 @@ ALL_UFS = tuple(
 ELECTION = coerce_election().as_dict()
 
 
-def canonical(value) -> bytes:
+def canonical(value: Any) -> bytes:
     return json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
     ).encode("utf-8")
 
 
-def digest(value) -> str:
+def digest(value: Any) -> str:
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
-def identity(namespace: str, value) -> str:
+def identity(namespace: str, value: Any) -> str:
     return f"{namespace}:v1:{digest(value)}"
 
 
@@ -45,23 +51,23 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def section_key(row) -> tuple[str, str, str, str]:
+def section_key(row: Mapping[str, Any]) -> SectionKey:
     return row["uf"], row["municipality"], row["zone"], row["section"]
 
 
-def section_directory(key, election=None) -> str:
+def section_directory(key: SectionKey, election: ElectionLike = None) -> str:
     pleito = coerce_election(election).pleito_code
     uf, municipality, zone, section = key
     return f"{BASE}/ele2026/arquivo-urna/{pleito}/dados/{uf}/{municipality}/{zone}/{section}"
 
 
-def aux_url(key, election=None) -> str:
+def aux_url(key: SectionKey, election: ElectionLike = None) -> str:
     pleito = coerce_election(election).pleito_code
     uf, municipality, zone, section = key
     return f"{section_directory(key, election)}/p{int(pleito):06d}-{uf}-m{municipality}-z{zone}-s{section}-aux.json"
 
 
-def index_url(uf: str, election=None) -> str:
+def index_url(uf: str, election: ElectionLike = None) -> str:
     pleito = coerce_election(election).pleito_code
     return f"{BASE}/ele2026/arquivo-urna/{pleito}/config/{uf}/{uf}-p{int(pleito):06d}-cs.json"
 
@@ -88,8 +94,13 @@ def hash_file(path: Path) -> tuple[str, int]:
 
 
 def read_manifest(
-    root: Path, ufs=DEFAULT_UFS, *, section_keys=None, election=None, source_manifest=None
-) -> dict:
+    root: Path,
+    ufs: Collection[str] = DEFAULT_UFS,
+    *,
+    section_keys: Collection[SectionKey] | None = None,
+    election: ElectionLike = None,
+    source_manifest: Path | None = None,
+) -> JSON:
     """Freeze selected rows in one read transaction, including committed WAL.
 
     ``mode=ro`` intentionally does not use SQLite's ``immutable`` flag, which
@@ -194,8 +205,13 @@ def read_manifest(
 
 
 def inventory_sources(
-    root: Path, ufs=DEFAULT_UFS, *, section_keys=None, election=None, source_manifest=None
-) -> dict:
+    root: Path,
+    ufs: Collection[str] = DEFAULT_UFS,
+    *,
+    section_keys: Collection[SectionKey] | None = None,
+    election: ElectionLike = None,
+    source_manifest: Path | None = None,
+) -> JSON:
     """Hash selected current mappings, preserving failed/unknown historical cases.
 
     Current source observations are *new local inventory observations*, not HTTP

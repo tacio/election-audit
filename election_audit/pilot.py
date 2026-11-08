@@ -9,6 +9,7 @@ import sqlite3
 import time
 import zipfile
 from collections import Counter
+from collections.abc import Collection
 from contextlib import closing
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from election_audit.source_inventory import (
     safe_source,
     utc_now,
 )
+from election_audit.types import JSON, Argv
 from election_audit.walkthrough import write_json
 from scripts.download_tse_logs import manifest_path, sections
 
@@ -36,7 +38,13 @@ POOL_LIMIT = 100_000
 MAX_SELECTED_BYTES = 64 * 1024**2
 
 
-def select_pilot(root, *, seed=SEED, sampled_ufs=SAMPLED_UFS, pool_limit=POOL_LIMIT):
+def select_pilot(
+    root: str | Path,
+    *,
+    seed: str = SEED,
+    sampled_ufs: Collection[str] = SAMPLED_UFS,
+    pool_limit: int = POOL_LIMIT,
+) -> JSON:
     """Read one WAL-consistent metadata view; hash only selected-UF small indexes.
 
     Each configured UF has an ordered bounded metadata pool. For sampled UFs,
@@ -168,14 +176,14 @@ PILOT_SQL = {
 }
 
 
-def review_original_messages(snapshot):
+def review_original_messages(snapshot: Path) -> JSON:
     """Export fixed keyword counters from frozen bytes, never text or new semantics."""
     document = inspect_snapshot(snapshot, verify_objects=True)
     counters, dates, members = Counter(), Counter(), Counter()
     keywords = ("biometr", "cancel", "suspens", "reinici", "modelo de urna", "habilita")
     total_bytes = 0
 
-    def visit(body, depth=0) -> None:
+    def visit(body: bytes, depth: int = 0) -> None:
         nonlocal total_bytes
         if depth > 4:
             raise PublicationError("Review nested depth exceeded")
@@ -233,7 +241,7 @@ def review_original_messages(snapshot):
     }
 
 
-def run_pilot(source, output):
+def run_pilot(source: str | Path, output: str | Path) -> JSON:
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     started = time.monotonic()
@@ -328,7 +336,7 @@ def run_pilot(source, output):
     return result
 
 
-def pilot_main(argv=None) -> int:
+def pilot_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)

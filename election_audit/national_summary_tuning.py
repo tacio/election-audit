@@ -14,6 +14,7 @@ from pathlib import Path
 from election_audit.national_migration import atomic, sha
 from election_audit.national_parallel import checked, prepare, status
 from election_audit.national_resources import apply
+from election_audit.types import JSON
 
 FILES = (
     "national_summary.py",
@@ -29,7 +30,7 @@ FILES = (
 )
 
 
-def save_state(path, state) -> None:
+def save_state(path: Path, state: JSON) -> None:
     value = {k: v for k, v in state.items() if k != "state_sha256"}
     checksum = hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
@@ -37,7 +38,7 @@ def save_state(path, state) -> None:
     atomic(path, {**value, "state_sha256": checksum})
 
 
-def read_state(path):
+def read_state(path: Path) -> JSON:
     state = json.loads(Path(path).read_text())
     expected = state.pop("state_sha256")
     actual = hashlib.sha256(
@@ -48,7 +49,7 @@ def read_state(path):
     return state
 
 
-def cgroup_snapshot():
+def cgroup_snapshot() -> JSON:
     try:
         relative = next(
             line.split("::", 1)[1]
@@ -81,7 +82,7 @@ def cgroup_snapshot():
         return {"enforcement": "affinity/address-space fallback; cgroup telemetry unavailable"}
 
 
-def choose(trials):
+def choose(trials: list[JSON]) -> JSON:
     groups = {}
     for trial in trials:
         if trial["state"] == "accepted":
@@ -118,7 +119,7 @@ def choose(trials):
     }
 
 
-def tune(config_path):
+def tune(config_path: str | Path) -> JSON:
     config_path = Path(config_path).absolute()
     config = json.loads(config_path.read_text())
     output = Path(config["output"])
