@@ -278,7 +278,20 @@ def results_hierarchy_main(argv: Argv = None) -> int:
     get.add_argument("--output", required=True, help="New output directory.")
     get.add_argument("--delay", type=float, default=0.2, help="Seconds between requests.")
     get.add_argument("--resume", action="store_true", help="Continue an interrupted fetch.")
+    signed = commands.add_parser(
+        "fetch-signed", help="Fetch the .jws and a fresh .json of every unified file of a snapshot."
+    )
+    signed.add_argument("--ea20-root", required=True, help="Finished EA20 snapshot root.")
+    signed.add_argument("--output", required=True, help="New output directory.")
+    signed.add_argument("--delay", type=float, default=0.34, help="Seconds between requests.")
+    signed.add_argument("--resume", action="store_true", help="Continue an interrupted fetch.")
     args = parser.parse_args(argv)
+    if args.command == "fetch-signed":
+        from election_audit.signed_results import fetch as fetch_signed
+
+        result = fetch_signed(args.ea20_root, args.output, delay=args.delay, resume=args.resume)
+        print(json.dumps(result, sort_keys=True))
+        return 0
     result = fetch(args.round, args.output, delay=args.delay, resume=args.resume)
     print(json.dumps(result, sort_keys=True))
     return 0

@@ -2568,7 +2568,17 @@ def integrity_check_main(argv: Argv = None) -> int:
     )
     gedai.add_argument("--output", required=True, help="New output directory.")
     gedai.add_argument("--uf", action="append", help="Restrict to UF (repeatable; lower case).")
+    jws = sub.add_parser("jws", help="J1-J4: TSE's JWS signatures on the published results.")
+    jws.add_argument("--signed-root", required=True, help="Finished fetch-signed root.")
+    jws.add_argument("--key", required=True, help="Pinned JWS key file (JWK and certificates).")
+    jws.add_argument("--output", required=True, help="New output directory.")
     args = parser.parse_args(argv)
+    if args.command == "jws":
+        from election_audit.signed_results import run_verify
+
+        result = run_verify(args.signed_root, args.key, args.output)
+        print(json.dumps(result["summary"]))
+        return 0
     if args.command == "gedai":
         from election_audit.gedai import run_gedai
 
