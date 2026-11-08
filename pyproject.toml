@@ -51,7 +51,9 @@ target-version = "py314"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "I"]
+select = ["ANN", "E4", "E7", "E9", "F", "I"]
+# Explicit Any is allowed where values are decoded ASN.1 or JSON.
+ignore = ["ANN401"]
 
 [tool.ruff.lint.per-file-ignores]
 # Preserve the legacy worker callback while separating formatting from behavior.

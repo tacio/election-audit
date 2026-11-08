@@ -12,9 +12,10 @@ Install `uv`, `just` and `rtk`. Every recipe already wraps itself in `rtk proxy 
 
 ```sh
 rtk proxy just setup                      # uv sync --locked
-rtk proxy env UV_OFFLINE=1 just check     # full gate: lock, ruff format --check, lint, contracts, docs, doc-commands, tests
+rtk proxy env UV_OFFLINE=1 just check     # full gate: lock, ruff format --check, lint, typecheck, contracts, docs, doc-commands, tests
 rtk proxy just fmt                        # ruff format
-rtk proxy just lint                       # ruff check
+rtk proxy just lint                       # ruff check (includes ANN: every signature annotated)
+rtk proxy just typecheck                  # ty check over election_audit, scripts and tests, with all extras
 rtk proxy just test                       # python -m unittest discover -s tests -v
 rtk proxy just contracts-check            # python -m election_audit.contracts
 rtk proxy just docs-check                 # paired en/pt-BR doc metadata, links, fenced-block parity
@@ -28,7 +29,9 @@ rtk proxy uv run --locked python -m unittest tests.test_cli -v
 rtk proxy uv run --locked python -m unittest tests.test_cli.CliTests.test_delegation_preserves_options_and_restores_process_arguments
 ```
 
-Optional extras are imported lazily: `dashboard` (marimo/altair), `research` (scikit-learn, quantile-forest) and `verification` (asn1tools, cryptography). To exercise them, install with `uv sync --locked --extra <name>`. `tests/test_electoral_verification.py` skips when `verification` is missing. Ruff selects only `E4 E7 E9 F I` with line length 100 and targets py314.
+Optional extras are imported lazily: `dashboard` (marimo/altair), `research` (scikit-learn, quantile-forest) and `verification` (asn1tools, cryptography). To exercise them, install with `uv sync --locked --extra <name>`. `tests/test_electoral_verification.py` skips when `verification` is missing. Ruff selects `ANN E4 E7 E9 F I` (ANN401 allowed) with line length 100 and targets py314. ty is pinned in the dev group and treats warnings as errors.
+
+**Typing.** Every function signature is annotated, enforced by ruff `ANN`, and `ty check` must pass. Use builtin generics, `X | None` and `collections.abc`; `election_audit/types.py` holds the shared aliases (`JSON`, `Row`, `Argv`) and `one()` for queries that always return a row. Decoded ASN.1, JSON and Parquet rows stay `dict[str, Any]`. Where ty cannot follow an invariant (exactly one of two roots given, a state opened earlier), state it with a commented `assert`; ignore only untyped or generated library members, with a narrow `# ty: ignore[rule]`. Annotations never change behaviour.
 
 ## Architecture
 

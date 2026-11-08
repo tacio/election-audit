@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 33 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 34 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -217,7 +217,10 @@ No national electoral result, national margin, fitted national model or fraud
 label exists.
 
 **Checks.** The full offline gate `just check` passes (lock, format, lint,
-contracts, docs, documented commands and all 403 tests).
+type check, contracts, docs, documented commands and all 403 tests). Every
+function in `election_audit/`, `scripts/` and `tests/` is annotated (ruff `ANN`)
+and `ty check` (pinned 0.0.94) reports no diagnostics; the conventions are in
+`CLAUDE.md`.
 
 ## Next step
 

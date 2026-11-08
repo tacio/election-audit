@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 33 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 34 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -230,7 +230,10 @@ Não existe resultado eleitoral nacional, margem nacional, modelo nacional ajust
 nem rótulo de fraude.
 
 **Verificações.** A verificação offline completa `just check` passa (lock, formato,
-lint, contratos, documentos, comandos documentados e todos os 403 testes).
+lint, verificação de tipos, contratos, documentos, comandos documentados e todos os
+403 testes). Toda função em `election_audit/`, `scripts/` e `tests/` tem anotações
+de tipo (ruff `ANN`) e `ty check` (fixado em 0.0.94) não relata diagnósticos; as
+convenções estão em `CLAUDE.md`.
 
 ## Próximo passo
 

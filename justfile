@@ -22,6 +22,10 @@ fmt:
 lint:
     rtk proxy uv run --locked ruff check .
 
+# Check type annotations with ty (all extras, so optional imports resolve).
+typecheck:
+    rtk proxy uv run --locked --all-extras ty check
+
 # Run offline unit tests with isolated temporary fixtures.
 test:
     rtk proxy uv run --locked python -m unittest discover -s tests -v
@@ -39,6 +43,7 @@ check:
     rtk proxy uv lock --check
     rtk proxy uv run --locked ruff format --check .
     rtk proxy just lint
+    rtk proxy just typecheck
     rtk proxy just contracts-check
     rtk proxy just docs-check
     rtk proxy just docs-command-check
