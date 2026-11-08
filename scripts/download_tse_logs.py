@@ -14,14 +14,18 @@ import threading
 import time
 import zipfile
 from collections import Counter, defaultdict
+from collections.abc import Callable, Generator, Iterable, Iterator, Sequence
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from http.client import IncompleteRead
 from pathlib import Path
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
+
+type Section = tuple[str, str, str, str, dict[str, Any]]
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +42,7 @@ class DownloadAlreadyRunning(RuntimeError):
 
 
 @contextmanager
-def output_lock(root):
+def output_lock(root: Path) -> Generator[None]:
     """One downloader per output directory; the OS releases the lock on exit."""
     root.mkdir(parents=True, exist_ok=True)
     # Keep this file: unlinking a lock file would let another process lock a
@@ -56,7 +60,7 @@ def output_lock(root):
             fcntl.flock(handle, fcntl.LOCK_UN)
 
 
-def manifest_path(root):
+def manifest_path(root: Path) -> Path:
     """Resolve the authoritative database, which may live on a separate SSD."""
     marker = root / "manifest-location.json"
     if not marker.exists():
@@ -70,7 +74,7 @@ def manifest_path(root):
     return path
 
 
-def configure_manifest(root, requested=None):
+def configure_manifest(root: Path, requested: Path | None = None) -> Path:
     """Copy the database consistently before switching; caller holds output_lock.
 
     The original is left as a snapshot. A location marker lets all future runs
@@ -111,11 +115,11 @@ def configure_manifest(root, requested=None):
     return target
 
 
-def now():
+def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def presidential_election(config, round_number=2):
+def presidential_election(config: dict[str, Any], round_number: int = 2) -> tuple[str, str]:
     from election_audit.elections import election_for_round
 
     descriptor = election_for_round(round_number)
@@ -140,12 +144,12 @@ def presidential_election(config, round_number=2):
     return str(matches[0][0]["cd"]), str(matches[0][1]["cd"])
 
 
-def runoff(config):
+def runoff(config: dict[str, Any]) -> tuple[str, str]:
     """Backward-compatible selector for the presidential runoff."""
     return presidential_election(config, 2)
 
 
-def validate_manifest_round(connection, pleito) -> None:
+def validate_manifest_round(connection: sqlite3.Connection, pleito: str) -> None:
     """Reject mixed/wrong-round stores before resume can reuse section keys."""
     prefix = f"{BASE}/ele2026/arquivo-urna/"
     expected = prefix + pleito + "/"
@@ -159,7 +163,7 @@ def validate_manifest_round(connection, pleito) -> None:
         )
 
 
-def sections(config, uf, pleito):
+def sections(config: dict[str, Any], uf: str, pleito: str) -> Iterator[Section]:
     if str(config.get("f", "")).lower() != "o" or str(config.get("cdp")) != pleito:
         raise ValueError("Wrong phase or pleito in section index")
     if not config.get("abr"):
@@ -179,7 +183,7 @@ def sections(config, uf, pleito):
                     )
 
 
-def log_urls(aux, directory):
+def log_urls(aux: dict[str, Any], directory: str) -> Iterator[tuple[str, Any, str, str]]:
     if str(aux.get("f", "")).lower() != "o":
         raise ValueError("Auxiliary file is not official")
     seen = set()
@@ -198,7 +202,9 @@ def log_urls(aux, directory):
                 yield url, group.get("st"), group["hash"], name
 
 
-def bounded_parallel_map(function, items, workers, stop):
+def bounded_parallel_map[T, R](
+    function: Callable[[T], R], items: Iterable[T], workers: int, stop: threading.Event
+) -> Generator[R]:
     """Keep workers fed as tasks finish, with at most 2 * workers queued/running.
 
     Results arrive in completion order. Stop scheduling and cancel queued work
@@ -231,7 +237,7 @@ def bounded_parallel_map(function, items, workers, stop):
 
 
 class Collector:
-    def __init__(self, root, rps, reserve_gib, timeout) -> None:
+    def __init__(self, root: Path, rps: float, reserve_gib: float, timeout: float) -> None:
         self.root = root
         self.root.mkdir(parents=True, exist_ok=True)
         (root / "objects").mkdir(exist_ok=True)
@@ -279,11 +285,11 @@ class Collector:
                 ON logs (run, uf, municipality, zone, section);
         """)
 
-    def db(self):
+    def db(self) -> sqlite3.Connection:
         """Raw connection for initialization/tests; workers use query/transaction."""
         return self._database
 
-    def query(self, sql, parameters=(), *, one=False):
+    def query(self, sql: str, parameters: Sequence[Any] = (), *, one: bool = False) -> Any:
         with self.db_lock:
             cursor = self._database.execute(sql, parameters)
             try:
@@ -292,7 +298,7 @@ class Collector:
                 cursor.close()
 
     @contextmanager
-    def transaction(self):
+    def transaction(self) -> Generator[sqlite3.Connection]:
         # No filesystem reads, hashing or network waits inside this context.
         with self.db_lock:
             with self._database:
@@ -303,21 +309,28 @@ class Collector:
         with self.db_lock:
             self._database.close()
 
-    def abort(self, reason) -> None:
+    def abort(self, reason: str) -> None:
         with self.lock:
             if self.stop_reason is None:
                 self.stop_reason = reason
             self.stop.set()
 
-    def add_stats(self, **values) -> None:
+    def add_stats(self, **values: int) -> None:
         with self.stats_lock:
             self.stats.update(values)
 
-    def statistics(self):
+    def statistics(self) -> dict[str, int]:
         with self.stats_lock:
             return dict(self.stats)
 
-    def prepare_resume(self, items, run, *, verify_existing=False, progress=None):
+    def prepare_resume(
+        self,
+        items: Sequence[Section],
+        run: str,
+        *,
+        verify_existing: bool = False,
+        progress: Callable[[str], None] | None = None,
+    ) -> tuple[list[Section], Counter[str]]:
         """Check prior successes in bulk and copy their manifest rows in one commit.
 
         Default checks existence and recorded size. Full SHA-256 revalidation is
@@ -398,7 +411,7 @@ class Collector:
                         ok = (
                             info is not None and stat.S_ISREG(info.st_mode) and info.st_size == size
                         )
-                        if ok and verify_existing:
+                        if ok and verify_existing and path is not None:
                             ok = hashlib.sha256(path.read_bytes()).hexdigest() == digest
                         checked[cache_key] = ok
                     except FileNotFoundError:
@@ -432,7 +445,7 @@ class Collector:
                 self.reused_sections += skipped["downloaded"]
         return pending, skipped
 
-    def saved_body(self, url):
+    def saved_body(self, url: str) -> bytes | None:
         cached = self.query("SELECT path,sha256 FROM files WHERE url=?", (url,), one=True)
         if cached:
             try:
@@ -443,7 +456,7 @@ class Collector:
                 return body
         return None
 
-    def reuse_section(self, item, run) -> bool:
+    def reuse_section(self, item: Section, run: str) -> bool:
         """Reuse verified logs only when the current section metadata is unchanged."""
         uf, mun, zone, sec, metadata = item
         previous = self.query(
@@ -479,7 +492,7 @@ class Collector:
             self.reused_sections += 1
         return True
 
-    def fetch(self, url, *, metadata=False):
+    def fetch(self, url: str, *, metadata: bool = False) -> bytes:
         if self.stop.is_set():
             raise CollectionStopped()
         if not metadata:
@@ -538,6 +551,8 @@ class Collector:
                 )
             if self.stop.wait(2**attempt):
                 raise CollectionStopped()
+        else:  # the last attempt either breaks with a body or raises
+            raise AssertionError("unreachable")
         if metadata:
             json.loads(body)
             suffix = ".json"
@@ -583,10 +598,10 @@ class Collector:
             self.add_stats(new_logs=1, new_log_bytes=len(body))
         return body
 
-    def json(self, url):
+    def json(self, url: str) -> Any:
         return json.loads(self.fetch(url, metadata=True))
 
-    def section(self, item, pleito, run, missing_only=False):
+    def section(self, item: Section, pleito: str, run: str, missing_only: bool = False) -> str:
         uf, mun, zone, sec, metadata = item
         status, details = "error", None
         try:
@@ -634,7 +649,7 @@ class Collector:
         return status
 
 
-def main():
+def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--round", type=int, choices=(1, 2), default=2)
@@ -690,7 +705,7 @@ def main():
         parser.error(str(exc))
 
 
-def run_collection(args, collector) -> int:
+def run_collection(args: argparse.Namespace, collector: Collector) -> int:
     from election_audit.elections import election_for_round
 
     round_number = getattr(args, "round", 2)
