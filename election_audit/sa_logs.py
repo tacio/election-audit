@@ -29,6 +29,7 @@ import urllib.error
 import urllib.request
 import zipfile
 from collections import Counter
+from collections.abc import Callable, Iterable, Iterator
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
@@ -38,6 +39,7 @@ import pyarrow.parquet as pq
 
 from election_audit.elections import election_for_round
 from election_audit.national_migration import atomic, sha
+from election_audit.types import JSON, Argv, Row
 
 VERSION = "sa-logs-v1"
 SUMMARY_VERSION = "sa-log-summary-v1"
@@ -64,7 +66,7 @@ CREATE TABLE files(
 # --------------------------------------------------------------------------- listing
 
 
-def listed_sa_logs(staged_root, round_number):
+def listed_sa_logs(staged_root: str | Path, round_number: int) -> Iterator[JSON]:
     """Yield every SA log the frozen auxiliary files of a certified staging list."""
     staged_root = Path(staged_root)
     pleito = election_for_round(round_number).pleito_code
@@ -105,7 +107,7 @@ def listed_sa_logs(staged_root, round_number):
 # --------------------------------------------------------------------------- fetch
 
 
-def _get(url, timeout=60, attempts=3):
+def _get(url: str, timeout: float = 60, attempts: int = 3) -> tuple[bytes, str | None, str | None]:
     if not url.startswith(ALLOWED_PREFIX):
         raise ValueError(f"Host outside the allow list: {url}")
     for attempt in range(1, attempts + 1):
@@ -124,14 +126,14 @@ def _get(url, timeout=60, attempts=3):
     raise AssertionError("unreachable")
 
 
-def check_jez(body) -> None:
+def check_jez(body: bytes) -> None:
     """A JEZ is a ZIP whose CRCs verify and which holds ``logd.dat``."""
     with zipfile.ZipFile(io.BytesIO(body)) as archive:
         if archive.testzip() is not None or "logd.dat" not in archive.namelist():
             raise ValueError("Not a valid SA log container")
 
 
-def _store(output, body):
+def _store(output: Path, body: bytes) -> tuple[str, str]:
     digest = hashlib.sha256(body).hexdigest()
     relative = Path("objects") / digest[:2] / f"{digest}.jez"
     target = output / relative
@@ -150,7 +152,7 @@ def _store(output, body):
     return digest, str(relative)
 
 
-def _bulk_index(bulk_root, round_number):
+def _bulk_index(bulk_root: str | Path | None, round_number: int) -> dict[str, tuple[Path, str]]:
     """Map each UF to its verified bulk archive for this round."""
     if bulk_root is None:
         return {}
@@ -169,7 +171,15 @@ def _bulk_index(bulk_root, round_number):
     return index
 
 
-def fetch(staged_root, round_number, output, *, bulk_root=None, delay=0.5, get=_get):
+def fetch(
+    staged_root: str | Path,
+    round_number: int,
+    output: str | Path,
+    *,
+    bulk_root: str | Path | None = None,
+    delay: float = 0.5,
+    get: Callable[[str], tuple[bytes, str | None, str | None]] = _get,
+) -> JSON:
     """Fetch every listed SA log into a new root and cross-check the bulk archive."""
     staged_root, output = Path(staged_root), Path(output)
     certificate = json.loads((staged_root / "staging-certificate.json").read_bytes())
@@ -253,17 +263,18 @@ def fetch(staged_root, round_number, output, *, bulk_root=None, delay=0.5, get=_
 # --------------------------------------------------------------------------- summarize
 
 
-def _time(stamp):
+def _time(stamp: str) -> str:
     return datetime.strptime(stamp, "%d/%m/%Y %H:%M:%S").isoformat()
 
 
-def parse_sa_log(body):
+def parse_sa_log(body: bytes) -> JSON:
     """Split an SA log into counting attempts; only fixed vocabulary leaves this function."""
     with zipfile.ZipFile(io.BytesIO(body)) as archive:
         text = archive.read("logd.dat").decode("latin-1")
     lines = [line.split("\t") for line in text.splitlines()]
     rows = [r for r in lines if len(r) >= 5]
-    attempts, current, selected = [], None, None
+    attempts, selected = [], None
+    current: JSON | None = None
     fields = {"Município": "municipality", "Zona Eleitoral": "zone", "Seção Eleitoral": "section"}
     contingency = any(r[4] == "Modo de carga da UE - Urna de contingência" for r in rows)
     for stamp, _level, _device, app, message, *_ in rows:
@@ -346,7 +357,7 @@ SUMMARY_SCHEMA = pa.schema(
 )
 
 
-def summarize_row(row, body):
+def summarize_row(row: Row, body: bytes) -> Row:
     parsed = parse_sa_log(body)
     attempts = parsed["attempts"]
     election_date = datetime.fromisoformat(election_for_round(row["round"]).election_date)
@@ -354,7 +365,7 @@ def summarize_row(row, body):
     key = (row["municipality"], row["zone"], row["section"])
     in_round = [a for a in attempts if a["date"] == day]
 
-    def identity(attempt):
+    def identity(attempt: JSON) -> tuple[str, ...]:
         found = attempt["identity"]
         return tuple(found.get(k, "").lstrip("0") for k in ("municipality", "zone", "section"))
 
@@ -394,12 +405,14 @@ def summarize_row(row, body):
     }
 
 
-def load_exclusions(path):
+def load_exclusions(path: str | Path) -> tuple[set[tuple[str, ...]], str]:
     value = json.loads(Path(path).read_bytes())
     return {tuple(key) for key in value["section_keys"]}, sha(path)
 
 
-def summarize(inputs, output, exclusions_path):
+def summarize(
+    inputs: Iterable[str | Path], output: str | Path, exclusions_path: str | Path
+) -> JSON:
     """One row per fetched SA log, across one or more fetch roots.
 
     Protected sections are skipped before their logs are read.
@@ -449,7 +462,7 @@ def summarize(inputs, output, exclusions_path):
 # --------------------------------------------------------------------------- CLI
 
 
-def sa_logs_main(argv=None) -> int:
+def sa_logs_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit sa-logs",
         description="Fetch and summarize contingency-counting (SA) logs of certified rounds.",

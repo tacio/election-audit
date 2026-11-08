@@ -6,10 +6,13 @@ import os
 import resource
 import shutil
 import subprocess
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
+from election_audit.types import JSON
 
-def cpu_allocation(fraction=0.5):
+
+def cpu_allocation(fraction: float = 0.5) -> JSON:
     if not 0 < fraction <= 0.5:
         raise ValueError("CPU fraction must be >0 and <=0.5")
     allowed = sorted(os.sched_getaffinity(0))
@@ -45,7 +48,14 @@ def cpu_allocation(fraction=0.5):
     }
 
 
-def policy(*, memory_bytes=4 * 1024**3, workers=None, batch=32, prefetch=1, cpu_fraction=0.5):
+def policy(
+    *,
+    memory_bytes: int = 4 * 1024**3,
+    workers: int | None = None,
+    batch: int = 32,
+    prefetch: int = 1,
+    cpu_fraction: float = 0.5,
+) -> JSON:
     cpus = cpu_allocation(cpu_fraction)
     maximum = min(
         len(cpus["allowed_cpus"]), max(1, (memory_bytes - 768 * 1024**2) // (512 * 1024**2))
@@ -77,7 +87,7 @@ def policy(*, memory_bytes=4 * 1024**3, workers=None, batch=32, prefetch=1, cpu_
     }
 
 
-def apply(policy, *, worker=False):
+def apply(policy: JSON, *, worker: bool = False) -> JSON:
     os.sched_setaffinity(0, policy["cpu"]["allowed_cpus"])
     current = os.getpriority(os.PRIO_PROCESS, 0)
     if current < policy["nice"]:
@@ -108,7 +118,7 @@ def apply(policy, *, worker=False):
     }
 
 
-def validate(resources) -> None:
+def validate(resources: JSON) -> None:
     cpus = resources["cpu"]
     if (
         not cpus["allowed_cpus"]
@@ -134,7 +144,7 @@ def validate(resources) -> None:
         raise ValueError("Need at least 1MiB output and 1GiB bounded scratch")
 
 
-def cgroup_command(command, policy, *, unit):
+def cgroup_command(command: Sequence[str], policy: JSON, *, unit: str) -> list[str]:
     """Build a narrow user service; caller probes manager before selecting it."""
     return [
         "systemd-run",
@@ -154,7 +164,7 @@ def cgroup_command(command, policy, *, unit):
     ]
 
 
-def metrics(pids):
+def metrics(pids: Iterable[int]) -> JSON:
     # Include multiprocessing's resource tracker and any nested helpers, not only
     # executor workers. Threads share the process RSS and inherited CPU affinity.
     expanded = set(pids)

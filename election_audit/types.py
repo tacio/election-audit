@@ -15,3 +15,14 @@ type Row = dict[str, Any]
 
 type Argv = Sequence[str] | None
 """Arguments of a ``*_main`` entry point; None reads ``sys.argv``."""
+
+
+def one[T](row: T | None) -> T:
+    """The row of a query that always returns one, such as ``SELECT count(*)``.
+
+    ``fetchone()`` is typed as possibly None; this states that the query cannot be empty and
+    fails with a clear error if it ever is.
+    """
+    if row is None:
+        raise LookupError("Query returned no row")
+    return row

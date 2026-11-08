@@ -13,6 +13,11 @@ from __future__ import annotations
 import lzma
 import struct
 import zlib
+from typing import Any
+
+type Folder = dict[str, Any]
+type Parts = list[list[tuple[int, int | None]]]
+type Streams = tuple[int, list[int], list[Folder], Parts]
 
 MAGIC = b"7z\xbc\xaf\x27\x1c"
 LZMA1, LZMA2, COPY = b"\x03\x01\x01", b"\x21", b"\x00"
@@ -42,24 +47,24 @@ class SevenZipError(ValueError):
 
 
 class _Reader:
-    def __init__(self, data) -> None:
+    def __init__(self, data: bytes) -> None:
         self.data, self.pos = data, 0
 
-    def byte(self):
+    def byte(self) -> int:
         if self.pos >= len(self.data):
             raise SevenZipError("Truncated 7z header")
         value = self.data[self.pos]
         self.pos += 1
         return value
 
-    def take(self, size):
+    def take(self, size: int) -> bytes:
         if size < 0 or self.pos + size > len(self.data):
             raise SevenZipError("Truncated 7z header")
         value = self.data[self.pos : self.pos + size]
         self.pos += size
         return value
 
-    def number(self):
+    def number(self) -> int:
         first, mask, value = self.byte(), 0x80, 0
         for index in range(8):
             if not first & mask:
@@ -68,7 +73,7 @@ class _Reader:
             mask >>= 1
         return value
 
-    def bits(self, count):
+    def bits(self, count: int) -> list[bool]:
         values, current, mask = [], 0, 0
         for _ in range(count):
             if not mask:
@@ -77,16 +82,16 @@ class _Reader:
             mask >>= 1
         return values
 
-    def digests(self, count):
+    def digests(self, count: int) -> list[int | None]:
         defined = [True] * count if self.byte() else self.bits(count)
         return [struct.unpack("<I", self.take(4))[0] if d else None for d in defined]
 
-    def expect(self, value) -> None:
+    def expect(self, value: int) -> None:
         if self.byte() != value:
             raise SevenZipError("Unexpected 7z header property")
 
 
-def _streams(r):
+def _streams(r: _Reader) -> Streams:
     pack_pos, pack_sizes, folders, sub = 0, [], [], None
     while (kind := r.byte()) != END:
         if kind == PACK_INFO:
@@ -131,7 +136,7 @@ def _streams(r):
     return pack_pos, pack_sizes, folders, sub
 
 
-def _substreams(r, folders):
+def _substreams(r: _Reader, folders: list[Folder]) -> Parts:
     counts = [1] * len(folders)
     sizes = None
     prop = r.byte()
@@ -174,7 +179,7 @@ def _substreams(r, folders):
     return [list(zip(s, c, strict=True)) for s, c in zip(sizes, crcs, strict=True)]
 
 
-def _decode(folder, packed, limit):
+def _decode(folder: Folder, packed: memoryview, limit: int) -> bytes:
     if folder["size"] > limit:
         raise SevenZipError("Unpacked size bound exceeded")
     method, props = folder["method"], folder["props"]
@@ -214,7 +219,7 @@ def _decode(folder, packed, limit):
     return out
 
 
-def _unpack(data, base, streams, limit):
+def _unpack(data: bytes, base: int, streams: Streams, limit: int) -> list[bytes]:
     pack_pos, pack_sizes, folders, sub = streams
     offset, outputs = base + pack_pos, []
     for folder, size, parts in zip(folders, pack_sizes, sub, strict=True):
@@ -232,7 +237,7 @@ def _unpack(data, base, streams, limit):
     return outputs
 
 
-def _files(r, count):
+def _files(r: _Reader, count: int) -> tuple[list[bool], list[bool] | None, list[str]]:
     empty_stream, empty_file, names = [False] * count, None, None
     while (prop := r.byte()) != END:
         payload = _Reader(r.take(r.number()))
@@ -252,7 +257,7 @@ def _files(r, count):
     return empty_stream, empty_file, names or [""] * count
 
 
-def read(data, *, limit=128 * 1024**2):
+def read(data: bytes, *, limit: int = 128 * 1024**2) -> list[tuple[str, bytes, bool]]:
     """Return ``[(name, bytes, is_dir)]`` for every entry of a 7z archive held in memory."""
     if len(data) < 32 or data[:6] != MAGIC:
         raise SevenZipError("Not a 7z archive")

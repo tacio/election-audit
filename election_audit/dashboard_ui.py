@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import math
+from typing import Any
+
+from election_audit.dashboard_data import AuditDataset
+from election_audit.types import JSON, Row
 
 
-def controls(dataset, table, language="en"):
+def controls(dataset: AuditDataset, table: str, language: str = "en") -> Any:
     import marimo as mo
 
     from election_audit.dashboard_data import DIMENSIONS
@@ -18,7 +22,7 @@ def controls(dataset, table, language="en"):
         "readiness": "Readiness / Prontidão",
         "location_id": "Location / Local",
     }
-    widgets = {
+    widgets: dict[str, Any] = {
         key: mo.ui.dropdown(
             options=["all", *dataset.options(table, key)],
             value="all",
@@ -32,7 +36,7 @@ def controls(dataset, table, language="en"):
     return mo.ui.dictionary(widgets)
 
 
-def render_page(dataset, result, mo):
+def render_page(dataset: AuditDataset, result: JSON, mo: Any) -> Any:
     csv, metadata = dataset.csv(
         result["table"], filters=result["filters"], offset=result["offset"], limit=result["limit"]
     )
@@ -64,7 +68,7 @@ def render_page(dataset, result, mo):
     )
 
 
-def _flat(row, prefix=""):
+def _flat(row: JSON, prefix: str = "") -> dict[str, float]:
     result = {}
     for key, value in row.items():
         name = prefix + key
@@ -75,7 +79,7 @@ def _flat(row, prefix=""):
     return result
 
 
-def numeric_fields(rows):
+def numeric_fields(rows: list[Row]) -> list[str]:
     fields = {key for row in rows for key in _flat(row)}
     preferred = [
         "turnout",
@@ -88,7 +92,7 @@ def numeric_fields(rows):
     return [key for key in preferred if key in fields] + sorted(fields - set(preferred))
 
 
-def render_plot(rows, measure, mo, provenance=None):
+def render_plot(rows: list[Row], measure: str, mo: Any, provenance: JSON | None = None) -> Any:
     import altair as alt
 
     values = [
@@ -99,7 +103,7 @@ def render_plot(rows, measure, mo, provenance=None):
     if not values:
         return mo.md("Measure unavailable / Medida indisponível")
     histogram = (
-        alt.Chart(alt.Data(values=values))
+        alt.Chart(alt.Data(values=values))  # ty: ignore[unresolved-attribute]  # mark_* hides the type
         .mark_bar()
         .encode(
             x=alt.X("value:Q", bin=alt.Bin(maxbins=30), title=measure),
@@ -109,7 +113,7 @@ def render_plot(rows, measure, mo, provenance=None):
         .properties(height=280)
     )
     points = (
-        alt.Chart(alt.Data(values=values))
+        alt.Chart(alt.Data(values=values))  # ty: ignore[unresolved-attribute]  # mark_* hides the type
         .mark_circle(size=45, opacity=0.6)
         .encode(
             x="record:Q",
@@ -130,7 +134,7 @@ def render_plot(rows, measure, mo, provenance=None):
     ]
     map_view = (
         mo.ui.altair_chart(
-            alt.Chart(alt.Data(values=coordinates))
+            alt.Chart(alt.Data(values=coordinates))  # ty: ignore[unresolved-attribute]  # mark_* hides the type
             .mark_circle()
             .encode(
                 latitude="latitude:Q", longitude="longitude:Q", color="value:Q", tooltip=["value:Q"]

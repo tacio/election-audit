@@ -23,12 +23,14 @@ import os
 import sqlite3
 import time
 from collections import Counter
+from collections.abc import Callable, Iterator
 from datetime import datetime
 from pathlib import Path
 
 from election_audit.elections import election_for_round
 from election_audit.national_migration import atomic, sha
 from election_audit.sa_logs import _get
+from election_audit.types import JSON, Argv
 
 VERSION = "results-hierarchy-v1"
 BASE = "https://resultados.tse.jus.br/oficial/ele2026"
@@ -45,18 +47,18 @@ CREATE TABLE files(
 """
 
 
-def _urls(round_number):
+def _urls(round_number: int) -> tuple[str, str, str]:
     election = election_for_round(round_number).election_code
     code = f"e{int(election):06d}"
     return election, f"{BASE}/{election}", code
 
 
-def config_url(round_number) -> str:
+def config_url(round_number: int) -> str:
     _, root, code = _urls(round_number)
     return f"{root}/config/mun-{code}-cm.json"
 
 
-def planned(config, round_number):
+def planned(config: JSON, round_number: int) -> Iterator[JSON]:
     """Every file the configuration implies, in a stable order."""
     election, root, code = _urls(round_number)
     if str(config.get("f", "")).lower() != "o":
@@ -108,7 +110,7 @@ def planned(config, round_number):
             }
 
 
-def check(entry, value, round_number) -> None:
+def check(entry: JSON, value: JSON, round_number: int) -> None:
     """Reject a body that is not official or names another election, round or scope."""
     election = election_for_round(round_number).election_code
     if str(value.get("f", "")).lower() != "o":
@@ -126,7 +128,7 @@ def check(entry, value, round_number) -> None:
             raise ValueError(f"Presidential office missing: {entry['url']}")
 
 
-def _store(output, body):
+def _store(output: Path, body: bytes) -> tuple[str, str]:
     digest = hashlib.sha256(body).hexdigest()
     relative = Path("objects") / digest[:2] / f"{digest}.json"
     target = output / relative
@@ -145,11 +147,19 @@ def _store(output, body):
     return digest, str(relative)
 
 
-def _number(value):
+def _number(value: str | int | None) -> int | None:
     return int(value) if value not in (None, "") else None
 
 
-def _row(entry, value, digest, relative, size, etag, last_modified):
+def _row(
+    entry: JSON,
+    value: JSON,
+    digest: str,
+    relative: str,
+    size: int,
+    etag: str | None,
+    last_modified: str | None,
+) -> tuple[object, ...]:
     sections = value.get("s") if entry["kind"] == "unified" else None
     return (
         entry["url"],
@@ -173,7 +183,14 @@ def _row(entry, value, digest, relative, size, etag, last_modified):
     )
 
 
-def fetch(round_number, output, *, delay=0.2, resume=False, get=_get):
+def fetch(
+    round_number: int,
+    output: str | Path,
+    *,
+    delay: float = 0.2,
+    resume: bool = False,
+    get: Callable[[str], tuple[bytes, str | None, str | None]] = _get,
+) -> JSON:
     """Fetch the whole presidential EA20 hierarchy of one round into a new root."""
     output = Path(output)
     binding = {"version": VERSION, "round": round_number, "office": OFFICE}
@@ -250,7 +267,7 @@ def fetch(round_number, output, *, delay=0.2, resume=False, get=_get):
     return result
 
 
-def results_hierarchy_main(argv=None) -> int:
+def results_hierarchy_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit results-hierarchy",
         description="Fetch the official hierarchical presidential results (EA20) of a round.",

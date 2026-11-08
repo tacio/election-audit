@@ -7,13 +7,17 @@ import json
 import re
 import shutil
 import tempfile
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
+from typing import Any, Self
 from urllib.parse import unquote, urljoin, urlsplit
 from urllib.request import urlopen
 
 import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
+
+from election_audit.types import JSON, Row, one
 
 VERSION = "audit-dashboard-data-v1"
 MAX_MANIFEST = 4 * 1024**2
@@ -46,13 +50,13 @@ TABLES = {
 }
 
 
-def _json(value):
+def _json(value: Any) -> str:
     return json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
     )
 
 
-def _hash(path):
+def _hash(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024**2), b""):
@@ -60,7 +64,7 @@ def _hash(path):
     return h.hexdigest()
 
 
-def _relative(value):
+def _relative(value: Any) -> str:
     if not isinstance(value, str) or not value or "\\" in value:
         raise ValueError("Dataset paths must be relative")
     decoded = unquote(value)
@@ -81,10 +85,24 @@ class AuditDataset:
     """Read only manifest-declared Parquet files with bounded verified caching."""
 
     @classmethod
-    def open(cls, uri, *, cache=None, cache_bytes=256 * 1024**2, allow_http=False):
+    def open(
+        cls,
+        uri: str,
+        *,
+        cache: str | Path | None = None,
+        cache_bytes: int = 256 * 1024**2,
+        allow_http: bool = False,
+    ) -> Self:
         return cls(uri, cache=cache, cache_bytes=cache_bytes, allow_http=allow_http)
 
-    def __init__(self, uri, *, cache=None, cache_bytes=256 * 1024**2, allow_http=False) -> None:
+    def __init__(
+        self,
+        uri: str,
+        *,
+        cache: str | Path | None = None,
+        cache_bytes: int = 256 * 1024**2,
+        allow_http: bool = False,
+    ) -> None:
         self.uri = str(uri)
         parsed = urlsplit(self.uri)
         self.remote = parsed.scheme in {"https", "http"}
@@ -133,7 +151,7 @@ class AuditDataset:
             ):
                 raise ValueError("Invalid dataset checksum/size")
 
-    def _download(self, url, maximum):
+    def _download(self, url: str, maximum: int) -> bytes:
         with urlopen(url, timeout=20) as response:
             final = urlsplit(response.url)
             origin = urlsplit(self.uri)
@@ -145,10 +163,10 @@ class AuditDataset:
         return body
 
     @property
-    def tables(self):
+    def tables(self) -> tuple[str, ...]:
         return tuple(sorted(self.manifest["tables"]))
 
-    def file(self, table):
+    def file(self, table: str) -> Path:
         spec = self.manifest["tables"][table]
         relative = _relative(spec["path"])
         if not self.remote:
@@ -180,7 +198,7 @@ class AuditDataset:
             raise ValueError("Dataset checksum/size mismatch")
         return path
 
-    def _view(self, db, table) -> None:
+    def _view(self, db: duckdb.DuckDBPyConnection, table: str) -> None:
         relation = db.read_parquet(str(self.file(table)))
         columns = set(relation.columns)
         relation.create_view("source_records")
@@ -192,7 +210,14 @@ class AuditDataset:
         sql = "SELECT *" + ("," + ",".join(additions) if additions else "") + " FROM source_records"
         db.execute("CREATE VIEW records AS " + sql)
 
-    def page(self, table, *, filters=None, limit=250, offset=0):
+    def page(
+        self,
+        table: str,
+        *,
+        filters: Mapping[str, Any] | None = None,
+        limit: int = 250,
+        offset: int = 0,
+    ) -> JSON:
         if (
             type(limit) is not int
             or not 1 <= limit <= 10000
@@ -213,7 +238,7 @@ class AuditDataset:
             db.execute("SET memory_limit='256MB'")
             self._view(db, table)
             clause = " WHERE " + " AND ".join(where) if where else ""
-            count = db.execute("SELECT count(*) FROM records" + clause, values).fetchone()[0]
+            count = one(db.execute("SELECT count(*) FROM records" + clause, values).fetchone())[0]
             rows = db.execute(
                 "SELECT payload FROM records" + clause + " LIMIT ? OFFSET ?",
                 [*values, limit, offset],
@@ -229,7 +254,7 @@ class AuditDataset:
             "manifest_sha256": self.manifest_sha256,
         }
 
-    def options(self, table, dimension):
+    def options(self, table: str, dimension: str) -> list[Any]:
         if dimension not in DIMENSIONS:
             raise ValueError("Unknown dimension")
         with duckdb.connect() as db:
@@ -245,7 +270,7 @@ class AuditDataset:
                 ).fetchall()
             ]
 
-    def csv(self, table, **kwargs):
+    def csv(self, table: str, **kwargs: Any) -> tuple[str, JSON]:
         import csv
         import io
 
@@ -261,7 +286,14 @@ class AuditDataset:
         return stream.getvalue(), {k: v for k, v in result.items() if k != "rows"}
 
 
-def publish_dataset(tables, output, *, release_id, access_state, notes=()):
+def publish_dataset(
+    tables: Mapping[str, Iterable[Row]],
+    output: str | Path,
+    *,
+    release_id: str,
+    access_state: str,
+    notes: Sequence[str] = (),
+) -> Path:
     """Write a new immutable dataset from explicit, already access-filtered row streams."""
     if access_state not in {"development_only", "final_evaluated", "exploratory_unpartitioned"}:
         raise ValueError("Explicit access state required")
@@ -312,7 +344,7 @@ def publish_dataset(tables, output, *, release_id, access_state, notes=()):
         raise
 
 
-def export_release(release, output):
+def export_release(release: str | Path, output: str | Path) -> Path:
     """Export curated marts; untouched test outcomes never enter the output directory."""
     from election_audit.publication import inspect_release, open_release
     from election_audit.release_tools import resolve_release
@@ -343,7 +375,7 @@ def export_release(release, output):
             selected = {k: v for k, v in TABLES.items() if v in names}
             state = "final_evaluated" if final_evaluated else "exploratory_unpartitioned"
 
-        def stream(table):
+        def stream(table: str) -> Iterator[Row]:
             cursor = db
             cursor.execute('SELECT payload FROM "' + table + '"')
             while batch := cursor.fetchmany(2048):

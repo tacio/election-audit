@@ -6,6 +6,7 @@ import json
 import re
 import sqlite3
 from collections import Counter
+from collections.abc import Iterable
 from contextlib import closing
 from pathlib import Path
 
@@ -18,7 +19,15 @@ from election_audit.source_inventory import digest
 ALLOWED = ("training", "calibration", "development_inspected")
 
 
-def export_development(features, protocol, output, *, predictions=None, cases=None, operations=()):
+def export_development(
+    features: str | Path,
+    protocol: str | Path,
+    output: str | Path,
+    *,
+    predictions: str | Path | None = None,
+    cases: str | Path | None = None,
+    operations: Iterable[str | Path] = (),
+) -> Path:
     """Use SQL joins against pinned partitions before retrieving any outcome values."""
     features, protocol = Path(features).resolve(), Path(protocol).resolve()
     frozen = load_protocol(protocol)

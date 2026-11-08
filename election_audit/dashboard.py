@@ -8,8 +8,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from election_audit.types import Argv
 
-def dashboard_main(argv=None):
+
+def dashboard_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset")
     parser.add_argument("--port", type=int, default=2718)

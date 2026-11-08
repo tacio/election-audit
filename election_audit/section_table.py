@@ -47,6 +47,7 @@ from election_audit.elections import election_for_round
 from election_audit.features import verified_member_sections
 from election_audit.national_migration import atomic, sha
 from election_audit.source_inventory import digest
+from election_audit.types import one
 
 VERSION = "section-features-v4"
 SESSIONS_VERSION = "session-aggregates-v4"
@@ -784,7 +785,9 @@ def build(
     binding["inputs"] = inputs
     place_rounds = {
         r: (
-            r if db.execute("SELECT count(*) FROM places WHERE round = ?", [r]).fetchone()[0] else 1
+            r
+            if one(db.execute("SELECT count(*) FROM places WHERE round = ?", [r]).fetchone())[0]
+            else 1
         )
         for r in (1, 2)
     }

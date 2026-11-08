@@ -25,6 +25,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from election_audit.national_migration import atomic, sha
+from election_audit.types import JSON, Argv
 
 VERSION = "integrity-documents-v1"
 RECORDS = "ea-integrity-manifest-*.json"
@@ -39,7 +40,7 @@ CREATE TABLE documents(
 """
 
 
-def _store(output, source, digest, media_type):
+def _store(output: Path, source: Path, digest: str, media_type: str) -> str:
     relative = Path("objects") / digest[:2] / f"{digest}{EXTENSIONS.get(media_type, '.bin')}"
     target = output / relative
     if not target.exists():
@@ -53,14 +54,14 @@ def _store(output, source, digest, media_type):
     return str(relative)
 
 
-def _court(name, value):
+def _court(name: str, value: JSON) -> str:
     court = str(value.get("uf", "")).lower()
     if len(court) != 2 or not court.isalpha():
         raise ValueError(f"Record file names no court: {name}")
     return court
 
 
-def ingest(downloads, output):
+def ingest(downloads: str | Path, output: str | Path) -> JSON:
     """Match browser records to saved files by SHA-256 and file them in a new root."""
     downloads, output = Path(downloads), Path(output)
     if output.exists():
@@ -141,7 +142,7 @@ def ingest(downloads, output):
     return result
 
 
-def integrity_documents_main(argv=None) -> int:
+def integrity_documents_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit integrity-docs",
         description="File browser-collected TRE integrity test documents by SHA-256.",
