@@ -120,7 +120,7 @@ def head(url: str) -> JSON:
     return _head(_revalidate(url))
 
 
-def _revalidate(url) -> str:
+def _revalidate(url: str) -> str:
     """Return ``url`` with a throwaway query that bypasses a stale CDN cache entry."""
     separator = "&" if urlsplit(url).query else "?"
     return f"{url}{separator}revalidate={time.time_ns()}"

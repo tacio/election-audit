@@ -32,9 +32,11 @@ import threading
 import time
 import zipfile
 from collections import Counter, defaultdict
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
 from functools import lru_cache
 from importlib.resources import files
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -43,6 +45,14 @@ from election_audit import urn_pki
 from election_audit.elections import election_for_round
 from election_audit.national_migration import atomic, sha
 from election_audit.semantic_pass import verified_bulk_archives
+from election_audit.types import JSON, Argv, Row, one
+
+if TYPE_CHECKING:
+    import duckdb
+    from asn1tools.compiler import Specification
+    from cryptography import x509
+type Verifier = Callable[[bytes, bytes], bool]
+type Entries = Mapping[tuple[str, int], int]
 
 VERSION = "integrity-sections-v4"  # v4: RDV contest blocks are summed
 SHARD_SECTIONS = 250
@@ -205,7 +215,7 @@ RESTRICTED_SCHEMA = pa.schema(
 # --------------------------------------------------------------------------- codecs
 
 
-def _pinned(name, digest):
+def _pinned(name: str, digest: str) -> Specification:
     import asn1tools
 
     raw = files("election_audit").joinpath(f"resources/{name}").read_bytes()
@@ -215,45 +225,45 @@ def _pinned(name, digest):
 
 
 @lru_cache(maxsize=1)
-def bu_codec():
+def bu_codec() -> Specification:
     return _pinned("bu-2026-official.asn1", BU_SHA)
 
 
 @lru_cache(maxsize=1)
-def rdv_codec():
+def rdv_codec() -> Specification:
     return _pinned("rdv-2026-official.asn1", RDV_SHA)
 
 
 @lru_cache(maxsize=1)
-def signature_codec():
+def signature_codec() -> Specification:
     return _pinned("assinatura-2026-official.asn1", SIGNATURE_SHA)
 
 
-def _key_info(part):
+def _key_info(part: JSON) -> tuple[Any, Any]:
     """(tagChaves, certificadoDigital) of one EntidadeAssinatura; the other is None."""
     kind, value = part["informacaoChave"]
     return (value, None) if kind == "tagChaves" else (None, value)
 
 
-def digest(entries):
+def digest(entries: Entries) -> str:
     """SHA-256 of a contest's nonzero (class, number, count) entries in canonical order."""
     canonical = sorted([k, n, c] for (k, n), c in entries.items() if c)
     return hashlib.sha256(json.dumps(canonical, separators=(",", ":")).encode()).hexdigest()
 
 
-def _cargo(code):
+def _cargo(code: tuple[str, Any]) -> str | int:
     kind, value = code
     return CARGO[value] if kind == "cargoConstitucional" else int(value)
 
 
-def _hex(value):
+def _hex(value: Any) -> str:
     return value.hex().upper() if isinstance(value, bytes | bytearray) else str(value)
 
 
 # --------------------------------------------------------------------------- checks
 
 
-def hardware_verifier(hardware):
+def hardware_verifier(hardware: JSON) -> tuple[Verifier | None, x509.Certificate | None]:
     """Verifier for the urn hardware key, or None when it cannot be checked.
 
     Observed on 2026 urns, both over the 64-byte SHA-512 hash, hashed again with SHA-512:
@@ -309,7 +319,7 @@ class Ed521Verifier:
     Each signature is also checked as ECPy, TSE's reference verifier, would; ``disagreements``
     counts the signatures where the two verdicts differ (expected 0)."""
 
-    def __init__(self, key) -> None:
+    def __init__(self, key: bytes) -> None:
         import ed521rs
 
         self.keys = {}
@@ -320,18 +330,18 @@ class Ed521Verifier:
                 self.keys[mode] = None  # the key does not decode: every signature fails
         self.disagreements = 0
 
-    def _verify(self, mode, signature, message):
+    def _verify(self, mode: str, signature: bytes, message: bytes) -> bool:
         key = self.keys[mode]
         return key is not None and key.verify(signature, message)
 
-    def __call__(self, digest_, signature):
+    def __call__(self, digest_: bytes, signature: bytes) -> bool:
         message = hashlib.sha512(digest_).digest()
         verdict = self._verify("strict", signature, message)
         self.disagreements += verdict != self._verify("ecpy", signature, message)
         return verdict
 
 
-def ed521_implementation():
+def ed521_implementation() -> JSON:
     import ed521rs
     from ed521rs import _native
 
@@ -346,7 +356,9 @@ def ed521_implementation():
     }
 
 
-def check_signatures(raw, published, election_date=None):
+def check_signatures(
+    raw: bytes, published: Mapping[str, bytes], election_date: str | None = None
+) -> tuple[Row, Verifier | None]:
     """I1. ``published`` maps member name to its SHA-512 digest (bytes).
 
     Returns the row and a verifier for other values signed by the urn hardware key."""
@@ -427,14 +439,15 @@ def check_signatures(raw, published, election_date=None):
     return row, verify
 
 
-def _cn(name):
+def _cn(name: x509.Name) -> str:
     from cryptography.x509.oid import NameOID
 
     values = name.get_attributes_for_oid(NameOID.COMMON_NAME)
-    return values[0].value if values else name.rfc4514_string()
+    # A common name is a string attribute; only some other attribute types hold bytes.
+    return cast(str, values[0].value) if values else name.rfc4514_string()
 
 
-def chain(bu, election, pleito):
+def chain(bu: JSON, election: JSON, pleito: Any) -> tuple[str, int]:
     """Recompute the BU hash chain of one election; returns (status, failing blocks)."""
     section = bu["identificacaoSecao"]
     load = bu["urna"]["correspondenciaResultado"]["carga"]["codigoCarga"]
@@ -470,7 +483,7 @@ def chain(bu, election, pleito):
     return ("ok" if final and not failed else "failed"), failed
 
 
-def bu_contests(bu):
+def bu_contests(bu: JSON) -> dict[tuple[int, str | int], JSON]:
     """Per (election, cargo): canonical entries, attendance and votes, from a decoded BU."""
     contests = {}
     for election in bu["resultadosVotacaoPorEleicao"]:
@@ -492,7 +505,7 @@ def bu_contests(bu):
     return contests
 
 
-def rdv_contests(rdv):
+def rdv_contests(rdv: JSON) -> tuple[dict[tuple[int, str | int], JSON], str]:
     contests = {}
     kind, elections = rdv["eleicoes"]
     for election in elections:
@@ -518,7 +531,7 @@ def rdv_contests(rdv):
     return contests, kind
 
 
-def _key_of(identification):
+def _key_of(identification: JSON) -> tuple[str, str, str]:
     zone = identification["municipioZona"]
     return (
         str(zone["municipio"]).zfill(5),
@@ -527,7 +540,13 @@ def _key_of(identification):
     )
 
 
-def check_section(item, blobs, published, pleito, election_date=None):
+def check_section(
+    item: Row,
+    blobs: Mapping[str, bytes],
+    published: Mapping[str, bytes],
+    pleito: int,
+    election_date: str | None = None,
+) -> tuple[Row, list[Row], list[Row], list[Row]]:
     """All per-section checks; returns (section row, contest rows, restricted rows, issues)."""
     uf, municipality, zone, section = item["key"]
     base = {"uf": uf, "municipality": municipality, "zone": zone, "section": section}
@@ -757,7 +776,14 @@ def check_section(item, blobs, published, pleito, election_date=None):
 # --------------------------------------------------------------------------- work list
 
 
-def section_work_list(bulk_root, archives, year, round_number, *, limit=None):
+def section_work_list(
+    bulk_root: str | Path,
+    archives: Sequence[Row],
+    year: int,
+    round_number: int,
+    *,
+    limit: int | None = None,
+) -> tuple[list[Row], dict[str, Any]]:
     """Sections of the bulk archives in physical order, plus unexpected members per archive."""
     if year != 2026:
         raise ValueError("Only the 2026 member layout has been reviewed for integrity checks")
@@ -786,7 +812,7 @@ def section_work_list(bulk_root, archives, year, round_number, *, limit=None):
                 if match[6] in ("busa", "imgbusa", "logsa", "sa"):
                     sections[key]["_sa"] = True
         extras[archive["path"]] = odd
-        for key in sorted(sections, key=order.get):
+        for key in sorted(sections, key=order.__getitem__):  # every section has an offset
             members = sections[key]
             sa = members.pop("_sa", False)
             items.append(
@@ -800,7 +826,9 @@ def section_work_list(bulk_root, archives, year, round_number, *, limit=None):
     return (items[:limit] if limit is not None else items), extras
 
 
-def read_shard(bulk_root, items):
+def read_shard(
+    bulk_root: str | Path, items: Sequence[Row]
+) -> list[tuple[dict[str, bytes], dict[str, bytes]]]:
     """Read one shard's members in order: small files as bytes, others as SHA-512 only."""
     out, handle, current = [], None, None
     try:
@@ -811,6 +839,7 @@ def read_shard(bulk_root, items):
                 handle = zipfile.ZipFile(Path(bulk_root) / item["archive"])
                 current = item["archive"]
             blobs, published = {}, {}
+            assert handle is not None  # opened for the first item's archive
             for kind, name in sorted(
                 item["members"].items(), key=lambda kv: handle.getinfo(kv[1]).header_offset
             ):
@@ -837,11 +866,13 @@ def read_shard(bulk_root, items):
 # --------------------------------------------------------------------------- pass
 
 
-def _write(path, rows, schema) -> None:
+def _write(path: Path, rows: list[Row], schema: pa.Schema) -> None:
     pq.write_table(pa.Table.from_pylist(rows, schema=schema), path, compression="zstd")
 
 
-def run_shard(task):
+def run_shard(
+    task: tuple[str, int, list[Row], list[tuple[dict[str, bytes], dict[str, bytes]]], int, str],
+) -> tuple[int, int, int]:
     shard_dir, index, items, bodies, pleito, election_date = task
     sections, contests, restricted, issues = [], [], [], []
     for item, (blobs, published) in zip(items, bodies, strict=True):
@@ -883,17 +914,17 @@ def _init_worker() -> None:
 
 
 def run_sections(
-    bulk_root,
-    round_number,
-    output,
+    bulk_root: str | Path,
+    round_number: int,
+    output: str | Path,
     *,
-    year=2026,
-    workers=4,
-    ufs=None,
-    limit=None,
-    resume=False,
-    shard_sections=SHARD_SECTIONS,
-):
+    year: int = 2026,
+    workers: int = 4,
+    ufs: Collection[str] | None = None,
+    limit: int | None = None,
+    resume: bool = False,
+    shard_sections: int = SHARD_SECTIONS,
+) -> JSON:
     """Run the section pass of one round into a new (or resumed) output root."""
     bulk_root = Path(bulk_root).expanduser().absolute()
     output = Path(output).expanduser().absolute()
@@ -933,7 +964,9 @@ def run_sections(
     todo = [i for i in range(len(shards)) if i not in done]
     gate = threading.BoundedSemaphore(workers + 2)
 
-    def tasks():
+    def tasks() -> Iterator[
+        tuple[str, int, list[Row], list[tuple[dict[str, bytes], dict[str, bytes]]], int, str]
+    ]:
         for i in todo:
             gate.acquire()
             yield (
@@ -947,7 +980,7 @@ def run_sections(
 
     started, finished, errors = time.monotonic(), sum(len(shards[i]) for i in done), 0
 
-    def report(stage, **extra) -> None:
+    def report(stage: str, **extra: Any) -> None:
         atomic(
             output / "status.json",
             {
@@ -977,7 +1010,7 @@ def run_sections(
     return result
 
 
-def merge(output, shard_count, binding, extras):
+def merge(output: Path, shard_count: int, binding: JSON, extras: JSON) -> JSON:
     release = output / "release"
     shutil.rmtree(release, ignore_errors=True)
     temporary = output / ".release.tmp"
@@ -1032,7 +1065,7 @@ def merge(output, shard_count, binding, extras):
     return manifest
 
 
-def summarize(release):
+def summarize(release: Path) -> JSON:
     """Check-level counts, from statuses only."""
     sections = pq.read_table(release / "sections.parquet").to_pylist()
     contests = pq.read_table(
@@ -1135,7 +1168,9 @@ SECTION_I2_SCHEMA = pa.schema(
 )
 
 
-def bweb_files(bweb_root, round_number, ufs=None):
+def bweb_files(
+    bweb_root: str | Path, round_number: int, ufs: Collection[str] | None = None
+) -> list[Row]:
     """Complete BWEB archives of one round from the input manifest, size-checked."""
     import contextlib
     import sqlite3
@@ -1163,7 +1198,7 @@ def bweb_files(bweb_root, round_number, ufs=None):
     return found
 
 
-def load_bweb(db, archive_path, table="b"):
+def load_bweb(db: duckdb.DuckDBPyConnection, archive_path: str | Path, table: str = "b") -> str:
     """Stream one BWEB CSV member into a DuckDB table of string columns."""
     import pyarrow.csv as pacsv
 
@@ -1211,7 +1246,9 @@ ORDER BY municipality, zone, section, election, cargo, k, n
 """
 
 
-def bweb_contests(db):
+def bweb_contests(
+    db: duckdb.DuckDBPyConnection,
+) -> dict[tuple[Any, ...], tuple[str, bool, Any, bool, Any, bool]]:
     """Contest digests and counts of one loaded BWEB table, streamed in key order.
 
     DuckDB groups and sorts (both spill to disk); the digest is built here with
@@ -1262,16 +1299,22 @@ FROM m GROUP BY ALL
 """
 
 
-def bweb_identity(db, uf, round_number, year):
+def bweb_identity(
+    db: duckdb.DuckDBPyConnection, uf: str, round_number: int, year: int
+) -> list[str]:
     election = election_for_round(round_number, year)
-    bad = db.execute(
-        "SELECT count(*) FROM b WHERE lower(SG_UF) <> ? OR CD_PLEITO <> ? OR NR_TURNO <> ?",
-        [uf, str(int(election.pleito_code)), str(round_number)],
-    ).fetchone()[0]
+    bad = one(
+        db.execute(
+            "SELECT count(*) FROM b WHERE lower(SG_UF) <> ? OR CD_PLEITO <> ? OR NR_TURNO <> ?",
+            [uf, str(int(election.pleito_code)), str(round_number)],
+        ).fetchone()
+    )[0]
     return bad
 
 
-def _bu_entries(bulk_root, archive, key, pleito, package):
+def _bu_entries(
+    bulk_root: str | Path, archive: str, key: tuple[str, ...], pleito: int, package: str
+) -> dict[tuple[int, str | int], JSON]:
     """Re-read one BU from its bulk archive to report the values of a disagreeing contest."""
     uf, municipality, zone, section = key
     suffix = "busa" if package == "sa" else "bu"
@@ -1283,7 +1326,7 @@ def _bu_entries(bulk_root, archive, key, pleito, package):
     return bu_contests(parser.decode("EntidadeBoletimUrna", envelope["conteudo"]))
 
 
-def _uf_db(temporary, uf, memory_limit):
+def _uf_db(temporary: Path, uf: str, memory_limit: str) -> duckdb.DuckDBPyConnection:
     """A fresh DuckDB database per BWEB archive, so no UF's memory carries over."""
     import duckdb
 
@@ -1295,13 +1338,20 @@ def _uf_db(temporary, uf, memory_limit):
     return db
 
 
-def _drop_uf_db(db, temporary, uf) -> None:
+def _drop_uf_db(db: duckdb.DuckDBPyConnection, temporary: Path, uf: str) -> None:
     db.close()
     for name in (f"bweb-{uf}.duckdb", f"bweb-{uf}.duckdb.wal"):
         (temporary / name).unlink(missing_ok=True)
 
 
-def run_bweb(sections_root, bweb_root, output, *, ufs=None, memory_limit="1GB"):
+def run_bweb(
+    sections_root: str | Path,
+    bweb_root: str | Path,
+    output: str | Path,
+    *,
+    ufs: Collection[str] | None = None,
+    memory_limit: str = "1GB",
+) -> JSON:
     """I2: compare every BWEB contest and section field with the section-pass release."""
     import duckdb
 
@@ -1627,7 +1677,7 @@ SELECT municipality, 'aggregated_sections',
 """
 
 
-def ea20_measures(node):
+def ea20_measures(node: JSON) -> dict[str, int]:
     """Presidential measures of one EA20 unified file, as integers."""
     measures = {}
     for cargo in node["carg"]:
@@ -1654,11 +1704,13 @@ def ea20_measures(node):
 EA20_ONLY = ("sections_total", "sections_not_installed")
 
 
-def ea20_extra(node):
+def ea20_extra(node: JSON) -> dict[str, int]:
     return {"sections_total": int(node["s"]["ts"]), "sections_not_installed": int(node["s"]["sni"])}
 
 
-def ea20_nodes(ea20_root, round_number):
+def ea20_nodes(
+    ea20_root: str | Path, round_number: int
+) -> tuple[dict[Any, JSON], dict[str, str], dict[Any, dict[str, int]]]:
     """Unified EA20 files of a finished hierarchy fetch, hash-checked, keyed by node."""
     import contextlib
     import sqlite3
@@ -1690,7 +1742,9 @@ def ea20_nodes(ea20_root, round_number):
     return nodes, hashes, extras
 
 
-def _compare(expected, observed, keys):
+def _compare(
+    expected: Mapping[str, Any], observed: Mapping[str, Any], keys: Iterable[str]
+) -> dict[str, JSON]:
     differing = {
         k: {"ea20": expected.get(k), "observed": observed.get(k)}
         for k in sorted(keys)
@@ -1699,7 +1753,15 @@ def _compare(expected, observed, keys):
     return differing
 
 
-def run_hierarchy(bweb_root, ea20_root, round_number, output, *, ufs=None, memory_limit="2GB"):
+def run_hierarchy(
+    bweb_root: str | Path,
+    ea20_root: str | Path,
+    round_number: int,
+    output: str | Path,
+    *,
+    ufs: Collection[str] | None = None,
+    memory_limit: str = "2GB",
+) -> JSON:
     """I4: section sums (BWEB, tied to the BU by I2) against every EA20 node."""
 
     output = Path(output).expanduser().absolute()
@@ -1732,7 +1794,14 @@ def run_hierarchy(bweb_root, ea20_root, round_number, output, *, ufs=None, memor
     rows, issues = [], []
     uf_sums, aggregated = {}, Counter()
 
-    def record(level, uf, municipality, comparison, expected, observed) -> None:
+    def record(
+        level: str,
+        uf: str | None,
+        municipality: str | None,
+        comparison: str,
+        expected: Mapping[str, Any],
+        observed: Mapping[str, Any],
+    ) -> None:
         keys = set(expected) | set(observed)
         differing = _compare(expected, observed, keys)
         rows.append(
@@ -1859,13 +1928,19 @@ CORRESPONDENCE_SCHEMA = pa.schema(
 )
 
 
-def _stamp(value):
+def _stamp(value: str | None) -> str | None:
     if not value or len(value) < 19:
         return None
     return value[:4] + value[5:7] + value[8:10] + "T" + value[11:13] + value[14:16] + value[17:19]
 
 
-def run_correspondence(sections_root, ceft_root, output, *, ufs=None):
+def run_correspondence(
+    sections_root: str | Path,
+    ceft_root: str | Path,
+    output: str | Path,
+    *,
+    ufs: Collection[str] | None = None,
+) -> JSON:
     """I9: each section's effective urn (CEFT) against the urn its BU says produced it."""
     import contextlib
     import csv
@@ -2058,7 +2133,7 @@ LOG_SECTION_SCHEMA = pa.schema(
 )
 
 
-def _witness_map(release):
+def _witness_map(release: Path) -> dict[tuple[str, ...], list[Row]]:
     objects = pq.read_table(
         release / "objects.parquet", columns=["object_sha256", "witnesses_json", "status"]
     ).to_pylist()
@@ -2070,7 +2145,9 @@ def _witness_map(release):
     return mapping
 
 
-def _official(release, digests, round_number):
+def _official(
+    release: Path, digests: Collection[str], round_number: int
+) -> dict[tuple[str, ...], list[Row]]:
     import pyarrow.compute as pc
 
     columns = [
@@ -2094,9 +2171,9 @@ def _official(release, digests, round_number):
     table = pq.read_table(release / "sessions.parquet", columns=columns)
 
     table = table.filter(
-        pc.and_(
-            pc.equal(table["session_kind"], "official_vota"),
-            pc.equal(table["session_round"], round_number),
+        pc.and_(  # ty: ignore[unresolved-attribute]  # generated at import
+            pc.equal(table["session_kind"], "official_vota"),  # ty: ignore[unresolved-attribute]
+            pc.equal(table["session_round"], round_number),  # ty: ignore[unresolved-attribute]
         )
     )
     sessions = defaultdict(list)
@@ -2149,7 +2226,9 @@ FROM devices d LEFT JOIN blocks b USING (w) GROUP BY ALL
 """
 
 
-def round1_statuses(runoff, first, memory_limit="1GB"):
+def round1_statuses(
+    runoff: Path, first: Path, memory_limit: str = "1GB"
+) -> dict[tuple[str, ...], str]:
     """I6 per section key: round-1 blocks of the runoff log against the round-1 log."""
     import duckdb
 
@@ -2187,7 +2266,7 @@ def round1_statuses(runoff, first, memory_limit="1GB"):
     return out
 
 
-def clock_rules(sessions, election_date):
+def clock_rules(sessions: Sequence[Row], election_date: str) -> list[str]:
     failed = []
     if not sessions:
         return ["R1"]
@@ -2206,7 +2285,13 @@ def clock_rules(sessions, election_date):
     return failed
 
 
-def run_logs(sections_root, semantic_root, output, *, semantic_round1=None):
+def run_logs(
+    sections_root: str | Path,
+    semantic_root: str | Path,
+    output: str | Path,
+    *,
+    semantic_round1: str | Path | None = None,
+) -> JSON:
     """I5 (attendance), I6 (round-1 blocks) and I7 (clock and session rules) per section."""
     sections_root = Path(sections_root).expanduser().absolute()
     semantic = Path(semantic_root).expanduser().absolute() / "release"
@@ -2331,7 +2416,7 @@ def run_logs(sections_root, semantic_root, output, *, semantic_round1=None):
                 {"check": "I7", "kind": "rules", **base, "failed": failed, "sessions": len(found)}
             )
         status6 = None
-        if first is not None:
+        if first is not None and i6 is not None and first_witnesses is not None:  # all three
             if not [o for o in first_witnesses.get(key, []) if o["status"] == "complete"]:
                 status6 = "round1_log_unavailable"
             else:
@@ -2380,7 +2465,7 @@ def run_logs(sections_root, semantic_root, output, *, semantic_round1=None):
     return result
 
 
-def integrity_check_main(argv=None) -> int:
+def integrity_check_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit integrity-check", description=__doc__.splitlines()[0]
     )

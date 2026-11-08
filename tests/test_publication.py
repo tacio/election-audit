@@ -43,7 +43,9 @@ class ReleaseTests(test_snapshots.SourceFixture):
         moved = base / "moved"
         shutil.move(base / "warehouse", moved)
         with open_release(moved) as db:
-            self.assertEqual(one(db.execute("SELECT count(*) FROM selected_event").fetchone())[0], 2)
+            self.assertEqual(
+                one(db.execute("SELECT count(*) FROM selected_event").fetchone())[0], 2
+            )
             self.assertEqual(one(db.execute("SELECT current_setting('threads')").fetchone())[0], 2)
             self.assertEqual(
                 one(db.execute("SELECT current_setting('memory_limit')").fetchone())[0], "128.0 MiB"
