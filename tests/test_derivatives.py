@@ -20,6 +20,7 @@ from election_audit.publication import (
 )
 from election_audit.release_tools import query_release, report_release, validate_release
 from election_audit.source_inventory import hash_file
+from election_audit.types import one
 
 
 class DerivativeTests(test_snapshots.SourceFixture):
@@ -29,8 +30,8 @@ class DerivativeTests(test_snapshots.SourceFixture):
         base, _, parsed = self.frozen_parse()
         parent = build_from_parse(parsed, base / "warehouse")
         with open_release(parent) as db:
-            section = json.loads(db.execute("SELECT payload FROM section LIMIT 1").fetchone()[0])
-            snapshot = json.loads(db.execute("SELECT payload FROM snapshot LIMIT 1").fetchone()[0])
+            section = json.loads(one(db.execute("SELECT payload FROM section LIMIT 1").fetchone())[0])
+            snapshot = json.loads(one(db.execute("SELECT payload FROM snapshot LIMIT 1").fetchone())[0])
         data = electoral_data()
         data.pop("election")
         data.pop("snapshot")

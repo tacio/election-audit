@@ -20,7 +20,7 @@ from election_audit.national_migration import atomic, sha
 from election_audit.national_parallel import encoded, load
 from election_audit.national_resources import apply
 from election_audit.national_summary_tools import verify_shard
-from election_audit.types import JSON
+from election_audit.types import JSON, Row
 
 VERSION = "source-summary-analysis-release-v1"
 
@@ -244,7 +244,7 @@ def publish_release(
             raise OSError("Audit snapshot exceeds analytical output allowance")
 
         class Writer:
-            def __init__(self, name) -> None:
+            def __init__(self, name: str) -> None:
                 self.name = name
                 self.schema = schemas[name]
                 self.rows = []
@@ -264,7 +264,7 @@ def publish_release(
                     self.sink, self.schema, compression="zstd", use_dictionary=True
                 )
 
-            def put(self, row) -> None:
+            def put(self, row: Row) -> None:
                 size = sum(len(v) if isinstance(v, (str, bytes)) else 16 for v in row.values())
                 if size > 32 * 1024**2:
                     raise MemoryError("Analytical row exceeds bounded payload")

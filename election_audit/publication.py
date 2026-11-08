@@ -9,8 +9,10 @@ import os
 import re
 import shutil
 import tempfile
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 import duckdb
 import pyarrow as pa
@@ -27,6 +29,7 @@ from election_audit.reconstruction import (
 )
 from election_audit.snapshots import _fsync_directory
 from election_audit.source_inventory import canonical, digest, hash_file
+from election_audit.types import JSON, Row, one
 
 VERSION = "operational-release-v1"
 FACTS = (
@@ -84,7 +87,7 @@ class ResourceConfig:
     batch_rows: int = 2048
     max_events: int = 100_000
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         for key, value in asdict(self).items():
             if type(value) is not int or value < (0 if key == "reserve_bytes" else 1):
                 raise PublicationError(f"Invalid resource setting: {key}")
@@ -92,12 +95,14 @@ class ResourceConfig:
             raise PublicationError("Worker/thread/batch limit exceeded")
 
 
-def _guard(path, config, extra_bytes=0) -> None:
+def _guard(path: str | Path, config: ResourceConfig, extra_bytes: int = 0) -> None:
     if shutil.disk_usage(path).free < config.reserve_bytes + config.spill_bytes + extra_bytes:
         raise PublicationError("SSD free space cannot preserve reserve plus spill cap")
 
 
-def _configure(connection, temporary, config) -> None:
+def _configure(
+    connection: duckdb.DuckDBPyConnection, temporary: str | Path, config: ResourceConfig
+) -> None:
     connection.execute(f"SET threads={config.duckdb_threads}")
     connection.execute(f"SET memory_limit='{config.memory_bytes}B'")
     connection.execute(f"SET max_temp_directory_size='{config.spill_bytes}B'")
@@ -105,18 +110,18 @@ def _configure(connection, temporary, config) -> None:
     connection.execute("SET preserve_insertion_order=false")
 
 
-def _columns(name):
+def _columns(name: str) -> dict[str, str]:
     if name in SCHEMA:
         return {key: spec["type"] for key, spec in SCHEMA[name]["fields"].items()}
     return dict.fromkeys(EXTRA_KEYS[name], "text")
 
 
-def _create(connection, name) -> None:
+def _create(connection: duckdb.DuckDBPyConnection, name: str) -> None:
     fields = ",".join(f'"{key}" {TYPES[kind]}' for key, kind in _columns(name).items())
     connection.execute(f'CREATE TABLE "{name}" ({fields}, payload JSON NOT NULL)')
 
 
-def _encoded(name, rows):
+def _encoded(name: str, rows: Iterable[Row]) -> pa.Table:
     columns = _columns(name)
     result = []
     for row in rows:
@@ -134,7 +139,7 @@ def _encoded(name, rows):
     return pa.Table.from_pylist(result, schema=schema)
 
 
-def _batches(rows, size):
+def _batches[T](rows: Iterable[T], size: int) -> Iterator[list[T]]:
     batch = []
     for row in rows:
         batch.append(row)
@@ -145,7 +150,7 @@ def _batches(rows, size):
         yield batch
 
 
-def _insert(connection, name, rows) -> None:
+def _insert(connection: duckdb.DuckDBPyConnection, name: str, rows: list[Row]) -> None:
     if not rows:
         return
     connection.register("incoming", _encoded(name, rows))
@@ -155,14 +160,16 @@ def _insert(connection, name, rows) -> None:
         connection.unregister("incoming")
 
 
-def _fact_view(connection, name, files) -> None:
+def _fact_view(connection: duckdb.DuckDBPyConnection, name: str, files: Iterable[str]) -> None:
     literals = ",".join("'" + file.replace("'", "''") + "'" for file in files)
     connection.execute(
         f'CREATE TEMP VIEW "{name}" AS SELECT * FROM read_parquet([{literals}], hive_partitioning=false)'
     )
 
 
-def _attach_facts(connection, path, tables) -> None:
+def _attach_facts(
+    connection: duckdb.DuckDBPyConnection, path: Path, tables: Mapping[str, JSON]
+) -> None:
     for name in FACTS:
         files = sorted(str(path / f) for f in tables.get(name, {}).get("files", []))
         if files:
@@ -171,7 +178,7 @@ def _attach_facts(connection, path, tables) -> None:
             _create(connection, name)
 
 
-def _validate(connection, names):
+def _validate(connection: duckdb.DuckDBPyConnection, names: Iterable[str]) -> list[str]:
     """Verify grains, many-to-one joins and operational accounting on disk."""
     errors, unavailable = [], []
     for name in names:
@@ -179,18 +186,22 @@ def _validate(connection, names):
         keys = [spec["primary_key"], *spec["unique_keys"]] if spec else [EXTRA_KEYS[name]]
         for key in keys:
             fields = ",".join(f'"{k}"' for k in key)
-            count = connection.execute(
-                f'SELECT count(*) FROM (SELECT {fields} FROM "{name}" GROUP BY {fields} '
-                "HAVING count(*)>1)"
-            ).fetchone()[0]
+            count = one(
+                connection.execute(
+                    f'SELECT count(*) FROM (SELECT {fields} FROM "{name}" GROUP BY {fields} '
+                    "HAVING count(*)>1)"
+                ).fetchone()
+            )[0]
             if count:
                 errors.append(f"{name}: duplicate key {key}")
         if not spec:
             continue
         for key in spec["primary_key"]:
-            if connection.execute(
-                f'SELECT count(*) FROM "{name}" WHERE "{key}" IS NULL'
-            ).fetchone()[0]:
+            if one(
+                connection.execute(
+                    f'SELECT count(*) FROM "{name}" WHERE "{key}" IS NULL'
+                ).fetchone()
+            )[0]:
                 errors.append(f"{name}: null primary key")
         for fk in spec["foreign_keys"]:
             target = fk["table"]
@@ -201,21 +212,25 @@ def _validate(connection, names):
             join = " AND ".join(
                 f'a."{a}"=b."{b}"' for a, b in zip(fk["fields"], fk["references"], strict=True)
             )
-            if connection.execute(
-                f'SELECT count(*) FROM "{name}" a WHERE {present} AND NOT EXISTS '
-                f'(SELECT 1 FROM "{target}" b WHERE {join})'
-            ).fetchone()[0]:
+            if one(
+                connection.execute(
+                    f'SELECT count(*) FROM "{name}" a WHERE {present} AND NOT EXISTS '
+                    f'(SELECT 1 FROM "{target}" b WHERE {join})'
+                ).fetchone()
+            )[0]:
                 errors.append(f"{name}: foreign key to {target}")
     if {"anonymous_cycle", "selected_event"} <= set(names):
-        if connection.execute("""SELECT count(*) FROM anonymous_cycle c JOIN selected_event e
-            ON c.end_event_id=e.event_id WHERE c.session_id<>e.session_id""").fetchone()[0]:
+        if one(
+            connection.execute("""SELECT count(*) FROM anonymous_cycle c JOIN selected_event e
+            ON c.end_event_id=e.event_id WHERE c.session_id<>e.session_id""").fetchone()
+        )[0]:
             errors.append("anonymous_cycle: end event belongs to another session")
     if errors:
         raise PublicationError("; ".join(errors[:20]))
     return sorted(set(unavailable))
 
 
-def _table_summary(connection, name):
+def _table_summary(connection: duckdb.DuckDBPyConnection, name: str) -> JSON:
     """Order-independent SHA-256 multiset digest with exact multiplicity."""
     cursor = connection.execute(f'SELECT payload FROM "{name}"')
     count, total = 0, 0
@@ -231,46 +246,52 @@ def _table_summary(connection, name):
     }
 
 
-def _validate_accounting(connection, context, selected_objects) -> None:
+def _validate_accounting(
+    connection: duckdb.DuckDBPyConnection, context: JSON, selected_objects: Iterable[str]
+) -> None:
     for name, key in (
         ("selected_event", "event_id"),
         ("anonymous_cycle", "cycle_id"),
         ("voting_session", "session_id"),
     ):
-        missing = connection.execute(
-            f'''SELECT count(*) FROM "{name}" t WHERE NOT EXISTS
+        missing = one(
+            connection.execute(
+                f'''SELECT count(*) FROM "{name}" t WHERE NOT EXISTS
             (SELECT 1 FROM record_lineage l WHERE l.derived_table=? AND
              json_extract_string(l.derived_key, '$[0]')=t."{key}")''',
-            [name],
-        ).fetchone()[0]
+                [name],
+            ).fetchone()
+        )[0]
         if missing:
             raise PublicationError(f"{name}: missing original-record lineage")
-    if connection.execute("""SELECT count(*) FROM event_evidence e WHERE NOT EXISTS
-        (SELECT 1 FROM selected_event s WHERE s.event_id=json_extract_string(e.payload, '$.canonical_event_id'))""").fetchone()[
-        0
-    ]:
+    if one(
+        connection.execute("""SELECT count(*) FROM event_evidence e WHERE NOT EXISTS
+        (SELECT 1 FROM selected_event s WHERE s.event_id=json_extract_string(e.payload, '$.canonical_event_id'))""").fetchone()
+    )[0]:
         raise PublicationError("Evidence references missing canonical event")
     for (sha,) in connection.execute(
         "SELECT DISTINCT json_extract_string(payload, '$.object_sha256') FROM event_evidence"
     ).fetchall():
         if sha not in selected_objects:
             raise PublicationError("Event object outside declared disjoint partition")
-    if connection.execute("""SELECT count(*) FROM session_summaries s JOIN
+    if one(
+        connection.execute("""SELECT count(*) FROM session_summaries s JOIN
         (SELECT session_id, count(*) AS n FROM selected_event GROUP BY session_id) e USING(session_id)
-        WHERE json_extract(s.payload, '$.observed_events')::BIGINT<>e.n""").fetchone()[0]:
+        WHERE json_extract(s.payload, '$.observed_events')::BIGINT<>e.n""").fetchone()
+    )[0]:
         raise PublicationError("Session event accounting mismatch")
-    if connection.execute("""SELECT count(*) FROM session_summaries s WHERE
+    if one(
+        connection.execute("""SELECT count(*) FROM session_summaries s WHERE
         json_extract(s.payload, '$.observed_cycles_by_state.completed')::BIGINT<>
-        (SELECT count(*) FROM anonymous_cycle c WHERE c.session_id=s.session_id AND c.completion_state='completed')""").fetchone()[
-        0
-    ]:
+        (SELECT count(*) FROM anonymous_cycle c WHERE c.session_id=s.session_id AND c.completion_state='completed')""").fetchone()
+    )[0]:
         raise PublicationError("Session completed-cycle accounting mismatch")
-    coverage = connection.execute("SELECT count(*) FROM operational_coverage").fetchone()[0]
+    coverage = one(connection.execute("SELECT count(*) FROM operational_coverage").fetchone())[0]
     if coverage != len(context["context_tables"]["section"]):
         raise PublicationError("Expected/member coverage accounting mismatch")
 
 
-def _safe_store(store) -> None:
+def _safe_store(store: Path) -> None:
     for ancestor in (store, *store.parents):
         if any(
             (ancestor / name).exists()
@@ -285,7 +306,13 @@ def _safe_store(store) -> None:
             raise PublicationError("Release store must be outside acquisition/frozen inputs")
 
 
-def publish_release(shards, store, *, config=None, hook=None):
+def publish_release(
+    shards: Iterable[Path],
+    store: str | Path,
+    *,
+    config: ResourceConfig | None = None,
+    hook: Callable[[str], None] | None = None,
+) -> Path:
     """Publish disjoint bounded reconstruction shards; repeat runs verify immutable hits.
 
     `hook(stage)` is an interruption-test seam, never persisted executable input.
@@ -515,7 +542,7 @@ def publish_release(shards, store, *, config=None, hook=None):
             raise
 
 
-def _point_current(store, key) -> None:
+def _point_current(store: Path, key: str) -> None:
     temporary = store / ".current-next"
     with temporary.open("w", encoding="ascii") as output:
         output.write(key + "\n")
@@ -525,7 +552,7 @@ def _point_current(store, key) -> None:
     _fsync_directory(store)
 
 
-def resolve_release(path):
+def resolve_release(path: str | Path) -> Path:
     path = Path(path).resolve()
     if (path / "current").is_file():
         key = (path / "current").read_text().strip()
@@ -535,7 +562,7 @@ def resolve_release(path):
     return path
 
 
-def inspect_release(path):
+def inspect_release(path: str | Path) -> JSON:
     path = resolve_release(path)
     document = _read_checked(path, "release.json")
     if document["identity"]["version"] == "derivative-release-v1":
@@ -575,7 +602,12 @@ def inspect_release(path):
     return document
 
 
-def open_release(path, *, config=None, _verified_document=None):
+def open_release(
+    path: str | Path,
+    *,
+    config: ResourceConfig | None = None,
+    _verified_document: JSON | None = None,
+) -> duckdb.DuckDBPyConnection:
     """Verified, relocated read-only database plus connection-local fact views."""
     path = resolve_release(path)
     document = _verified_document if _verified_document is not None else inspect_release(path)
@@ -603,7 +635,14 @@ def open_release(path, *, config=None, _verified_document=None):
     return connection
 
 
-def build_from_parse(parse, store, *, config=None, evidence=None, object_groups=None):
+def build_from_parse(
+    parse: str | Path,
+    store: str | Path,
+    *,
+    config: ResourceConfig | None = None,
+    evidence: Any = None,
+    object_groups: list[list[str]] | None = None,
+) -> Path:
     """Bounded object/group reconstruction, shared verified parse reader and context."""
     config = config or ResourceConfig()
     reader = FrozenParseReader(parse)
@@ -622,7 +661,13 @@ def build_from_parse(parse, store, *, config=None, evidence=None, object_groups=
     return publish_release(paths, store, config=config)
 
 
-def build_from_snapshot(snapshot, store, *, config=None, evidence=None):
+def build_from_snapshot(
+    snapshot: str | Path,
+    store: str | Path,
+    *,
+    config: ResourceConfig | None = None,
+    evidence: Any = None,
+) -> Path:
     """Frozen snapshot → parallel bounded parse → reconstruction → release."""
     from election_audit.archive_parsing import parse_snapshot
 

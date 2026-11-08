@@ -15,6 +15,7 @@ from election_audit.publication import (
     open_release,
 )
 from election_audit.release_tools import COUNT_SQL, query_release, report_release, validate_release
+from election_audit.types import one
 
 
 class ReleaseInterfaceTests(test_snapshots.SourceFixture):
@@ -36,9 +37,9 @@ class ReleaseInterfaceTests(test_snapshots.SourceFixture):
         self.assertTrue(query["truncated"])
         with open_release(path) as db:
             self.assertGreater(
-                db.execute(
+                one(db.execute(
                     "SELECT count(*) FROM record_lineage WHERE derived_table='section'"
-                ).fetchone()[0],
+                ).fetchone())[0],
                 0,
             )
         self.assertEqual(inspect_release(path)["tables"]["operational_coverage"]["rows"], 1)

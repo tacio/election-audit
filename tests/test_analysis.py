@@ -16,6 +16,7 @@ from election_audit.publication import (
     resolve_release,
 )
 from election_audit.release_tools import query_release, report_release, validate_release
+from election_audit.types import one
 
 
 class AnalysisTests(test_snapshots.SourceFixture):
@@ -186,8 +187,8 @@ class AnalysisTests(test_snapshots.SourceFixture):
 
         base, parent, bundle, data = self.parent_and_bundle()
         with open_release(parent) as db:
-            section = json.loads(db.execute("SELECT payload FROM section LIMIT 1").fetchone()[0])
-            snapshot = db.execute("SELECT snapshot_id FROM snapshot LIMIT 1").fetchone()[0]
+            section = json.loads(one(db.execute("SELECT payload FROM section LIMIT 1").fetchone())[0])
+            snapshot = one(db.execute("SELECT snapshot_id FROM snapshot LIMIT 1").fetchone())[0]
         new_section = {**section, "section_id": "linked-principal", "section_code": "9999"}
         data["section"] = [new_section]
         data["location"] = [

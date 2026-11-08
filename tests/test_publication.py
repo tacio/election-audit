@@ -15,6 +15,7 @@ from election_audit.publication import (
     publish_release,
 )
 from election_audit.reconstruction import reconstruct_parse
+from election_audit.types import one
 
 
 class ReleaseTests(test_snapshots.SourceFixture):
@@ -42,10 +43,10 @@ class ReleaseTests(test_snapshots.SourceFixture):
         moved = base / "moved"
         shutil.move(base / "warehouse", moved)
         with open_release(moved) as db:
-            self.assertEqual(db.execute("SELECT count(*) FROM selected_event").fetchone()[0], 2)
-            self.assertEqual(db.execute("SELECT current_setting('threads')").fetchone()[0], 2)
+            self.assertEqual(one(db.execute("SELECT count(*) FROM selected_event").fetchone())[0], 2)
+            self.assertEqual(one(db.execute("SELECT current_setting('threads')").fetchone())[0], 2)
             self.assertEqual(
-                db.execute("SELECT current_setting('memory_limit')").fetchone()[0], "128.0 MiB"
+                one(db.execute("SELECT current_setting('memory_limit')").fetchone())[0], "128.0 MiB"
             )
         self.assertIsNone(manifest["global_eligible_cycle_total"])
 

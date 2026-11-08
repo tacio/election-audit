@@ -16,7 +16,7 @@ import duckdb
 from election_audit.archive_parsing import _read_checked
 from election_audit.publication import PublicationError, ResourceConfig, open_release
 from election_audit.source_inventory import canonical, digest
-from election_audit.types import JSON, Argv, Row
+from election_audit.types import JSON, Argv, Row, one
 
 VERSION = "audit-analysis-v1"
 REGISTRY_VERSION = "audit-features-v1"
@@ -137,7 +137,7 @@ def _instant(value: str) -> datetime:
     return instant
 
 
-def read_analysis(bundle: str | Path, config: JSON) -> JSON:
+def read_analysis(bundle: str | Path, config: ResourceConfig) -> JSON:
     raw = Path(bundle).read_bytes()
     if len(raw) > 8 * 1024**2:
         raise PublicationError("Analysis configuration exceeds 8 MiB bound")
@@ -332,7 +332,7 @@ def feature_rows(parent: Path, document: JSON, spec: JSON, config: ResourceConfi
 
 def derive_analysis(
     parent: Path, document: JSON, spec: JSON, config: ResourceConfig
-) -> tuple[dict[str, list[Row]], JSON]:
+) -> tuple[dict[str, Any], JSON]:
     from election_audit.analysis_ledgers import (
         SCHEMAS as LEDGER_SCHEMAS,
     )
@@ -343,7 +343,7 @@ def derive_analysis(
     )
     from election_audit.analysis_partitions import SCHEMAS as PARTITION_SCHEMAS
 
-    result = {
+    result: dict[str, Any] = {
         "audit_feature_registry": registry(),
         "audit_features": feature_rows(parent, document, spec, config),
     }
@@ -596,9 +596,11 @@ def protect_test_query(connection: duckdb.DuckDBPyConnection, document: JSON, sq
 
     if "test_partition_status" not in document.get("combined_tables", {}):
         return
-    untouched = connection.execute(
-        "SELECT count(*) FROM test_partition_status WHERE access_state='untouched'"
-    ).fetchone()[0]
+    untouched = one(
+        connection.execute(
+            "SELECT count(*) FROM test_partition_status WHERE access_state='untouched'"
+        ).fetchone()
+    )[0]
     if untouched:
         safe = {
             "audit_feature_registry",

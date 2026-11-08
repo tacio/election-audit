@@ -170,7 +170,7 @@ def validate_electoral(data: Tables, generated: Tables) -> None:
                 )
     for vid in versions:
 
-        def visit(current, ancestors) -> None:
+        def visit(current: str, ancestors: set[str]) -> None:
             if current in ancestors:
                 raise PublicationError("Cyclic result supersession")
             for old in evidence.get(current, {}).get("supersedes", []):
@@ -352,7 +352,7 @@ def _reconcile(data: Tables) -> list[Row]:
             sums[choices[count["vote_choice_id"]]["choice_kind"]] += count["vote_count"]
         checks = {}
 
-        def check(name, left, right) -> None:
+        def check(name: str, left: Any, right: Any) -> None:
             checks[name] = {
                 "observed": left,
                 "reference": right,
@@ -550,7 +550,7 @@ def _section_marts(
         )
         key = {k: decision[k] for k in ("snapshot_id", "principal_section_id", "contest_id")}
 
-        def ratio(a, b):
+        def ratio(a: float | None, b: float | None) -> float | None:
             return a / b if complete and a is not None and b is not None and b > 0 else None
 
         result = {

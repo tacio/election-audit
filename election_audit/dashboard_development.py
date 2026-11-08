@@ -6,7 +6,7 @@ import json
 import re
 import sqlite3
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from contextlib import closing
 from pathlib import Path
 
@@ -15,6 +15,7 @@ import pyarrow.parquet as pq
 from election_audit.dashboard_data import _hash, _relative, publish_dataset
 from election_audit.research_protocol import load_protocol
 from election_audit.source_inventory import digest
+from election_audit.types import Row
 
 ALLOWED = ("training", "calibration", "development_inspected")
 
@@ -61,7 +62,7 @@ def export_development(
         db.execute("PRAGMA query_only=ON")
         allowed = "p.partition_name IN ('training','calibration','development_inspected')"
 
-        def context(key):
+        def context(key: str) -> Row:
             row = db.execute(
                 "SELECT u.payload,p.partition_name FROM units u JOIN frozen.unit_partition p USING(unit_key) WHERE u.unit_key=? AND "
                 + allowed,
@@ -71,7 +72,7 @@ def export_development(
                 raise ValueError("Outcome belongs to protected or unknown unit")
             return {**json.loads(row[0]), "partition_name": row[1]}
 
-        def coverage():
+        def coverage() -> Iterator[Row]:
             for row in db.execute(
                 "SELECT uf,round,partition_name,count(*) AS units,sum(source_ready) AS source_ready_units FROM frozen.unit_partition GROUP BY uf,round,partition_name ORDER BY 1,2,3"
             ):
@@ -81,7 +82,7 @@ def export_development(
                     "protected_outcomes": row["partition_name"] not in ALLOWED,
                 }
 
-        def electoral():
+        def electoral() -> Iterator[Row]:
             query = (
                 "SELECT u.payload AS unit,c.payload AS counts,p.partition_name FROM units u JOIN counts c USING(unit_key) JOIN frozen.unit_partition p USING(unit_key) WHERE "
                 + allowed
@@ -114,7 +115,7 @@ def export_development(
                     "readiness": "ready" if unit.get("source_ready") else "unavailable",
                 }
 
-        def feature_rows(family=None):
+        def feature_rows(family: str | None = None) -> Iterator[Row]:
             sql = (
                 "SELECT f.payload,u.payload AS unit,p.partition_name FROM features f JOIN units u USING(unit_key) JOIN frozen.unit_partition p USING(unit_key) WHERE "
                 + allowed
@@ -130,7 +131,7 @@ def export_development(
                     "partition_name": row["partition_name"],
                 }
 
-        def comparisons():
+        def comparisons() -> Iterator[Row]:
             sql = (
                 "SELECT c.payload FROM comparisons c WHERE EXISTS (SELECT 1 FROM units u JOIN frozen.unit_partition p USING(unit_key) WHERE u.stable_location_id=c.stable_location_id AND "
                 + allowed
@@ -141,7 +142,7 @@ def export_development(
             for row in db.execute(sql):
                 yield json.loads(row[0])
 
-        def prediction_rows():
+        def prediction_rows() -> Iterator[Row]:
             if predictions is None:
                 return
             directory = Path(predictions).resolve()
@@ -183,7 +184,7 @@ def export_development(
                         "readiness": "descriptive_only",
                     }
 
-        def case_rows():
+        def case_rows() -> Iterator[Row]:
             if cases is None:
                 return
             directory = Path(cases).resolve()
@@ -207,11 +208,11 @@ def export_development(
                         "readiness": "unresolved_independent_corroboration",
                     }
 
-        def models():
+        def models() -> Iterator[Row]:
             yield from prediction_rows()
             yield from case_rows()
 
-        def operational_rows():
+        def operational_rows() -> Iterator[Row]:
             for directory in operations:
                 directory = Path(directory).resolve()
                 artifact_body = (directory / "artifact.json").read_bytes()

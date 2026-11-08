@@ -127,7 +127,7 @@ def _pairs(pairs: Sequence[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
-def strict_json(text: str) -> Any:
+def strict_json(text: str | bytes) -> Any:
     return json.loads(
         text,
         object_pairs_hook=_pairs,

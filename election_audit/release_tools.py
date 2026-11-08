@@ -27,7 +27,7 @@ from election_audit.publication import (
     resolve_release,
 )
 from election_audit.source_inventory import digest
-from election_audit.types import JSON, Argv
+from election_audit.types import JSON, Argv, one
 
 COUNT_SQL = "SELECT completion_state, count(*) AS observed_cycles FROM anonymous_cycle GROUP BY completion_state ORDER BY completion_state"
 LATE_SQL = "SELECT count(*) AS sessions, count(try_cast(json_extract_string(payload, '$.completed_cycles_after17') AS BIGINT)) AS classifiable_sessions FROM late_voting"
@@ -261,10 +261,12 @@ TEXT: dict[str, dict[str, Any]] = {
 def _mark_synthetic(path: Path, output: Path, document: JSON, products: list[Path]) -> list[Path]:
     """Pair report metadata and keep fixture reports visibly marked."""
     with open_release(path, _verified_document=document) as db:
-        synthetic = db.execute(
-            "SELECT count(*) FROM source_observation WHERE "
-            "official_url LIKE 'fixture://%' OR official_url LIKE '%/synthetic-%'"
-        ).fetchone()[0]
+        synthetic = one(
+            db.execute(
+                "SELECT count(*) FROM source_observation WHERE "
+                "official_url LIKE 'fixture://%' OR official_url LIKE '%/synthetic-%'"
+            ).fetchone()
+        )[0]
     identity = "EA-REPORT-" + path.name.upper()
     for product in products:
         if product.name.startswith("report.") and product.suffix == ".md":

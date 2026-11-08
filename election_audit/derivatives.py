@@ -430,7 +430,7 @@ def publish_derivative(
                     parent, parent_doc, imported["analysis"], config
                 )
 
-                def partition(row):
+                def partition(row: Row) -> tuple[str, str, str]:
                     return ("unknown", "unknown", "unknown")
             else:
                 with open_release(parent, _verified_document=parent_doc) as source:
@@ -465,7 +465,7 @@ def publish_derivative(
                 sections = {r["section_id"]: r for r in combined.get("section", [])}
                 elections = {r["election_id"]: r for r in combined.get("election", [])}
 
-                def partition(row):
+                def partition(row: Row) -> tuple[str, str, str]:
                     version = versions.get(row.get("result_version_id"), {})
                     section = sections.get(
                         row.get("principal_section_id", version.get("principal_section_id")), {}

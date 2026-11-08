@@ -197,7 +197,7 @@ def validate_records(
         elif run is not None:
             raise PublicationError("Protocol/run/model config envelope run ID must be null")
 
-        def reference(identifier, expected):
+        def reference(identifier: str, expected: str) -> Row:
             if identifier not in records or records[identifier]["record_kind"] != expected:
                 raise PublicationError(f"Missing {expected} reference")
             return records[identifier]

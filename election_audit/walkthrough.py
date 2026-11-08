@@ -17,7 +17,7 @@ from election_audit.source_inventory import (
     index_url,
     section_directory,
 )
-from election_audit.types import JSON, Row
+from election_audit.types import JSON, Row, one
 
 SYNTHETIC_AT = "2026-10-29T00:00:00+00:00"
 
@@ -59,7 +59,7 @@ def synthetic_source(root: Path) -> Path:
         """)
         db.execute("INSERT INTO runs VALUES (?,?,?,'synthetic')", (SYNTHETIC_AT,) * 3)
 
-        def save(url, body) -> None:
+        def save(url: str, body: bytes | JSON) -> None:
             import hashlib
 
             raw = body if isinstance(body, bytes) else canonical(body)
@@ -101,7 +101,9 @@ def synthetic_source(root: Path) -> Path:
             },
         )
 
-        def line(message, time="08:00:00", date="25/10/2026", device="1234"):
+        def line(
+            message: str, time: str = "08:00:00", date: str = "25/10/2026", device: str = "1234"
+        ) -> bytes:
             return f"{date} {time}\tINFO\t{device}\tVOTA\t{message}\t\n".encode("latin-1")
 
         first = [
@@ -235,9 +237,9 @@ def normalized_demo(parent: Path, directory: str | Path) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     with open_release(parent) as db:
         section = json.loads(
-            db.execute("SELECT payload FROM section WHERE section_code='0001'").fetchone()[0]
+            one(db.execute("SELECT payload FROM section WHERE section_code='0001'").fetchone())[0]
         )
-        snapshot = db.execute("SELECT snapshot_id FROM snapshot LIMIT 1").fetchone()[0]
+        snapshot = one(db.execute("SELECT snapshot_id FROM snapshot LIMIT 1").fetchone())[0]
 
     def row(name: str, **values: Any) -> Row:
         result = {key: values.get(key) for key in SCHEMA[name]["fields"]}

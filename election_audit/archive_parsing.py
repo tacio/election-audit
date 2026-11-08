@@ -692,6 +692,8 @@ class FrozenParseReader:
         self.document = inspect_parse(self.path, object_sha256=[])
         self.artifacts = {item["object_sha256"]: item for item in self.document["artifacts"]}
         self.associations = {}
+        # Reconstruction context digests, by store, shared by the shards of one parse.
+        self.reconstruction_contexts: dict[str, str] = {}
         for row in self.document["associations"]:
             self.associations.setdefault(row["observation"]["object_sha256"], []).append(row)
 

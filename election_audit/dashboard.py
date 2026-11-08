@@ -48,7 +48,7 @@ def dashboard_main(argv: Argv = None) -> int:
     return subprocess.call(command, env=environment)
 
 
-def dashboard_export_main(argv=None) -> int:
+def dashboard_export_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description="Export a curated, portable dashboard dataset")
     parser.add_argument("release", type=Path, nargs="?")
     parser.add_argument("--features", type=Path)

@@ -303,7 +303,7 @@ def process_compact_original(
         try:
             parser = _parse_bounded(resolve_original(reference), work, row["sha256"])
 
-            def events():
+            def events() -> Iterator[Row]:
                 with (work / "events.jsonl").open() as source:
                     for line in source:
                         yield json.loads(line)

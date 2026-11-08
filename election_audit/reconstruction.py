@@ -13,8 +13,10 @@ import os
 import shutil
 import tempfile
 from collections import defaultdict
+from collections.abc import Iterable, Iterator, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from election_audit.archive_parsing import (
@@ -26,6 +28,9 @@ from election_audit.archive_parsing import (
 from election_audit.contracts import validate_rows
 from election_audit.snapshots import _fsync_directory
 from election_audit.source_inventory import canonical, digest, hash_file, identity
+from election_audit.types import JSON, Argv, Row
+
+type Bundle = dict[str, Any]
 
 VERSION = "operational-v1"
 EVIDENCE_VERSION = "operational-evidence-v1"
@@ -45,20 +50,20 @@ class ReconstructionError(ValueError):
     """Invalid evidence or reconstruction input; no successful artifact emitted."""
 
 
-def _row(**values):
+def _row(**values: Any) -> Row:
     return {**values, "field_states": {key: "unresolved" for key, v in values.items() if v is None}}
 
 
-def _reading(event):
+def _reading(event: Row) -> datetime | None:
     raw = event.get("device_timestamp_raw")
     return datetime.strptime(raw, "%d/%m/%Y %H:%M:%S") if raw else None
 
 
-def _stream(event):
+def _stream(event: Row) -> bytes:
     return canonical([event["object_sha256"], event["record_locator"]["archive_segments"]])
 
 
-def _claim(claim, events):
+def _claim(claim: JSON, events: dict[str, Row]) -> bool:
     """Validate exact source anchors; a review remains a supplied human assertion."""
     if claim.get("review_state") not in {"reviewed", "unverified"}:
         raise ReconstructionError("Every claim needs reviewed/unverified review_state")
@@ -87,7 +92,7 @@ def _claim(claim, events):
     return claim["review_state"] == "reviewed"
 
 
-def _contiguous(ids, events) -> None:
+def _contiguous(ids: Sequence[str], events: dict[str, Row]) -> None:
     if not ids or len(set(ids)) != len(ids) or any(key not in events for key in ids):
         raise ReconstructionError("Empty, duplicate or unknown event interval")
     group = [events[key] for key in ids]
@@ -98,7 +103,13 @@ def _contiguous(ids, events) -> None:
         raise ReconstructionError("Interval must contain every consecutive physical source line")
 
 
-def reconstruct_sessions(document, witnesses, *, evidence=None, max_events=1_000_000):
+def reconstruct_sessions(
+    document: JSON,
+    witnesses: Iterable[Row],
+    *,
+    evidence: JSON | None = None,
+    max_events: int = 1_000_000,
+) -> Bundle:
     """Build candidate sessions once per content occurrence; retain every witness.
 
     Explicit segments replace candidate boundaries only for reviewed claims. A
@@ -397,7 +408,7 @@ def reconstruct_sessions(document, witnesses, *, evidence=None, max_events=1_000
     }
 
 
-def _lineage(table, key, witness, role):
+def _lineage(table: str, key: Any, witness: Row, role: str) -> Row:
     return {
         "derived_table": table,
         "derived_key": canonical(key if isinstance(key, list) else [key]).decode(),
@@ -426,7 +437,7 @@ SEMANTIC_KINDS = {
 }
 
 
-def reconstruct_cycles(bundle):
+def reconstruct_cycles(bundle: Bundle) -> Bundle:
     """Explicit anonymous state machine; completion requires an active authorization.
 
     A request alone supplies neither authorization nor method. Repeated starts,
@@ -464,9 +475,14 @@ def reconstruct_cycles(bundle):
         sessions[event["session_id"]].append(event)
     details = {}
     for sid, events in sessions.items():
-        active, sequence = None, 0
+        # The open cycle's state, or None. Any: ty does not narrow variables that nested
+        # functions rebind with nonlocal.
+        active: Any = None
+        sequence = 0
 
-        def begin(event, *, authorized=False, mode="unresolved"):
+        def begin(
+            event: Row, *, authorized: bool = False, mode: str = "unresolved"
+        ) -> dict[str, Any]:
             return {
                 "start": event,
                 "events": [event],
@@ -479,7 +495,7 @@ def reconstruct_cycles(bundle):
                 "attempts": int(event["event_kind"] == "authorization_attempt"),
             }
 
-        def finish(state, end=None, reason=None) -> None:
+        def finish(state: str, end: Row | None = None, reason: str | None = None) -> None:
             nonlocal active, sequence
             if reason:
                 active["reasons"].append(reason)
@@ -630,7 +646,7 @@ def reconstruct_cycles(bundle):
     return bundle
 
 
-def normalize_clocks(bundle, document):
+def normalize_clocks(bundle: Bundle, document: JSON) -> Bundle:
     """Apply explicit section/election rules, never UF or early/late heuristics.
 
     A timezone-free reviewed continuity interval may support local durations.
@@ -696,9 +712,10 @@ def normalize_clocks(bundle, document):
                 local = adjusted.replace(tzinfo=zone)
                 alternate = adjusted.replace(tzinfo=zone, fold=1)
                 valid = local.astimezone(UTC).astimezone(zone).replace(tzinfo=None) == adjusted
-                if valid and local.utcoffset() == alternate.utcoffset():
+                offset = local.utcoffset()  # never None for a datetime with a ZoneInfo
+                if valid and offset is not None and offset == alternate.utcoffset():
                     event["normalized_at"] = local.astimezone(UTC).isoformat()
-                    event["offset_seconds"] = int(local.utcoffset().total_seconds())
+                    event["offset_seconds"] = int(offset.total_seconds())
                     event["clock_confidence"] = "verified"
                     state = "converted"
                 else:
@@ -737,7 +754,7 @@ def normalize_clocks(bundle, document):
     return bundle
 
 
-def elapsed_seconds(bundle, event_ids):
+def elapsed_seconds(bundle: Bundle, event_ids: Sequence[str]) -> tuple[float | None, str]:
     """Return elapsed/state only for one reviewed continuous interval and source order."""
     clocks = bundle.get("clock_evidence", {})
     if len(event_ids) < 2 or any(key not in clocks for key in event_ids):
@@ -768,7 +785,7 @@ def elapsed_seconds(bundle, event_ids):
     return (readings[-1] - readings[0]).total_seconds(), "local_continuity_verified"
 
 
-def summarize_operations(bundle):
+def summarize_operations(bundle: Bundle) -> Bundle:
     """Calculate evidenced durations/gaps and explicit operational denominators.
 
     Observed diagnostics remain available for unresolved sessions; eligible target
@@ -1015,7 +1032,7 @@ ARTIFACT_FORMAT = "election-audit-reconstruction-v1"
 EXTRA_TABLES = ("event_evidence", "session_summaries", "cycle_gaps", "interruptions")
 
 
-def _evidence_rows(bundle):
+def _evidence_rows(bundle: Bundle) -> Iterator[Row]:
     for key, source in bundle["all_events"].items():
         target = bundle["aliases"].get(key, key)
         yield {
@@ -1043,8 +1060,14 @@ def _evidence_rows(bundle):
 
 
 def reconstruct_parse(
-    parse, store, *, evidence=None, object_sha256=None, max_events=1_000_000, reader=None
-):
+    parse: str | Path,
+    store: str | Path,
+    *,
+    evidence: JSON | None = None,
+    object_sha256: Iterable[str] | None = None,
+    max_events: int = 1_000_000,
+    reader: FrozenParseReader | None = None,
+) -> Path:
     """Publish one immutable bounded reconstruction shard without raw input access.
 
     object_sha256 selects a content group (including all its publisher witnesses).
@@ -1151,7 +1174,7 @@ def reconstruct_parse(
             raise
 
 
-def inspect_reconstruction(path):
+def inspect_reconstruction(path: str | Path) -> JSON:
     """Verify standalone immutable metadata and every row file; raw/parses unnecessary."""
     path = Path(path)
     publication = _read_checked(path, "reconstruction.json")
@@ -1171,7 +1194,7 @@ def inspect_reconstruction(path):
     return publication
 
 
-def _publish_context(store, parse_id, document):
+def _publish_context(store: Path, parse_id: str, document: JSON) -> str:
     """Persist full population metadata once per store, shared by all shards."""
     parent = store / "contexts"
     parent.mkdir(parents=True, exist_ok=True)
@@ -1195,7 +1218,7 @@ def _publish_context(store, parse_id, document):
         return hash_file(target / "parse.json")[0]
 
 
-def load_reconstruction_context(path, *, publication=None):
+def load_reconstruction_context(path: str | Path, *, publication: JSON | None = None) -> JSON:
     """Load/check shared full population metadata; relocate the whole store together."""
     path = Path(path)
     publication = publication or _read_checked(path, "reconstruction.json")
@@ -1215,7 +1238,7 @@ def load_reconstruction_context(path, *, publication=None):
     return document
 
 
-def iter_reconstruction_rows(path, table):
+def iter_reconstruction_rows(path: str | Path, table: str) -> Iterator[Row]:
     """Stream contract rows or explicit intermediate summaries/evidence after verification."""
     if table not in (*TABLES, *EXTRA_TABLES):
         raise ReconstructionError("Unknown reconstruction table")
@@ -1223,7 +1246,7 @@ def iter_reconstruction_rows(path, table):
     yield from _rows(Path(path) / f"{table}.jsonl")
 
 
-def reconstruction_main(argv=None) -> int:
+def reconstruction_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("parse", type=Path)
     parser.add_argument("--store", type=Path, required=True)
