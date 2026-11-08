@@ -19,15 +19,20 @@ import uuid
 import zipfile
 import zlib
 from collections import Counter
+from collections.abc import Iterable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import IO, Any
 from urllib.parse import unquote, urlsplit
 
 from election_audit import sevenzip
 from election_audit.snapshots import _fsync_directory, inspect_snapshot, snapshot_tables
 from election_audit.source_inventory import canonical, digest, hash_file, identity, safe_source
+from election_audit.types import JSON, Argv, Row
+
+type Segments = Sequence[JSON]
 
 PARSER_VERSION = "jez-structural-v1"
 ARTIFACT_FORMAT = "election-audit-parse-v1"
@@ -53,7 +58,7 @@ class ParseConfig:
     max_lines: int = 2000000
     max_issues: int = 10000
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if any(type(value) is not int or value < 1 for value in asdict(self).values()):
             raise ValueError("Parser limits must be positive integers")
 
@@ -62,7 +67,7 @@ class ParseError(ValueError):
     """Invalid artifact or unsafe output/input placement."""
 
 
-def _locator(segments, line=None):
+def _locator(segments: Segments, line: int | None = None) -> JSON:
     return {
         "archive_segments": segments,
         "line_start": line,
@@ -72,12 +77,21 @@ def _locator(segments, line=None):
     }
 
 
-def _json_line(handle, row) -> None:
+def _json_line(handle: IO[bytes] | None, row: Any) -> None:
+    if handle is None:  # summary parsers override every writing method
+        raise ParseError("Parser has no output stream")
     handle.write(canonical(row) + b"\n")
 
 
 class _Parser:
-    def __init__(self, object_sha256, config, directory, events, issues) -> None:
+    def __init__(
+        self,
+        object_sha256: str,
+        config: ParseConfig,
+        directory: str | Path,
+        events: IO[bytes] | None,
+        issues: IO[bytes] | None,
+    ) -> None:
         self.sha = object_sha256
         self.config = config
         self.directory = directory
@@ -87,11 +101,19 @@ class _Parser:
         self.incomplete = False
         self.log_members = 0
 
-    def member_buffer(self):
+    def member_buffer(self) -> IO[bytes]:
         """Seekable member storage; subclasses may provide a bounded RAM spool."""
         return tempfile.TemporaryFile(dir=self.directory)
 
-    def issue(self, code, segments, *, line=None, severity="error", **details) -> None:
+    def issue(
+        self,
+        code: str,
+        segments: Segments,
+        *,
+        line: int | None = None,
+        severity: str = "error",
+        **details: Any,
+    ) -> None:
         # No exception text, raw messages, line samples, tokens or personal IDs.
         self.incomplete |= severity == "error"
         self.counts["issues_seen"] += 1
@@ -120,7 +142,7 @@ class _Parser:
         )
         self.counts["issues_written"] += 1
 
-    def _directory_guard(self, stream, segments) -> bool:
+    def _directory_guard(self, stream: IO[bytes], segments: Segments) -> bool:
         # ZipFile loads its central directory into memory. Bound it BEFORE opening.
         stream.seek(0, 2)
         length = stream.tell()
@@ -188,7 +210,7 @@ class _Parser:
         stream.seek(0)
         return True
 
-    def archive(self, stream, segments=()) -> None:
+    def archive(self, stream: IO[bytes], segments: Segments = ()) -> None:
         segments = list(segments)
         if len(segments) > self.config.max_depth:
             self.issue("archive_depth_limit", segments, limit=self.config.max_depth)
@@ -278,7 +300,7 @@ class _Parser:
         except zipfile.BadZipFile, RuntimeError, NotImplementedError, EOFError, ValueError:
             self.issue("invalid_archive", segments)
 
-    def archive_7z(self, stream, segments) -> None:
+    def archive_7z(self, stream: IO[bytes], segments: Segments) -> None:
         """2022 logs are 7z archives; the same bounds and issue codes apply."""
         stream.seek(0, 2)
         if stream.tell() > self.config.max_archive_bytes:
@@ -324,7 +346,7 @@ class _Parser:
                 ):
                     self.archive(body, nested)
 
-    def lines(self, body, segments) -> None:
+    def lines(self, body: IO[bytes], segments: Segments) -> None:
         line_number = 0
         while line := body.readline(self.config.max_line_bytes + 1):
             line_number += 1
@@ -389,7 +411,7 @@ class _Parser:
             self.counts["events"] += 1
 
 
-def _write_checked(directory, name, value) -> None:
+def _write_checked(directory: Path, name: str, value: Any) -> None:
     encoded = canonical(value) + b"\n"
     with (directory / name).open("xb") as stream:
         stream.write(encoded)
@@ -401,7 +423,7 @@ def _write_checked(directory, name, value) -> None:
         os.fsync(stream.fileno())
 
 
-def _read_checked(directory, name):
+def _read_checked(directory: Path, name: str) -> Any:
     try:
         body = (directory / name).read_bytes()
         if hashlib.sha256(body).hexdigest() != (directory / (name + ".sha256")).read_text().strip():
@@ -411,7 +433,7 @@ def _read_checked(directory, name):
         raise ParseError("Incomplete or corrupt derived metadata") from exc
 
 
-def inspect_artifact(path):
+def inspect_artifact(path: str | Path) -> JSON:
     """Verify metadata, cache identity and every streamed artifact on each cache hit."""
     path = Path(path)
     document = _read_checked(path, "artifact.json")
@@ -433,7 +455,13 @@ def inspect_artifact(path):
     return document
 
 
-def parse_object(source, store, *, config=None, expected_sha256=None):
+def parse_object(
+    source: str | Path,
+    store: str | Path,
+    *,
+    config: ParseConfig | None = None,
+    expected_sha256: str | None = None,
+) -> tuple[Path, bool]:
     """Parse one immutable object into store/cache/KEY; return (path, cache_hit).
 
     Internal/fixture API: production callers use parse_snapshot, which checks
@@ -504,11 +532,13 @@ def parse_object(source, store, *, config=None, expected_sha256=None):
     return target, False
 
 
-def _is_log_name(name):
+def _is_log_name(name: str) -> bool:
     return name.lower().endswith(("log.dat", ".jez", ".zip"))
 
 
-def parse_snapshot(snapshot, store, *, config=None, workers=4):
+def parse_snapshot(
+    snapshot: str | Path, store: str | Path, *, config: ParseConfig | None = None, workers: int = 4
+) -> Path:
     """Publish frozen snapshot associations separately from reusable content cache."""
     if type(workers) is not int or not 1 <= workers <= 64:
         raise ParseError("Parser workers must be between 1 and 64")
@@ -536,7 +566,7 @@ def parse_snapshot(snapshot, store, *, config=None, workers=4):
     hashes = {observations[key]["object_sha256"] for key in selected}
     hashes.discard(None)
 
-    def parse_row(row):
+    def parse_row(row: Row) -> Row:
         path, _hit = parse_object(
             safe_source(snapshot, row["storage_locator"]),
             store,
@@ -622,7 +652,7 @@ def parse_snapshot(snapshot, store, *, config=None, workers=4):
     return target
 
 
-def inspect_parse(path, *, object_sha256=None):
+def inspect_parse(path: str | Path, *, object_sha256: Iterable[str] | None = None) -> JSON:
     """Verify a publication and its cached content without opening any snapshot/raw input."""
     path = Path(path)
     document = _read_checked(path, "parse.json")
@@ -657,7 +687,7 @@ class FrozenParseReader:
     The document is read-only by convention; callers must never mutate it.
     """
 
-    def __init__(self, path) -> None:
+    def __init__(self, path: str | Path) -> None:
         self.path = Path(path).resolve()
         self.document = inspect_parse(self.path, object_sha256=[])
         self.artifacts = {item["object_sha256"]: item for item in self.document["artifacts"]}
@@ -665,7 +695,9 @@ class FrozenParseReader:
         for row in self.document["associations"]:
             self.associations.setdefault(row["observation"]["object_sha256"], []).append(row)
 
-    def group(self, object_sha256=None):
+    def group(
+        self, object_sha256: Iterable[str] | None = None
+    ) -> tuple[Iterator[Row], Iterator[Row]]:
         selected = set(self.artifacts) if object_sha256 is None else set(object_sha256)
         if not selected <= self.artifacts.keys():
             raise ParseError("Unknown selected parse object")
@@ -684,13 +716,15 @@ class FrozenParseReader:
         )
 
 
-def _rows(path):
+def _rows(path: str | Path) -> Iterator[Any]:
     with Path(path).open("rb") as stream:
         for line in stream:
             yield json.loads(line)
 
 
-def iter_event_witnesses(path, *, object_sha256=None):
+def iter_event_witnesses(
+    path: str | Path, *, object_sha256: Iterable[str] | None = None
+) -> Iterator[Row]:
     """Stream one witness per original observation/line, retaining all package assets.
 
     Content event_id is shared by identical bytes; witness_event_id is scoped to
@@ -710,7 +744,9 @@ def iter_event_witnesses(path, *, object_sha256=None):
     yield from _event_witnesses(path, document, artifacts, associations)
 
 
-def _event_witnesses(path, document, artifacts, associations):
+def _event_witnesses(
+    path: Path, document: JSON, artifacts: list[JSON], associations: dict[str, list[Row]]
+) -> Iterator[Row]:
     for artifact in artifacts:
         for event in _rows(path.parent.parent / "cache" / artifact["cache_key"] / "events.jsonl"):
             for association in associations.get(artifact["object_sha256"], []):
@@ -727,7 +763,7 @@ def _event_witnesses(path, document, artifacts, associations):
                 }
 
 
-def iter_lineage(path):
+def iter_lineage(path: str | Path) -> Iterator[Row]:
     """Contract-shaped original-record links, one per event witness/observation."""
     for event in iter_event_witnesses(path):
         yield {
@@ -741,7 +777,9 @@ def iter_lineage(path):
         }
 
 
-def iter_parsing_issues(path, *, object_sha256=None):
+def iter_parsing_issues(
+    path: str | Path, *, object_sha256: Iterable[str] | None = None
+) -> Iterator[Row]:
     """Stream snapshot-bound parsing_issue contract rows from content diagnostics."""
     path = Path(path)
     selected = None if object_sha256 is None else set(object_sha256)
@@ -754,7 +792,7 @@ def iter_parsing_issues(path, *, object_sha256=None):
     yield from _parsing_issues(path, document, artifacts)
 
 
-def _parsing_issues(path, document, artifacts):
+def _parsing_issues(path: Path, document: JSON, artifacts: list[JSON]) -> Iterator[Row]:
     for artifact in artifacts:
         for index, issue in enumerate(
             _rows(path.parent.parent / "cache" / artifact["cache_key"] / "issues.jsonl")
@@ -772,7 +810,7 @@ def _parsing_issues(path, document, artifacts):
             }
 
 
-def parse_main(argv=None) -> int:
+def parse_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description="Parse frozen JEZ/ZIP logs into structural events")
     parser.add_argument("snapshot", type=Path)
     parser.add_argument("--workers", type=int, default=4)

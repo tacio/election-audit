@@ -33,6 +33,7 @@ from election_audit.national import (
     source_connection,
 )
 from election_audit.source_inventory import canonical, digest, hash_file, utc_now
+from election_audit.types import JSON, Argv
 
 REGIONS = {
     **dict.fromkeys("ac am ap pa ro rr to".split(), "north"),
@@ -44,7 +45,7 @@ REGIONS = {
 }
 
 
-def profile_source(spec, output, scratch):
+def profile_source(spec: JSON, output: str | Path, scratch: str | Path) -> Path:
     """Freeze file metadata in SQLite, without reading electoral/log outcomes."""
     output, scratch = Path(output).resolve(), Path(scratch).resolve()
     if output.exists():
@@ -150,7 +151,13 @@ def profile_source(spec, output, scratch):
     return output
 
 
-def select_sample(profile, output, *, per_band=2, exclusions=None):
+def select_sample(
+    profile: str | Path,
+    output: str | Path,
+    *,
+    per_band: int = 2,
+    exclusions: str | Path | None = None,
+) -> JSON:
     if type(per_band) is not int or not 1 <= per_band <= 32:
         raise ValueError("per_band must be between1 and32")
     profile, output = Path(profile).resolve(), Path(output).resolve()
@@ -233,7 +240,7 @@ def select_sample(profile, output, *, per_band=2, exclusions=None):
         "regions": dict(Counter(REGIONS[u["uf"]] for u in units)),
         "sampling_limits": "deterministic content-hash ranks within UF size quartiles plus deliberate maximum-size tails; all versions in selected sections retained; not a random electoral-outcome sample or national certification",
     }
-    if excluded is not None:
+    if excluded is not None and exclusions is not None:
         sample["exclusions"] = {
             "path": str(exclusions),
             "sha256": hash_file(exclusions)[0],
@@ -263,13 +270,19 @@ def select_sample(profile, output, *, per_band=2, exclusions=None):
     return sample
 
 
-def _progress(directory, value) -> None:
+def _progress(directory: Path, value: JSON) -> None:
     temporary = directory / ".progress.tmp"
     temporary.write_bytes(canonical(value) + b"\n")
     temporary.replace(directory / "progress.json")
 
 
-def run_sample(sample_dir, store, scratch, *, output_budget_bytes=2 * 1024**3):
+def run_sample(
+    sample_dir: str | Path,
+    store: str | Path,
+    scratch: str | Path,
+    *,
+    output_budget_bytes: int = 2 * 1024**3,
+) -> JSON:
     sample_dir, store, scratch = (
         Path(sample_dir).resolve(),
         Path(store).resolve(),
@@ -354,7 +367,7 @@ def run_sample(sample_dir, store, scratch, *, output_budget_bytes=2 * 1024**3):
                     flush=True,
                 )
 
-    def distributions(values):
+    def distributions(values: list[float]) -> JSON:
         values = sorted(values)
         return {
             "n": len(values),
@@ -419,15 +432,15 @@ def run_sample(sample_dir, store, scratch, *, output_budget_bytes=2 * 1024**3):
 
 
 def run_compact_sample(
-    sample_dir,
-    output,
-    store,
-    scratch,
+    sample_dir: str | Path,
+    output: str | Path,
+    store: str | Path,
+    scratch: str | Path,
     *,
-    output_budget_bytes=2 * 1024**3,
-    compare_payload_report=None,
-    batch_rows=16384,
-):
+    output_budget_bytes: int = 2 * 1024**3,
+    compare_payload_report: str | Path | None = None,
+    batch_rows: int = 16384,
+) -> JSON:
     """Budgeted same-source compact experiment, retaining originals in registered CAS."""
     from election_audit.national_storage import iter_compact, payload_rows, process_compact_original
 
@@ -566,7 +579,7 @@ def run_compact_sample(
                 flush=True,
             )
 
-    def dist(values):
+    def dist(values: list[float]) -> JSON:
         values = sorted(values)
         return {
             "n": len(values),
@@ -617,7 +630,7 @@ def run_compact_sample(
     return report
 
 
-def main(argv=None) -> int:
+def main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("profile", "select", "run", "compact"))
     parser.add_argument("--config", type=Path)

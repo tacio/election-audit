@@ -14,12 +14,16 @@ import os
 import re
 import tempfile
 from collections import Counter
+from collections.abc import Iterator
 from datetime import datetime
+from pathlib import Path
+from typing import IO, Any
 
-from election_audit.archive_parsing import MESSAGES, PARSER_VERSION, ParseConfig, _Parser
+from election_audit.archive_parsing import MESSAGES, PARSER_VERSION, ParseConfig, Segments, _Parser
 from election_audit.national_migration import file_stat
 from election_audit.national_relocation import relocated_root
 from election_audit.source_inventory import identity
+from election_audit.types import JSON, Row
 
 VERSION = "source-operational-summary-v1"
 BLOCK_LINES = 512
@@ -33,7 +37,7 @@ class SummaryBudgetExceeded(MemoryError):
     """Stop without publishing an incomplete/truncated diagnostic/evidence set."""
 
 
-def timestamp(value):
+def timestamp(value: str) -> datetime:
     if not TIMESTAMP.fullmatch(value):
         raise ValueError("Invalid structural timestamp")
     # Same calendar validation as strptime, without its global locale/cache path.
@@ -49,7 +53,12 @@ def timestamp(value):
 
 class SummaryParser(_Parser):
     def __init__(
-        self, object_sha, directory, *, output_limit=32 * 1024**2, block_lines=BLOCK_LINES
+        self,
+        object_sha: str,
+        directory: str | Path,
+        *,
+        output_limit: int = 32 * 1024**2,
+        block_lines: int = BLOCK_LINES,
     ) -> None:
         super().__init__(object_sha, ParseConfig(), directory, None, None)
         self.output_limit, self.estimated_output, self.block_lines = output_limit, 0, block_lines
@@ -63,23 +72,31 @@ class SummaryParser(_Parser):
         self.replayed = []
         self.segment_sizes = {}
 
-    def member_buffer(self):
+    def member_buffer(self) -> IO[bytes]:
         # At most depth+1 buffers, each <=2 MiB RAM; larger members spill to the
         # bounded scratch root. CRC is checked before emitting lines, as before.
-        return tempfile.SpooledTemporaryFile(max_size=2 * 1024**2, dir=self.directory)
+        return tempfile.SpooledTemporaryFile(max_size=2 * 1024**2, dir=str(self.directory))
 
-    def retain(self, destination, row) -> None:
+    def retain(self, destination: list[Any], row: tuple[Any, ...]) -> None:
         self.estimated_output += 256 + sum(len(v) for v in row if isinstance(v, (str, bytes)))
         if self.estimated_output > self.output_limit:
             raise SummaryBudgetExceeded("Evidence/index output exceeds explicit per-object bound")
         destination.append(row)
 
-    def line_hash(self):
+    def line_hash(self) -> str | None:
         if self.current_line_hash is None:
             self.current_line_hash = hashlib.sha256(self.current_line_bytes).hexdigest()
         return self.current_line_hash
 
-    def issue(self, code, segments, *, line=None, severity="error", **details) -> None:
+    def issue(
+        self,
+        code: str,
+        segments: Segments,
+        *,
+        line: int | None = None,
+        severity: str = "error",
+        **details: Any,
+    ) -> None:
         self.incomplete |= severity == "error"
         self.counts["issues_seen"] += 1
         self.diagnostics[(code, severity)] += 1
@@ -113,7 +130,7 @@ class SummaryParser(_Parser):
             ),
         )
 
-    def lines(self, body, segments) -> None:
+    def lines(self, body: IO[bytes], segments: Segments) -> None:
         member = len(self.members)
         self.current_member = member
         first_sequence = self.counts["lines"] + 1
@@ -279,7 +296,7 @@ class SummaryParser(_Parser):
         )
         self.current_line_hash = None
 
-    def result(self):
+    def result(self) -> JSON:
         return {
             "version": VERSION,
             "object_sha256": self.sha,
@@ -308,7 +325,14 @@ class SummaryParser(_Parser):
         }
 
 
-def summarize(row, scratch, *, output_limit=32 * 1024**2, block_lines=BLOCK_LINES, _replay=None):
+def summarize(
+    row: Row,
+    scratch: str | Path,
+    *,
+    output_limit: int = 32 * 1024**2,
+    block_lines: int = BLOCK_LINES,
+    _replay: tuple[int, int, int] | None = None,
+) -> JSON:
     root = relocated_root(row["source_root"], row["path"], row["sha256"], row["bytes"])
     source = root / row["path"]
     before = file_stat(root, row["path"])
@@ -347,7 +371,9 @@ def summarize(row, scratch, *, output_limit=32 * 1024**2, block_lines=BLOCK_LINE
         os.close(fd)
 
 
-def replay_lines(row, scratch, member_key, start, stop):
+def replay_lines(
+    row: Row, scratch: str | Path, member_key: int, start: int, stop: int
+) -> Iterator[JSON]:
     """Return a bounded exact forensic window, including hashes of unknown/error lines.
 
     This revalidates the raw source and archive and emits the same selected-field

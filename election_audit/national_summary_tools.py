@@ -108,7 +108,7 @@ def iter_source_observations(directory: str | Path) -> Iterator[Row]:
 def replay(
     directory: str | Path,
     object_sha: str,
-    member: str,
+    member: int,
     start: int,
     stop: int,
     development_sample: str | Path,
