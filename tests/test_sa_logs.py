@@ -7,6 +7,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from typing import Any
 
 import pyarrow.parquet as pq
 
@@ -16,11 +17,21 @@ BASE = "https://resultados.tse.jus.br/oficial/ele2026/arquivo-urna/3220/dados"
 OPERATOR = "151116550256"
 
 
-def line(stamp, app, message) -> str:
+def line(stamp: str, app: str, message: str) -> str:
     return f"{stamp}\tINFO\t02254078\t{app}\t{message}\t0123456789ABCDEF"
 
 
-def attempt(day, clock, municipality, zone, section, *, kind, reason="Outros", cancel=False):
+def attempt(
+    day: str,
+    clock: str,
+    municipality: str,
+    zone: str,
+    section: str,
+    *,
+    kind: str,
+    reason: str = "Outros",
+    cancel: bool = False,
+) -> list[str]:
     rows = [
         line(f"{day} {clock}:00", "SA", f"Tipo de apuração selecionada ({kind})"),
         line(f"{day} {clock}:01", "SA", "Identificação (município, zona e seção) confirmada"),
@@ -43,7 +54,7 @@ def attempt(day, clock, municipality, zone, section, *, kind, reason="Outros", c
     ]
 
 
-def jez(rows):
+def jez(rows: list[str]) -> bytes:
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("logd.dat", ("\n".join(rows) + "\n").encode("latin-1"))
@@ -94,7 +105,7 @@ class SaLogTests(unittest.TestCase):
         )
         self.bulk = self.bulk_root()
 
-    def stage(self, sections):
+    def stage(self, sections: dict[tuple[str, str, str, str], Any]) -> Path:
         staged = self.root / "staged"
         (staged / "objects").mkdir(parents=True)
         files = []
@@ -121,7 +132,7 @@ class SaLogTests(unittest.TestCase):
         )
         return staged
 
-    def bulk_root(self, *, tamper=None):
+    def bulk_root(self, *, tamper: str | None = None) -> Path:
         bulk = self.root / ("bulk-tampered" if tamper else "bulk")
         (bulk / "files").mkdir(parents=True)
         rows = []
@@ -142,10 +153,10 @@ class SaLogTests(unittest.TestCase):
             db.commit()
         return bulk
 
-    def get(self, url):
+    def get(self, url: str) -> tuple[bytes, str | None, str | None]:
         return self.bodies[url], '"e"', "Sun, 04 Oct 2026 23:00:00 GMT"
 
-    def fetch(self, name="fetch", **options):
+    def fetch(self, name: str = "fetch", **options: Any) -> dict[str, Any]:
         return sa_logs.fetch(self.staged, 1, self.root / name, delay=0, get=self.get, **options)
 
     def test_fetch_lists_only_sa_logs_stores_them_and_matches_the_bulk_archive(self) -> None:

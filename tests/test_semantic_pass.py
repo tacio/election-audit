@@ -8,7 +8,9 @@ import sqlite3
 import tempfile
 import unittest
 import zipfile
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 import pyarrow.parquet as pq
 from test_sevenzip import make_7z
@@ -20,7 +22,14 @@ TOKEN = "ABCDEF0123456789"
 VOTER = "000012345678"
 
 
-def log_body(messages, *, round_number=2, date="25/10/2026", device="12345678", start=0):
+def log_body(
+    messages: Iterable[str],
+    *,
+    round_number: int = 2,
+    date: str = "25/10/2026",
+    device: str = "12345678",
+    start: int = 0,
+) -> bytes:
     label = "SEGUNDO" if round_number == 2 else "PRIMEIRO"
     records = [
         ("GAP", f"Iniciando aplicação - ELEIÇÃO OFICIAL {label} TURNO - {round_number}º turno"),
@@ -35,7 +44,7 @@ def log_body(messages, *, round_number=2, date="25/10/2026", device="12345678", 
     ).encode("latin-1")
 
 
-def jez(*bodies, nested=False):
+def jez(*bodies: bytes, nested: bool = False) -> bytes:
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w") as z:
         for index, body in enumerate(bodies):
@@ -75,7 +84,7 @@ CYCLES = [
 ]
 
 
-def timed_body(records, device="12345678"):
+def timed_body(records: Iterable[tuple[str, int, str, str]], device: str = "12345678") -> bytes:
     """Log lines from (date, seconds after 08:00, application, message) records."""
     return "".join(
         f"{date} {8 + t // 3600:02d}:{t // 60 % 60:02d}:{t % 60:02d}"
@@ -232,7 +241,7 @@ class PassTests(unittest.TestCase):
         self.exclusions.write_text(json.dumps({"section_keys": [["ac", "01015", "0002", "0101"]]}))
         self.output = base / "pass"
 
-    def run_pass(self, **options):
+    def run_pass(self, **options: Any) -> dict[str, Any]:
         return sp.run_pass(
             self.root, 2, self.output, exclusions_path=self.exclusions, workers=1, **options
         )
@@ -275,7 +284,14 @@ class PassTests(unittest.TestCase):
             )
 
 
-def log_body_2022(messages, *, round_number=2, date="30/10/2022", device="12345678", start=0):
+def log_body_2022(
+    messages: Iterable[str],
+    *,
+    round_number: int = 2,
+    date: str = "30/10/2022",
+    device: str = "12345678",
+    start: int = 0,
+) -> bytes:
     """A 2022 (8.26.0.0) log: same machine, different round and software markers."""
     label = "SEGUNDO" if round_number == 2 else "PRIMEIRO"
     records = [
@@ -403,7 +419,7 @@ class BulkPassTests(unittest.TestCase):
             db.commit()
         self.output = Path(self.temp.name) / "pass"
 
-    def run_bulk(self, **options):
+    def run_bulk(self, **options: Any) -> dict[str, Any]:
         return sp.run_pass(
             None, 2, self.output, bulk_root=self.bulk, year=2022, workers=1, **options
         )

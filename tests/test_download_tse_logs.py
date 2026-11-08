@@ -8,15 +8,18 @@ import threading
 import time
 import unittest
 import zipfile
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stderr, redirect_stdout
+from email.message import Message
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from scripts import download_tse_logs as dl
 
 
-def jez(content):
+def jez(content: bytes | str) -> bytes:
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("logd.dat", content)
@@ -24,7 +27,7 @@ def jez(content):
 
 
 class Response(io.BytesIO):
-    def __init__(self, body) -> None:
+    def __init__(self, body: bytes) -> None:
         super().__init__(body)
         self.headers = {"Content-Length": str(len(body)), "ETag": '"test"'}
 
@@ -38,7 +41,7 @@ class CollectorTests(unittest.TestCase):
         self.addCleanup(self.collector.db().close)
         self.directory = f"{dl.BASE}/ele2026/arquivo-urna/3221/dados/ac/01120/0001/0001"
         self.aux_url = self.directory + "/p003221-ac-m01120-z0001-s0001-aux.json"
-        self.aux = {
+        self.aux: dict[str, Any] = {
             "f": "o",
             "st": "Totalizada",
             "hashes": [
@@ -67,7 +70,7 @@ class CollectorTests(unittest.TestCase):
         }
         calls = []
 
-        def open_response(request, timeout):
+        def open_response(request: Any, timeout: float) -> Response:
             calls.append(request.full_url)
             return Response(bodies[request.full_url])
 
@@ -156,7 +159,7 @@ class CollectorTests(unittest.TestCase):
                 (self.root / relative).unlink()
             calls = []
 
-            def open_response(request, timeout):
+            def open_response(request: Any, timeout: float) -> Response:
                 calls.append(request.full_url)
                 return Response(bodies[request.full_url])
 
@@ -218,7 +221,7 @@ class CollectorTests(unittest.TestCase):
                 "cancelled",
             )
             request.assert_not_called()
-        self.assertIn("Auxiliary file is not official", self.collector.stop_reason)
+        self.assertIn("Auxiliary file is not official", self.collector.stop_reason or "")
         self.assertEqual(
             self.collector.db()
             .execute("SELECT COUNT(*) FROM sections WHERE status='error'")
@@ -233,7 +236,7 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(self.collector.db().execute("SELECT COUNT(*) FROM files").fetchone()[0], 0)
 
     def test_throttle_stops_without_retry(self) -> None:
-        error = dl.HTTPError(self.aux_url, 429, "too many requests", {}, None)
+        error = dl.HTTPError(self.aux_url, 429, "too many requests", Message(), None)
         with patch.object(dl, "urlopen", side_effect=error) as request:
             with self.assertRaisesRegex(RuntimeError, "HTTP 429"):
                 self.collector.fetch(self.aux_url, metadata=True)
@@ -246,7 +249,7 @@ class CollectorTests(unittest.TestCase):
             dl.URLError(ConnectionResetError(104, "Connection reset by peer")),
             ConnectionResetError(104, "Connection reset by peer"),
             dl.IncompleteRead(b"{", 1),
-            dl.HTTPError(self.aux_url, 503, "unavailable", {}, None),
+            dl.HTTPError(self.aux_url, 503, "unavailable", Message(), None),
         ]
         for error in errors:
             with (
@@ -327,7 +330,7 @@ class CollectorTests(unittest.TestCase):
         release = threading.Event()
         self.collector.next_request = time.monotonic() + 10
 
-        def wait_for_release(delay) -> bool:
+        def wait_for_release(delay: float) -> bool:
             waiting.set()
             if not release.wait(2):
                 raise AssertionError("Rate wait did not get released")
@@ -353,10 +356,10 @@ class CollectorTests(unittest.TestCase):
         class FakeClock:
             value = 0.0
 
-            def monotonic(self):
+            def monotonic(self) -> float:
                 return self.value
 
-            def wait(self, delay) -> bool:
+            def wait(self, delay: float) -> bool:
                 # Called under the rate lock, so clock updates are serialized.
                 self.value += delay
                 return False
@@ -382,7 +385,7 @@ class CollectorTests(unittest.TestCase):
             for i in range(1, 7)
         ]
 
-        def open_response(request, timeout):
+        def open_response(request: Any, timeout: float) -> Response:
             if request.full_url.endswith("-aux.json"):
                 return Response(json.dumps(self.aux).encode())
             return Response(jez(b"original log bytes"))
@@ -429,7 +432,7 @@ class CollectorTests(unittest.TestCase):
         self.collector.db().execute("PRAGMA busy_timeout=1")
         barrier = threading.Barrier(32)
 
-        def worker(index):
+        def worker(index: int) -> int:
             barrier.wait(timeout=5)
             connection_id = id(self.collector.db())
             for iteration in range(10):
@@ -510,7 +513,7 @@ class CollectorTests(unittest.TestCase):
             ],
         }
 
-        def open_response(request, timeout):
+        def open_response(request: Any, timeout: float) -> Response:
             if request.full_url.endswith("ele-c.json"):
                 return Response(json.dumps(config).encode())
             if request.full_url.endswith("-cs.json"):
@@ -545,7 +548,7 @@ class CollectorTests(unittest.TestCase):
             pass
 
         # A complete state must produce no section requests on the next run.
-        def config_only(request, timeout):
+        def config_only(request: Any, timeout: float) -> Response:
             if request.full_url.endswith("ele-c.json"):
                 return Response(json.dumps(config).encode())
             if request.full_url.endswith("-cs.json"):
@@ -580,7 +583,7 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(report["manifest"], str(external.resolve()))
         self.assertEqual(report["reused_sections"], 4)
 
-    def seed_section_for_bulk_resume(self):
+    def seed_section_for_bulk_resume(self) -> dict[str, bytes]:
         bodies = {
             self.aux_url: json.dumps(self.aux).encode(),
             self.directory + "/aaa/official-log.jez": jez(b"first"),
@@ -707,7 +710,7 @@ class ParallelSchedulingTests(unittest.TestCase):
         gate = threading.Event()
         released = []
 
-        def task(index):
+        def task(index: int) -> int:
             if index == 0:
                 released.append(gate.wait(2))
             elif index == 6:
@@ -722,12 +725,12 @@ class ParallelSchedulingTests(unittest.TestCase):
         stop = threading.Event()
         consumed = []
 
-        def items():
+        def items() -> Iterator[int]:
             for index in range(100):
                 consumed.append(index)
                 yield index
 
-        def task(index):
+        def task(index: int) -> int:
             if index == 0:
                 raise ValueError("original failure")
             return index
@@ -740,7 +743,7 @@ class ParallelSchedulingTests(unittest.TestCase):
     def test_consumer_interrupt_stops_and_cancels_queued_work(self) -> None:
         stop = threading.Event()
 
-        def task(index):
+        def task(index: int) -> int:
             if index >= 2:
                 stop.wait(2)
             return index
