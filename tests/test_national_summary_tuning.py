@@ -3,12 +3,13 @@
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 from election_audit.national_summary_tuning import choose, read_state, save_state
 
 
 class SummaryTuningTests(unittest.TestCase):
-    def trials(self, workers, values, batch=32):
+    def trials(self, workers: int, values: list[float], batch: int = 32) -> list[dict[str, Any]]:
         return [
             {
                 "state": "accepted",

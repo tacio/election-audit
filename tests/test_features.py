@@ -5,6 +5,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 from election_audit.features import (
     FEATURES,
@@ -21,7 +22,7 @@ from election_audit.features import (
 )
 
 
-def unit(turn=2, section="0001", snapshot="source"):
+def unit(turn: int = 2, section: str = "0001", snapshot: str = "source") -> dict[str, Any]:
     return {
         "round": turn,
         "uf": "ac",
@@ -35,7 +36,7 @@ def unit(turn=2, section="0001", snapshot="source"):
     }
 
 
-def counts():
+def counts() -> dict[str, Any]:
     return {
         "eligible_electors": 100,
         "attending_voters": 80,
@@ -55,14 +56,14 @@ def counts():
     }
 
 
-def database():
+def database() -> sqlite3.Connection:
     db = sqlite3.connect(":memory:")
     db.row_factory = sqlite3.Row
     _initialize(db)
     return db
 
 
-def links():
+def links() -> dict[str, Any]:
     return {
         "version": "reviewed-feature-links-v1",
         "links": [

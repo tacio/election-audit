@@ -4,12 +4,16 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 from election_audit import integrity_documents as docs
 
 
-def record(url, body, *, status=200, kind="application/pdf"):
+def record(
+    url: str, body: bytes, *, status: int = 200, kind: str = "application/pdf"
+) -> dict[str, Any]:
     return {
         "uf": "sp",
         "title": url.rsplit("/", 1)[-1],
@@ -30,7 +34,7 @@ class IntegrityDocumentTests(unittest.TestCase):
         self.downloads = self.root / "downloads"
         self.downloads.mkdir()
 
-    def write_records(self, court, records) -> None:
+    def write_records(self, court: str, records: Iterable[dict[str, Any]]) -> None:
         body = {"uf": court, "collected_at": "2026-11-04T16:00:00Z", "records": records}
         (self.downloads / f"ea-integrity-manifest-{court}.json").write_text(json.dumps(body))
 

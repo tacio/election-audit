@@ -22,7 +22,7 @@ class SummaryReleaseTests(unittest.TestCase):
         self.helper.execute(self.out)
         self.release = self.helper.fixture.root / "release"
 
-    def export(self, check=True):
+    def export(self, check: bool = True) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
                 sys.executable,

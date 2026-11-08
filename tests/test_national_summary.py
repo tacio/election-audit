@@ -7,7 +7,9 @@ import os
 import tempfile
 import unittest
 import zipfile
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from election_audit.archive_parsing import ParseConfig
@@ -34,7 +36,7 @@ class SummaryTests(unittest.TestCase):
         os.environ.pop("ELECTION_AUDIT_RELOCATION", None)
         os.environ.pop("ELECTION_AUDIT_RELOCATION_SHA256", None)
 
-    def source(self, lines, *, nested=False):
+    def source(self, lines: Iterable[bytes], *, nested: bool = False) -> dict[str, Any]:
         body = io.BytesIO()
         with zipfile.ZipFile(body, "w", compression=zipfile.ZIP_DEFLATED) as z:
             z.writestr("logd.dat", b"".join(lines))
@@ -57,7 +59,14 @@ class SummaryTests(unittest.TestCase):
             "url": "https://example.test/source.jez",
         }
 
-    def line(self, time="08:00:00", app="VOTA", message="Unknown", device="123", level="INFO"):
+    def line(
+        self,
+        time: str = "08:00:00",
+        app: str = "VOTA",
+        message: str = "Unknown",
+        device: str = "123",
+        level: str = "INFO",
+    ) -> bytes:
         return f"25/10/2026 {time}\t{level}\t{device}\t{app}\t{message}\tprivate-token\n".encode(
             "latin-1"
         )

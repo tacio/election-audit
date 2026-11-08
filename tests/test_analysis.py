@@ -1,6 +1,8 @@
 """Synthetic feature arithmetic and immutable analysis derivative integration."""
 
 import json
+from pathlib import Path
+from typing import Any
 
 import test_analysis_ledgers
 import test_derivatives
@@ -23,7 +25,7 @@ class AnalysisTests(test_snapshots.SourceFixture):
     frozen_parse = test_derivatives.DerivativeTests.frozen_parse
     parent_and_bundle = test_derivatives.DerivativeTests.parent_and_bundle
 
-    def analysis_fixture(self, extra=None):
+    def analysis_fixture(self, extra: dict[str, Any] | None = None) -> tuple[Path, Path, Path]:
         base, parent, bundle, _ = self.parent_and_bundle()
         electoral = publish_derivative(parent, bundle, base / "warehouse")
         spec = {

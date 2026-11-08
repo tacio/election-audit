@@ -2,6 +2,7 @@
 
 import copy
 import unittest
+from typing import Any
 
 from election_audit.operational_marts import (
     coverage_rows,
@@ -10,7 +11,9 @@ from election_audit.operational_marts import (
 )
 
 
-def inputs(completion="2026-10-25T20:00:00+00:00", confidence="verified"):
+def inputs(
+    completion: str | None = "2026-10-25T20:00:00+00:00", confidence: str = "verified"
+) -> list[Any]:
     session = {
         "session_id": "s",
         "snapshot_id": "snap",

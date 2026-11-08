@@ -2,12 +2,13 @@
 
 import copy
 import unittest
+from typing import Any
 
 from election_audit.analysis_partitions import VERSION, assign_partitions
 from election_audit.publication import PublicationError
 
 
-def specification():
+def specification() -> dict[str, Any]:
     return {
         "version": VERSION,
         "seed": "frozen-2026",
@@ -32,7 +33,7 @@ def specification():
     }
 
 
-def population():
+def population() -> list[dict[str, Any]]:
     return [
         {
             "snapshot_id": snap,

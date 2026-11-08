@@ -4,8 +4,10 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 from election_audit.research_evaluation import (
     append_record,
@@ -24,7 +26,7 @@ from election_audit.research_protocol import (
 
 
 @contextmanager
-def connection(path):
+def connection(path: str | Path) -> Generator[sqlite3.Connection]:
     db = sqlite3.connect(path)
     try:
         with db:
@@ -79,7 +81,7 @@ class ResearchProtocolTests(unittest.TestCase):
             )
         )
 
-    def protocol(self, name="protocol", **kwargs):
+    def protocol(self, name: str = "protocol", **kwargs: Any) -> tuple[Path, dict[str, Any]]:
         path = publish_protocol(self.feature, self.root / name, **kwargs)
         return path, load_protocol(path)
 
@@ -147,7 +149,7 @@ class ResearchProtocolTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "pin mismatch"):
             self.protocol("wrongpin")
 
-    def journal(self):
+    def journal(self) -> tuple[sqlite3.Connection, dict[str, Any], list[Any]]:
         protocol, doc = self.protocol()
         db = open_journal(self.root / "journal.sqlite", protocol)
         common = {"protocol_id": doc["protocol_id"], "partition_id": doc["partition_id"]}

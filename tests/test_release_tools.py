@@ -3,6 +3,7 @@
 import io
 import json
 from contextlib import redirect_stderr, redirect_stdout
+from pathlib import Path
 
 import test_reconstruction
 import test_snapshots
@@ -21,7 +22,7 @@ from election_audit.types import one
 class ReleaseInterfaceTests(test_snapshots.SourceFixture):
     frozen_parse = test_reconstruction.PublicationTests.frozen_parse
 
-    def build(self):
+    def build(self) -> tuple[Path, Path]:
         base, _, parsed = self.frozen_parse()
         return base, build_from_parse(parsed, base / "warehouse")
 

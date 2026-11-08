@@ -56,7 +56,7 @@ class TuningTests(unittest.TestCase):
             limits(512 * 1024**2)
 
     def test_repeat_noise_plateau_and_rejected_trials_not_winners(self) -> None:
-        def trials(batch, values):
+        def trials(batch: int, values: list[float]) -> list[dict[str, Any]]:
             return [
                 {"state": "accepted", "batch_rows": batch, "events_per_second": v} for v in values
             ]

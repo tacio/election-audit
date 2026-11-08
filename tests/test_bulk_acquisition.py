@@ -18,7 +18,7 @@ from unittest.mock import patch
 from election_audit import bulk_acquisition as bulk
 
 
-def archive(text):
+def archive(text: str) -> bytes:
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w") as z:
         z.writestr("a.bu", text * 50)
@@ -43,7 +43,7 @@ class Server:
             def log_message(self, format: str, *args: Any) -> None:
                 pass
 
-            def _file(self):
+            def _file(self) -> str:
                 return self.path.split("?", 1)[0].rsplit("/", 1)[-1]
 
             def do_HEAD(self) -> None:
@@ -125,7 +125,7 @@ class BulkAcquisitionTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.output = Path(self.temp.name) / "bulk"
 
-    def run_acquire(self, **options):
+    def run_acquire(self, **options: Any) -> dict[str, Any]:
         return bulk.acquire(
             ["demo-dataset"],
             self.output,
@@ -135,7 +135,7 @@ class BulkAcquisitionTests(unittest.TestCase):
             **options,
         )
 
-    def rows(self):
+    def rows(self) -> list[Any]:
         uri = (self.output / "manifest.sqlite").as_uri() + "?mode=ro"
         with contextlib.closing(sqlite3.connect(uri, uri=True)) as db:
             return db.execute(

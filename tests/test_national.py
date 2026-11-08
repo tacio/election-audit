@@ -7,6 +7,7 @@ import sqlite3
 import tempfile
 import unittest
 import zipfile
+from collections.abc import Generator
 from contextlib import closing, contextmanager
 from pathlib import Path
 from typing import Any
@@ -28,7 +29,7 @@ from election_audit.national import (
 
 
 @contextmanager
-def database(path):
+def database(path: Path) -> Generator[sqlite3.Connection]:
     with closing(sqlite3.connect(path)) as db:
         with db:
             yield db
@@ -73,7 +74,7 @@ class NationalTests(unittest.TestCase):
             self.prefix + "dados/ac/01007/0001/0001/pkg/a-log.jez", archive.getvalue()
         )
 
-    def save(self, url, body):
+    def save(self, url: str, body: bytes) -> dict[str, Any]:
         h = hashlib.sha256(body).hexdigest()
         path = self.raw / "objects" / h
         path.parent.mkdir(exist_ok=True)

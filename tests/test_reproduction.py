@@ -99,7 +99,7 @@ class ReproductionTests(unittest.TestCase):
             object_groups=self.descriptor["object_groups"],
         )
 
-        def interrupt(stage) -> None:
+        def interrupt(stage: str) -> None:
             if stage == "before_release":
                 raise InterruptedError("fixture interruption")
 

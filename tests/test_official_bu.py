@@ -9,6 +9,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from typing import Any
 
 from election_audit.electoral_imports import read_import
 from election_audit.electoral_results import derive_electoral
@@ -21,12 +22,18 @@ FILENAME = "bweb_2t_AC_261020260742.zip"
 URL = "https://cdn.tse.jus.br/estatistica/sead/eleicoes/eleicoes2026/buweb/" + FILENAME
 
 
-def sample_rows():
+def sample_rows() -> list[dict[str, str]]:
     with (FIXTURES / "ac-sample.csv").open(encoding="latin-1", newline="") as handle:
         return list(csv.DictReader(handle, delimiter=";"))
 
 
-def official_bundle(root, *, rows=None, header=None, dictionary=None):
+def official_bundle(
+    root: Path,
+    *,
+    rows: list[dict[str, Any]] | None = None,
+    header: list[str] | None = None,
+    dictionary: bytes | None = None,
+) -> Path:
     buffer = io.StringIO(newline="")
     writer = csv.DictWriter(
         buffer, header or LAYOUT["header"], delimiter=";", quoting=csv.QUOTE_ALL
@@ -80,7 +87,7 @@ def official_bundle(root, *, rows=None, header=None, dictionary=None):
     return path
 
 
-def repin(bundle, role) -> None:
+def repin(bundle: Path, role: str) -> None:
     document = json.loads(bundle.read_text())
     spec = document[role]
     spec["sha256"] = hashlib.sha256((bundle.parent / spec["path"]).read_bytes()).hexdigest()

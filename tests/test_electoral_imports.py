@@ -5,18 +5,19 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 from election_audit.electoral_imports import read_import
 from election_audit.publication import SCHEMA, PublicationError
 
 
-def row(name, **values):
+def row(name: str, **values: Any) -> dict[str, Any]:
     result = {key: values.get(key) for key in SCHEMA[name]["fields"]}
     result["field_states"] = {key: "unknown" for key, value in result.items() if value is None}
     return result
 
 
-def bundle_at(root, tables):
+def bundle_at(root: Path, tables: dict[str, list[dict[str, Any]]]) -> Path:
     sources = []
     for name, rows in tables.items():
         data = "".join(json.dumps(r) + "\n" for r in rows).encode()

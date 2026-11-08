@@ -1,6 +1,7 @@
 import importlib.util
 import unittest
 from pathlib import Path
+from typing import Any
 
 FIXTURE = Path(__file__).parent / "fixtures/urn-pki"
 
@@ -16,7 +17,7 @@ class UrnPkiTests(unittest.TestCase):
 
         self.x509, self.pki = x509, urn_pki
 
-    def leaf(self, stem):
+    def leaf(self, stem: str) -> Any:
         return self.x509.load_pem_x509_certificate((FIXTURE / f"{stem}-leaf.pem").read_bytes())
 
     def test_authorities_and_revocation_lists_load_verified(self) -> None:
@@ -62,7 +63,7 @@ class UrnPkiTests(unittest.TestCase):
         key = ec.generate_private_key(ec.SECP521R1())
         now = datetime(2026, 1, 1, tzinfo=UTC)
 
-        def forged(issuer, serial):
+        def forged(issuer: Any, serial: int) -> Any:
             builder = (
                 self.x509.CertificateBuilder()
                 .subject_name(self.x509.Name.from_rfc4514_string("CN=ueao00000001,O=TSE,C=BR"))
@@ -85,7 +86,7 @@ class UrnPkiTests(unittest.TestCase):
         self.assertEqual(self.pki.check_certificate(None)["pki_issuer_signature"], None)
 
 
-def _der():
+def _der() -> Any:
     from cryptography.hazmat.primitives.serialization import Encoding
 
     return Encoding.DER

@@ -3,6 +3,8 @@
 import copy
 import json
 import shutil
+from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import test_reconstruction
@@ -26,7 +28,7 @@ from election_audit.types import one
 class DerivativeTests(test_snapshots.SourceFixture):
     frozen_parse = test_reconstruction.PublicationTests.frozen_parse
 
-    def parent_and_bundle(self):
+    def parent_and_bundle(self) -> tuple[Path, Path, Path, dict[str, Any]]:
         base, _, parsed = self.frozen_parse()
         parent = build_from_parse(parsed, base / "warehouse")
         with open_release(parent) as db:
@@ -79,7 +81,7 @@ class DerivativeTests(test_snapshots.SourceFixture):
 
         reads = []
 
-        def counted(path):
+        def counted(path: Path) -> tuple[str, int]:
             reads.append(str(path))
             return hash_file(path)
 

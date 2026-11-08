@@ -6,6 +6,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 from election_audit.binary_bu import decode_bu
 from election_audit.elections import election_for_round
@@ -21,7 +22,7 @@ class VerificationTests(unittest.TestCase):
         self.election = election_for_round(2)
         self.candidates = {"13": {"destination": "Válido"}, "22": {"destination": "Válido"}}
 
-    def records(self, key):
+    def records(self, key: tuple[str, ...]) -> list[dict[str, Any]]:
         return [
             r
             for r in self.rows

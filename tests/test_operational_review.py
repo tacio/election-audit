@@ -4,7 +4,9 @@ import json
 import tempfile
 import unittest
 import zipfile
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 import pyarrow.parquet as pq
 
@@ -15,7 +17,15 @@ from election_audit.source_inventory import hash_file
 
 
 class OperationalReviewTests(unittest.TestCase):
-    def fixture(self, root, messages, *, official=True, date="25/10/2026", round_number=2):
+    def fixture(
+        self,
+        root: Path,
+        messages: Iterable[str],
+        *,
+        official: bool = True,
+        date: str = "25/10/2026",
+        round_number: int = 2,
+    ) -> tuple[Path, Path]:
         original = root / "source.jez"
         prefix = [
             (
@@ -59,7 +69,7 @@ class OperationalReviewTests(unittest.TestCase):
         )
         return original, structural
 
-    def rows(self, path, name):
+    def rows(self, path: Path, name: str) -> list[Any]:
         return [
             json.loads(r) for r in pq.read_table(path / (name + ".parquet")).column(0).to_pylist()
         ]

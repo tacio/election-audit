@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from collections.abc import Iterable
 from contextlib import closing
 from pathlib import Path
 from typing import Any
@@ -124,7 +125,7 @@ class WorkloadExecutionTests(unittest.TestCase):
             },
         )
 
-    def configure(self, reuse_stores=()):
+    def configure(self, reuse_stores: Iterable[str | Path] = ()) -> dict[str, Any]:
         return prepare(
             self.profile,
             self.excluded,
@@ -137,7 +138,7 @@ class WorkloadExecutionTests(unittest.TestCase):
             reuse_stores=reuse_stores,
         )
 
-    def execute(self, **kwargs):
+    def execute(self, **kwargs: Any) -> dict[str, Any]:
         with (
             patch("election_audit.national_workload.configure_production"),
             patch("election_audit.national.guard"),

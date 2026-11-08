@@ -6,6 +6,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 from election_audit.research_evaluation import final_evaluation_complete
 from election_audit.research_models import (
@@ -18,7 +19,7 @@ from election_audit.research_models import (
 from election_audit.research_protocol import hash_file, publish_protocol
 
 
-def fixture(root):
+def fixture(root: Path) -> tuple[Path, Path]:
     source = root / "features"
     source.mkdir()
     with sqlite3.connect(source / "features.sqlite") as db:
@@ -153,7 +154,7 @@ class MechanismValidationTests(unittest.TestCase):
         }
         calls = []
 
-        def refit(train, cal, test, seed):
+        def refit(train: Any, cal: Any, test: list[dict[str, Any]], seed: int) -> list[bool]:
             calls.append(seed)
             self.assertIsNot(train, records)
             return [r["injected"] for r in test]

@@ -10,6 +10,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from typing import Any
 
 import pyarrow.parquet as pq
 
@@ -113,7 +114,7 @@ class PrintedPassTests(unittest.TestCase):
         self.cmind = base / "cmind"
         (self.cmind / "raw").mkdir(parents=True)
 
-    def qr(self, content, *, sign=True, final=None):
+    def qr(self, content: str, *, sign: bool = True, final: str | None = None) -> str:
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.asymmetric import ec
         from cryptography.hazmat.primitives.serialization import Encoding
@@ -133,11 +134,11 @@ class PrintedPassTests(unittest.TestCase):
         codes += [f"QRCE:2:2 IDUE:{self.urn} MDUE:2015 CERT:{cert[half:]}"]
         return "\n".join(codes)
 
-    def write(self, number, qr) -> None:
+    def write(self, number: int, qr: str) -> None:
         record = {"data": {"id": str(number), "is_simulated": "0", "qr_raw": qr}}
         (self.cmind / "raw" / f"bu_{number:06d}.json").write_text(json.dumps(record))
 
-    def run_pass(self, name="out"):
+    def run_pass(self, name: str = "out") -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
         result = pb.run_printed(self.bulk, Path(self.temp.name) / name, cmind=self.cmind)
         table = pq.read_table(Path(self.temp.name) / name / "release" / "printed.parquet")
         return result, {r["source_id"]: r for r in table.to_pylist()}

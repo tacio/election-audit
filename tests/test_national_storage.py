@@ -5,7 +5,9 @@ import io
 import tempfile
 import unittest
 import zipfile
+from collections.abc import Iterable, Iterator
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pyarrow as pa
@@ -25,7 +27,7 @@ class CompactEventsTests(unittest.TestCase):
         self.sha = "a" * 64
         self.config = ParseConfig().__dict__
 
-    def rows(self, n=41):
+    def rows(self, n: int = 41) -> Iterator[dict[str, Any]]:
         for i in range(n):
             locator = {
                 "archive_segments": [
@@ -54,7 +56,7 @@ class CompactEventsTests(unittest.TestCase):
                 "parser_version": PARSER_VERSION,
             }
 
-    def write(self, rows):
+    def write(self, rows: Iterable[dict[str, Any]]) -> Path:
         return write_compact(
             rows,
             self.directory,

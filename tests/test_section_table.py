@@ -1,5 +1,6 @@
 import json
 import unittest
+from typing import Any
 
 from election_audit.section_table import (
     METHODS,
@@ -20,7 +21,7 @@ CYCLES = [
 ]
 
 
-def session(**values):
+def session(**values: Any) -> dict[str, Any]:
     base = {
         "uf": "ac",
         "municipality": "01392",
@@ -153,7 +154,15 @@ class ClockTests(unittest.TestCase):
         self.assertEqual(clock_state(stepped, "15:00:00", day), "backstep")
 
 
-def row(round_number, section, members, *, ops=None, protected=False, result=True):
+def row(
+    round_number: int,
+    section: str,
+    members: list[str],
+    *,
+    ops: dict[str, Any] | None = None,
+    protected: bool = False,
+    result: bool = True,
+) -> dict[str, Any]:
     key = ("ac", "01392", "0009", section)
     profile = {("ac", "01392", "0009", m): {c: 1 for c in PROFILE_COLUMNS} for m in members}
     result_row = (
