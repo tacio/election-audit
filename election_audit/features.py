@@ -9,20 +9,26 @@ import re
 import shutil
 import sqlite3
 import tempfile
+from collections.abc import Collection, Iterable
 from pathlib import Path
+from typing import Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
 from election_audit.contracts import load_contract
 from election_audit.source_inventory import canonical, digest
+from election_audit.types import JSON, Argv, Row
+
+# (value, numerator, denominator, unavailability reason) of one feature component.
+type Measure = tuple[Any, Any, Any, str | None]
 
 VERSION = "feature-release-v1"
 FEATURES = load_contract("features")["features"]
 BATCH = 2048
 
 
-def _sha(path):
+def _sha(path: Path) -> str:
     h = hashlib.sha256()
     with Path(path).open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024**2), b""):
@@ -30,7 +36,7 @@ def _sha(path):
     return h.hexdigest()
 
 
-def _anchor(value):
+def _anchor(value: Any) -> bool:
     return (
         isinstance(value, dict)
         and bool(re.fullmatch(r"[0-9a-f]{64}", value.get("object_sha256", "")))
@@ -38,14 +44,14 @@ def _anchor(value):
     )
 
 
-def _db(path):
+def _db(path: Path) -> sqlite3.Connection:
     db = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA query_only=ON")
     return db
 
 
-def _initialize(db) -> None:
+def _initialize(db: sqlite3.Connection) -> None:
     db.executescript("""
       CREATE TABLE units(unit_key TEXT PRIMARY KEY,round INTEGER,uf TEXT,municipality_tse TEXT,zone TEXT,section TEXT,
        principal_section_id TEXT,location_id TEXT,stable_location_id TEXT,source_snapshot_id TEXT,source_ready INTEGER,payload TEXT);
@@ -61,7 +67,9 @@ def _initialize(db) -> None:
     """)
 
 
-def _store_unit(db, unit, counts, members=()) -> None:
+def _store_unit(
+    db: sqlite3.Connection, unit: Row, counts: JSON, members: Iterable[str] = ()
+) -> None:
     required = ("round", "uf", "municipality_tse", "zone", "section", "source_snapshot_id")
     if any(unit.get(k) in (None, "") for k in required):
         raise ValueError("Unit requires explicit round/geography/source identity")
@@ -109,10 +117,10 @@ def _store_unit(db, unit, counts, members=()) -> None:
         db.execute("INSERT INTO members VALUES(?,?)", (key, member))
 
 
-def verified_member_sections(principal, payload):
+def verified_member_sections(principal: Any, payload: JSON) -> list[str]:
     """Recover preserved BWEB composition without inventing unknown members."""
 
-    def code(value):
+    def code(value: Any) -> str:
         token = str(value).strip()
         if not re.fullmatch(r"[0-9]{1,4}", token) or int(token) < 1:
             raise ValueError("Invalid composition section code")
@@ -143,7 +151,9 @@ def verified_member_sections(principal, payload):
     return sorted(raw_members) if raw_members is not None else []
 
 
-def ingest_verification(db, path, ufs=None):
+def ingest_verification(
+    db: sqlite3.Connection, path: str | Path, ufs: Collection[str] | None = None
+) -> JSON:
     path = Path(path).resolve()
     if path.is_dir():
         path /= "evidence.sqlite"
@@ -232,7 +242,9 @@ def ingest_verification(db, path, ufs=None):
     return {"kind": "verification", "path": str(path), "sha256": before}
 
 
-def ingest_release(db, path, ufs=None):
+def ingest_release(
+    db: sqlite3.Connection, path: str | Path, ufs: Collection[str] | None = None
+) -> JSON:
     from election_audit.publication import inspect_release, open_release
     from election_audit.release_tools import resolve_release
 
@@ -290,7 +302,7 @@ def ingest_release(db, path, ufs=None):
     }
 
 
-def apply_links(db, document=None) -> None:
+def apply_links(db: sqlite3.Connection, document: JSON | None = None) -> None:
     if document is None:
         return
     if document.get("version") != "reviewed-feature-links-v1":
@@ -315,7 +327,7 @@ def apply_links(db, document=None) -> None:
     )
 
 
-def ingest_operations(db, path):
+def ingest_operations(db: sqlite3.Connection, path: str | Path) -> JSON:
     path = Path(path).resolve()
     manifest = json.loads((path / "artifact.json").read_text())
     for name, spec in manifest.get("files", {}).items():
@@ -359,10 +371,16 @@ def ingest_operations(db, path):
     return {"kind": "operational_review", "artifact_sha256": _sha(path / "artifact.json")}
 
 
-def measures(unit, counts, operations, candidate_a=None, candidate_b=None):
+def measures(
+    unit: Row,
+    counts: JSON,
+    operations: list[Row],
+    candidate_a: str | None = None,
+    candidate_b: str | None = None,
+) -> dict[tuple[str, str], Measure]:
     totals = counts
     ready = bool(unit["source_ready"])
-    numbers = [
+    numbers: list[Any] = [
         totals.get(f) for f in ("eligible_electors", "attending_voters", "abstaining_electors")
     ]
     accounting = (
@@ -376,9 +394,15 @@ def measures(unit, counts, operations, candidate_a=None, candidate_b=None):
         k: v for k, v in choices.items() if re.fullmatch(r"[0-9]{1,2}", k) and 1 <= int(k) <= 94
     }
     legal = totals.get("legal_final_counts_ready") is True
-    result = {}
+    result: dict[tuple[str, str], Measure] = {}
 
-    def ratio(feature, component, numerator, denominator, reason=None) -> None:
+    def ratio(
+        feature: str,
+        component: str,
+        numerator: Any,
+        denominator: Any,
+        reason: str | None = None,
+    ) -> None:
         if reason is None and (numerator is None or denominator is None):
             reason = "missing_input"
         if reason is None and denominator <= 0:
@@ -501,7 +525,9 @@ def measures(unit, counts, operations, candidate_a=None, candidate_b=None):
     return result
 
 
-def derive_features(db, candidate_a=None, candidate_b=None) -> None:
+def derive_features(
+    db: sqlite3.Connection, candidate_a: str | None = None, candidate_b: str | None = None
+) -> None:
     definitions = {f["id"]: f for f in FEATURES}
     for unitrow in db.execute("SELECT * FROM units ORDER BY unit_key"):
         unit = dict(unitrow)
@@ -576,7 +602,7 @@ def derive_features(db, candidate_a=None, candidate_b=None) -> None:
             )
 
 
-def derive_rounds(db) -> None:
+def derive_rounds(db: sqlite3.Connection) -> None:
     groups = db.execute(
         "SELECT DISTINCT stable_location_id FROM units WHERE stable_location_id IS NOT NULL ORDER BY 1"
     )
@@ -618,7 +644,7 @@ def derive_rounds(db) -> None:
             sets[turn] = set(members)
         if not sets[1] or sets[1] != sets[2]:
             reason = "incomparable_member_population"
-        sums = {}
+        sums: dict[int, dict[str, Any]] = {}
         for turn in (1, 2):
             records = [
                 json.loads(
@@ -671,7 +697,7 @@ def derive_rounds(db) -> None:
         db.execute("INSERT INTO comparisons VALUES(?,?)", (stable, canonical(row).decode()))
 
 
-def _write_table(db, table, output):
+def _write_table(db: sqlite3.Connection, table: str, output: Path) -> JSON:
     files = []
     schema = pa.schema([("payload", pa.string())])
     if table in ("units", "features"):
@@ -679,13 +705,13 @@ def _write_table(db, table, output):
     else:
         query = f"SELECT 0,'all',payload FROM {table} ORDER BY 3"
     current = None
-    writer = None
+    writer: pq.ParquetWriter | None = None
     count = 0
-    file = None
+    file: Path | None = None
     batch = []
 
     def close() -> None:
-        if writer:
+        if writer and file is not None:  # both set when a partition opens
             if batch:
                 writer.write_table(pa.Table.from_arrays([pa.array(batch)], schema=schema))
                 batch.clear()
@@ -711,6 +737,7 @@ def _write_table(db, table, output):
         batch.append(payload)
         count += 1
         if len(batch) == BATCH:
+            assert writer is not None  # opened with the first partition
             writer.write_table(pa.Table.from_arrays([pa.array(batch)], schema=schema))
             batch.clear()
     close()
@@ -718,8 +745,15 @@ def _write_table(db, table, output):
 
 
 def publish_features(
-    electoral, output, *, links=None, operations=(), candidate_a=None, candidate_b=None, ufs=None
-):
+    electoral: Iterable[str | Path],
+    output: str | Path,
+    *,
+    links: JSON | None = None,
+    operations: Iterable[str | Path] = (),
+    candidate_a: str | None = None,
+    candidate_b: str | None = None,
+    ufs: Collection[str] | None = None,
+) -> JSON:
     output = Path(output).resolve()
     if output.exists():
         raise FileExistsError(output)
@@ -786,7 +820,7 @@ def publish_features(
         raise
 
 
-def features_main(argv=None) -> int:
+def features_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--electoral", type=Path, action="append", required=True)
     parser.add_argument("--output", type=Path, required=True)

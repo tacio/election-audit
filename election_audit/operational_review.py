@@ -15,9 +15,11 @@ import sqlite3
 import tempfile
 import zipfile
 from collections import Counter
+from collections.abc import Iterable, Iterator, Sequence
 from datetime import datetime, timedelta
 from importlib.resources import files
 from pathlib import Path
+from typing import IO, Any
 from zoneinfo import ZoneInfo
 
 import pyarrow as pa
@@ -27,6 +29,9 @@ from election_audit import sevenzip
 from election_audit.elections import election_for_round
 from election_audit.national import _read_json, _verify_files, _write_json
 from election_audit.source_inventory import canonical, digest, hash_file
+from election_audit.types import JSON, Argv, Row
+
+type RawEvent = tuple[JSON, str, str, str, str, str]
 
 VERSION = "real-operational-v1"
 RULES = json.loads(files("election_audit").joinpath("resources/real-log-rules.json").read_text())
@@ -51,13 +56,13 @@ CONTEST = re.compile(
 )
 
 
-def rules_for(year):
+def rules_for(year: int) -> JSON:
     if year not in RULES_BY_YEAR:
         raise ValueError(f"No reviewed log rules for {year!r}")
     return RULES_BY_YEAR[year]
 
 
-def _markers(rules):
+def _markers(rules: JSON) -> tuple[dict[str, int], dict[str, int], str, re.Pattern[str] | None]:
     templates = rules.get("templates", TEMPLATES_2026)
     operator = templates["operator_authorized"]
     return (
@@ -72,13 +77,13 @@ _MARKERS = {}
 
 
 class Rows:
-    def __init__(self, path) -> None:
+    def __init__(self, path: str | Path) -> None:
         self.writer = pq.ParquetWriter(
             path, pa.schema([("payload", pa.string())]), compression="zstd"
         )
         self.batch, self.count = [], 0
 
-    def append(self, row) -> None:
+    def append(self, row: Row) -> None:
         self.batch.append(canonical(row).decode())
         self.count += 1
         if len(self.batch) >= 2048:
@@ -118,7 +123,7 @@ PROMOTING_KINDS = frozenset(
 )
 
 
-def keeps_round(application, message, phase, rules=RULES):
+def keeps_round(application: str, message: str, phase: int | None, rules: JSON = RULES) -> bool:
     """True when a GAP restart line names the round whose context is in effect."""
     if application != "GAP" or phase is None:
         return False
@@ -128,7 +133,7 @@ def keeps_round(application, message, phase, rules=RULES):
     return markers[1].get(message) == phase
 
 
-def classify(application, message, rules=RULES):
+def classify(application: str, message: str, rules: JSON = RULES) -> tuple[str, Any]:
     """Full matches only; variable fields are never retained in returned semantics."""
     markers = _MARKERS.get(rules["version"])
     if markers is None:
@@ -154,11 +159,11 @@ def classify(application, message, rules=RULES):
     return "unknown", None
 
 
-def raw_events(path):
+def raw_events(path: str | Path) -> Iterator[RawEvent]:
     """Read only validated log members; repeat original locators including occurrences."""
     total, members, sequence = 0, 0, 0
 
-    def entries(handle):
+    def entries(handle: IO[bytes]) -> Iterator[tuple[int, str, int, Iterator[bytes]]]:
         """(index, original name, chunk iterator); 2022 logs are 7z, 2026 logs ZIP."""
         if handle.read(len(sevenzip.MAGIC)) == sevenzip.MAGIC:
             handle.seek(0)
@@ -182,7 +187,7 @@ def raw_events(path):
                         iter(lambda: f.read(65536), b""),
                     )
 
-    def archive(handle, segments=()):
+    def archive(handle: IO[bytes], segments: Sequence[JSON] = ()) -> Iterator[RawEvent]:
         nonlocal total, members, sequence
         if len(segments) > 4:
             raise ValueError("Nested archive bound exceeded")
@@ -250,7 +255,7 @@ def raw_events(path):
         yield from archive(f)
 
 
-def _clock(clock, reading, event_id):
+def _clock(clock: JSON | None, reading: datetime, event_id: str) -> datetime | None:
     if not clock or event_id not in clock["evidence"]["event_ids"]:
         return None
     if set(clock) != {"timezone", "adjustment_seconds", "continuity", "evidence"}:
@@ -266,8 +271,15 @@ def _clock(clock, reading, event_id):
 
 
 def review_object(
-    structural, original, output, *, round_number=2, clock=None, witnesses=(), year=2026
-):
+    structural: str | Path,
+    original: str | Path,
+    output: str | Path,
+    *,
+    round_number: int = 2,
+    clock: JSON | None = None,
+    witnesses: Iterable[Row] = (),
+    year: int = 2026,
+) -> Path:
     """Bounded disk join against structural hashes and deterministic real semantics."""
     structural, original, output = Path(structural), Path(original), Path(output)
     document = _read_json(structural / "artifact.json")
@@ -341,11 +353,14 @@ def review_object(
                 for a in evidence["anchors"]
             ):
                 raise ValueError("Clock anchor mismatch")
-        stream, session, pending = None, None, None
+        stream = None
+        # Open session and cycle state; finish_* rebind them with nonlocal.
+        session: dict[str, Any] | None = None
+        pending: dict[str, Any] | None = None
         phase, phase_anchor, software = None, None, False
         fingerprint, stream_count = hashlib.sha256(), 0
 
-        def finish_cycle(state, event=None) -> None:
+        def finish_cycle(state: str, event: Row | None = None) -> None:
             nonlocal pending
             if pending is None:
                 if state == "completed":
@@ -384,7 +399,7 @@ def review_object(
                 session["cycles_" + state] = session.get("cycles_" + state, 0) + 1
             pending = None
 
-        def finish_session(reason) -> None:
+        def finish_session(reason: str) -> None:
             nonlocal session, software
             finish_cycle("unresolved")
             if session:
@@ -505,8 +520,12 @@ def review_object(
             elif kind == "operator_authorized" and pending and pending["manual_request"]:
                 pending["operator"] = True
             elif kind == "method_biometric":
-                if pending is None:
-                    pending = {
+                # A local name for the open cycle: ty does not narrow `pending`, which
+                # finish_cycle() rebinds with nonlocal.
+                current = pending = (
+                    pending
+                    if pending is not None
+                    else {
                         "session_id": session["session_id"],
                         "start_id": row["event_id"],
                         "start_clock": None,
@@ -517,12 +536,15 @@ def review_object(
                         "interrupted": False,
                         "unknown": False,
                     }
-                pending["method"] = "biometric"
+                )
+                current["method"] = "biometric"
             elif kind == "authorization":
                 if pending and pending["authorized"]:
                     finish_cycle("unresolved")
-                if pending is None:
-                    pending = {
+                current = pending = (
+                    pending
+                    if pending is not None
+                    else {
                         "session_id": session["session_id"],
                         "method": "unknown",
                         "manual_request": False,
@@ -530,9 +552,10 @@ def review_object(
                         "interrupted": False,
                         "unknown": False,
                     }
-                pending.update(start_id=row["event_id"], start_clock=normalized, authorized=True)
-                if pending["manual_request"] and pending["operator"]:
-                    pending["method"] = "manual"
+                )
+                current.update(start_id=row["event_id"], start_clock=normalized, authorized=True)
+                if current["manual_request"] and current["operator"]:
+                    current["method"] = "manual"
             elif kind == "completion":
                 if pending and pending["authorized"]:
                     finish_cycle("completed", event)
@@ -592,7 +615,14 @@ def review_object(
         raise
 
 
-def review_national(store, output, *, round_number=2, max_objects=None, clock_evidence=None):
+def review_national(
+    store: str | Path,
+    output: str | Path,
+    *,
+    round_number: int = 2,
+    max_objects: int | None = None,
+    clock_evidence: JSON | None = None,
+) -> JSON:
     """Review bounded structural groups; disk census preserves every publisher witness."""
     store, output = Path(store), Path(output)
     clock_evidence = clock_evidence or {}
@@ -657,7 +687,7 @@ def review_national(store, output, *, round_number=2, max_objects=None, clock_ev
     }
 
 
-def operational_review_main(argv=None) -> int:
+def operational_review_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--store", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
