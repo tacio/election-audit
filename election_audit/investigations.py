@@ -9,12 +9,15 @@ import math
 import random
 import sqlite3
 import tempfile
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import closing
 from pathlib import Path
+from typing import Any, TypeIs
 
 from election_audit.research_evaluation import append_record, open_journal
 from election_audit.research_protocol import hash_file, load_protocol, read_only
 from election_audit.source_inventory import canonical, digest
+from election_audit.types import JSON, Argv, Row
 from scripts.audit_statistics import (
     maximum_switch_margin_change,
     nonnegative_count,
@@ -24,7 +27,7 @@ from scripts.audit_statistics import (
 VERSION = "investigations-v1"
 
 
-def _anchor(value):
+def _anchor(value: Any) -> bool:
     return (
         isinstance(value, dict)
         and isinstance(value.get("object_sha256"), str)
@@ -35,11 +38,16 @@ def _anchor(value):
     )
 
 
-def _write(path, value) -> None:
+def _real(value: object) -> TypeIs[int | float]:
+    """An int or float, excluding bool and subclasses, as ``type(value) in (int, float)``."""
+    return type(value) in (int, float)
+
+
+def _write(path: Path, value: Any) -> None:
     Path(path).write_bytes(canonical(value) + b"\n")
 
 
-def _seal(directory, identity) -> None:
+def _seal(directory: Path, identity: JSON) -> None:
     files = {
         p.name: {"sha256": hash_file(p), "bytes": p.stat().st_size}
         for p in sorted(Path(directory).iterdir())
@@ -48,7 +56,7 @@ def _seal(directory, identity) -> None:
     _write(Path(directory) / "artifact.json", {"version": VERSION, **identity, "files": files})
 
 
-def _check_features(features, protocol):
+def _check_features(features: str | Path, protocol: str | Path) -> tuple[JSON, Path]:
     doc = load_protocol(protocol)
     path = Path(features) / "features.sqlite"
     if hash_file(path) != doc["identity"]["feature_catalog_sha256"]:
@@ -56,7 +64,16 @@ def _check_features(features, protocol):
     return doc, path
 
 
-def build_cases(features, protocol, evaluation, output, *, per_family=20, controls=100, seed=42):
+def build_cases(
+    features: str | Path,
+    protocol: str | Path,
+    evaluation: str | Path,
+    output: str | Path,
+    *,
+    per_family: int = 20,
+    controls: int = 100,
+    seed: int = 42,
+) -> JSON:
     """Never inspect test outcomes; validate every supplied prediction's partition."""
     if (
         type(per_family) is not int
@@ -231,7 +248,15 @@ def build_cases(features, protocol, evaluation, output, *, per_family=20, contro
     return summary
 
 
-def record_review(protocol, journal, case, *, conclusion, explanations, corroboration=()):
+def record_review(
+    protocol: str | Path,
+    journal: str | Path,
+    case: Row,
+    *,
+    conclusion: str,
+    explanations: Sequence[str],
+    corroboration: Iterable[JSON] = (),
+) -> str:
     if conclusion not in {"unresolved", "benign", "requires_review"} or not explanations:
         raise ValueError("Review needs supported conclusion and alternative explanations")
     if any(not _anchor(anchor) for anchor in corroboration):
@@ -273,7 +298,7 @@ def record_review(protocol, journal, case, *, conclusion, explanations, corrobor
         db.close()
 
 
-def read_national_margin(path, candidate_a, candidate_b):
+def read_national_margin(path: str | Path, candidate_a: str, candidate_b: str) -> tuple[int, JSON]:
     body = Path(path).read_bytes()
     ref = json.loads(body)
     if any(
@@ -313,7 +338,7 @@ def read_national_margin(path, candidate_a, candidate_b):
     }
 
 
-def conditional_scenario(document, *, national_reference=None):
+def conditional_scenario(document: JSON, *, national_reference: str | Path | None = None) -> JSON:
     mechanism = document["mechanism"]
     if mechanism not in {"removal_exact", "removal_at_most", "switching_cap"}:
         raise ValueError("Unsupported mechanism")
@@ -388,8 +413,14 @@ def conditional_scenario(document, *, national_reference=None):
 
 
 def geographic_sensitivity(
-    blocks, output, full_pipeline, *, pipeline_sha256, repetitions=200, seed=42
-):
+    blocks: Iterable[str],
+    output: str | Path,
+    full_pipeline: Callable[[list[str], int], JSON],
+    *,
+    pipeline_sha256: str,
+    repetitions: int = 200,
+    seed: int = 42,
+) -> JSON:
     """Resample whole geography and rerun the caller's full fit and selection."""
     blocks = sorted(set(blocks))
     if (
@@ -426,7 +457,7 @@ def geographic_sensitivity(
         rng = random.Random(seed + iteration)
         sampled = [rng.choice(blocks) for _ in blocks]
         if checkpoint.exists():
-            result = json.loads(checkpoint.read_text())
+            result: JSON = json.loads(checkpoint.read_text())
             pin = result.pop("result_hash", None)
             if (
                 pin != digest(result)
@@ -441,7 +472,7 @@ def geographic_sensitivity(
                     "Sensitivity requires full fit and selection, not selected residual bootstrap"
                 )
             value = run.get("baseline_relative_excess")
-            if type(value) not in (int, float) or not math.isfinite(value):
+            if not _real(value) or not math.isfinite(value):
                 raise ValueError("Nonfinite baseline-relative excess")
             result = {
                 **run,
@@ -452,7 +483,7 @@ def geographic_sensitivity(
             _write(checkpoint, {**result, "result_hash": digest(result)})
         value = result.get("baseline_relative_excess")
         if (
-            type(value) not in (int, float)
+            not _real(value)
             or not math.isfinite(value)
             or result.get("fit_rerun") is not True
             or result.get("selection_rerun") is not True
@@ -476,7 +507,7 @@ def geographic_sensitivity(
     return summary
 
 
-def export_cases_dataset(cases, protocol, output):
+def export_cases_dataset(cases: str | Path, protocol: str | Path, output: str | Path) -> Path:
     from election_audit.dashboard_data import publish_dataset
 
     cases = Path(cases)
@@ -488,7 +519,7 @@ def export_cases_dataset(cases, protocol, output):
         if Path(name).name != name or hash_file(cases / name) != pin["sha256"]:
             raise ValueError("Case export source changed")
 
-    def rows():
+    def rows() -> Iterator[Row]:
         with read_only(Path(protocol) / "research.sqlite") as partitions:
             with (cases / "cases.jsonl").open() as stream:
                 for line in stream:
@@ -516,7 +547,7 @@ def export_cases_dataset(cases, protocol, output):
     )
 
 
-def sensitivity_from_config(configuration, output):
+def sensitivity_from_config(configuration: str | Path, output: str | Path) -> JSON:
     import importlib.util
 
     config = json.loads(Path(configuration).read_text())
@@ -539,7 +570,7 @@ def sensitivity_from_config(configuration, output):
     )
 
 
-def investigations_main(argv=None) -> int:
+def investigations_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     cases = sub.add_parser("cases")

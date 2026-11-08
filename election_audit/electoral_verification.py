@@ -13,31 +13,33 @@ import zipfile
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from election_audit.binary_bu import decode_bu
-from election_audit.elections import election_for_round
+from election_audit.elections import ElectionDescriptor, election_for_round
+from election_audit.types import JSON, Argv, Row
 
 VERSION = "electoral-verification-v1"
 BASE = "https://resultados.tse.jus.br/oficial"
 
 
-def _json(v):
+def _json(v: Any) -> str:
     return json.dumps(v, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def _sha(b):
+def _sha(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
 
 
-def _required(condition, message) -> None:
+def _required(condition: object, message: str) -> None:
     if not condition:
         raise ValueError(message)
 
 
 class Evidence:
-    def __init__(self, directory, *, allow_download=False) -> None:
+    def __init__(self, directory: str | Path, *, allow_download: bool = False) -> None:
         self.directory = Path(directory)
         self.allow_download = allow_download
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -54,7 +56,7 @@ class Evidence:
         CREATE TABLE IF NOT EXISTS run(identity TEXT PRIMARY KEY,payload TEXT);
         """)
 
-    def keep(self, body, url, role, **extra):
+    def keep(self, body: bytes, url: str, role: str, **extra: Any) -> tuple[bytes, str]:
         digest = _sha(body)
         path = self.directory / "objects" / digest
         if path.exists():
@@ -74,7 +76,7 @@ class Evidence:
         self.db.commit()
         return body, digest
 
-    def get(self, url, role):
+    def get(self, url: str, role: str) -> tuple[bytes, str]:
         row = self.db.execute(
             "SELECT o.sha256,s.path,s.bytes FROM observation o JOIN source_object s USING(sha256) WHERE url=? ORDER BY observed_at DESC LIMIT 1",
             (url,),
@@ -105,7 +107,7 @@ class Evidence:
         time.sleep(0.125)
         return self.keep(body, url, role, **extra)
 
-    def import_pilot(self, directory) -> None:
+    def import_pilot(self, directory: str | Path) -> None:
         directory = Path(directory)
         for spec in json.loads((directory / "sources.json").read_text()):
             url = spec.get("url")
@@ -120,7 +122,9 @@ class Evidence:
             )
             self.keep(body, url, spec["role"], original_observation=spec)
 
-    def import_manifest(self, manifest, root, election, uf) -> None:
+    def import_manifest(
+        self, manifest: str | Path, root: str | Path, election: ElectionDescriptor, uf: str
+    ) -> None:
         root = Path(root).resolve()
         with sqlite3.connect(Path(manifest).resolve().as_uri() + "?mode=ro", uri=True) as db:
             db.row_factory = sqlite3.Row
@@ -143,7 +147,9 @@ class Evidence:
             db.rollback()
 
 
-def read_bweb(store, archive, expected_sha, election, uf) -> None:
+def read_bweb(
+    store: Evidence, archive: str | Path, expected_sha: str, election: ElectionDescriptor, uf: str
+) -> None:
     # Stream the CSV, retaining only one section's records in Python during verification.
     path = Path(archive)
     h = hashlib.sha256()
@@ -184,7 +190,7 @@ def read_bweb(store, archive, expected_sha, election, uf) -> None:
         store.db.commit()
 
 
-def _candidates(reference):
+def _candidates(reference: JSON) -> dict[str, JSON]:
     rows = [
         c
         for cargo in reference["carg"]
@@ -203,7 +209,7 @@ def _candidates(reference):
     }
 
 
-def verify_section(records, binary, candidates):
+def verify_section(records: list[Row], binary: Row, candidates: dict[str, JSON]) -> JSON:
     r = records[0]
     fields = (
         "QT_APTOS",
@@ -256,7 +262,7 @@ def verify_section(records, binary, candidates):
     if r["DS_SECOES_AGREGADAS"] not in {"#NULO#", "#NULO", "-1"}:
         members += [x.strip().zfill(4) for x in r["DS_SECOES_AGREGADAS"].split("/")]
     _required(len(members) == len(set(members)), "Duplicate principal/member composition")
-    choices = {
+    choices: dict[str, Any] = {
         c: {
             "count": binary["choices"].get(c, 0),
             "origin": "BWEB_observed"
@@ -295,7 +301,7 @@ def verify_section(records, binary, candidates):
     }
 
 
-def inspect_evidence(directory):
+def inspect_evidence(directory: str | Path) -> JSON:
     """Verify a completed artifact without reopening its SQLite database writable."""
     directory = Path(directory).resolve()
     artifact = json.loads((directory / "artifact.json").read_text())
@@ -323,17 +329,17 @@ def inspect_evidence(directory):
 
 
 def verify(
-    archive,
-    archive_sha,
-    output,
+    archive: str | Path,
+    archive_sha: str,
+    output: str | Path,
     *,
-    round_number=2,
-    uf="ac",
-    pilot=None,
-    manifest=None,
-    root=None,
-    download=False,
-):
+    round_number: int = 2,
+    uf: str = "ac",
+    pilot: str | Path | None = None,
+    manifest: str | Path | None = None,
+    root: str | Path | None = None,
+    download: bool = False,
+) -> JSON:
     election = election_for_round(round_number)
     _required(re.fullmatch("[a-z]{2}", uf) is not None, "Invalid UF")
     if (Path(output) / "artifact.json").exists():
@@ -361,6 +367,7 @@ def verify(
         store.import_pilot(pilot)
     if manifest:
         _required(root is not None, "Manifest requires raw root")
+        assert root is not None  # checked by _required
         store.import_manifest(manifest, root, election, uf)
     read_bweb(store, archive, archive_sha, election, uf)
     refbody, refsha = store.get(
@@ -543,7 +550,7 @@ def verify(
     return summary
 
 
-def electoral_verify_main(argv=None) -> int:
+def electoral_verify_main(argv: Argv = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--archive", required=True, type=Path)
     p.add_argument("--archive-sha256", required=True)

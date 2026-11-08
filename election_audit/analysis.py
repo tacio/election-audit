@@ -5,13 +5,18 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from collections.abc import Iterable, Iterator
 from datetime import datetime
 from importlib.resources import files
 from pathlib import Path
+from typing import Any
+
+import duckdb
 
 from election_audit.archive_parsing import _read_checked
 from election_audit.publication import PublicationError, ResourceConfig, open_release
 from election_audit.source_inventory import canonical, digest
+from election_audit.types import JSON, Argv, Row
 
 VERSION = "audit-analysis-v1"
 REGISTRY_VERSION = "audit-features-v1"
@@ -97,7 +102,7 @@ SCHEMAS = {
 }
 
 
-def registry():
+def registry() -> list[JSON]:
     """All 21 contracts retain their normative dependency and exclusion definitions."""
     contract = json.loads(
         files("election_audit.resources").joinpath("contracts/features.json").read_text()
@@ -122,7 +127,7 @@ def registry():
     ]
 
 
-def _instant(value):
+def _instant(value: str) -> datetime:
     try:
         instant = datetime.fromisoformat(value)
     except (TypeError, ValueError) as exc:
@@ -132,7 +137,7 @@ def _instant(value):
     return instant
 
 
-def read_analysis(bundle, config):
+def read_analysis(bundle: str | Path, config: JSON) -> JSON:
     raw = Path(bundle).read_bytes()
     if len(raw) > 8 * 1024**2:
         raise PublicationError("Analysis configuration exceeds 8 MiB bound")
@@ -185,13 +190,13 @@ def read_analysis(bundle, config):
     }
 
 
-def _rows(connection, sql, batch_rows):
+def _rows(connection: duckdb.DuckDBPyConnection, sql: str, batch_rows: int) -> Iterator[Any]:
     cursor = connection.execute(sql)
     while batch := cursor.fetchmany(batch_rows):
         yield from batch
 
 
-def _measure(feature, component, result, spec):
+def _measure(feature: str, component: Row, result: Row, spec: JSON) -> tuple[Any, Any, str | None]:
     totals = result.get("totals", {})
     a, b = spec.get("candidate_a"), spec.get("candidate_b")
     if result.get("availability") != "available":
@@ -214,7 +219,7 @@ def _measure(feature, component, result, spec):
     return None, None, BLOCKERS.get(feature, "missing_input")
 
 
-def feature_rows(parent, document, spec, config):
+def feature_rows(parent: Path, document: JSON, spec: JSON, config: ResourceConfig) -> Iterator[Row]:
     """Stream the long ledger; never materialize parent operational events/cycles."""
     names = document.get("combined_tables", document["tables"])
     result_sql = "r.payload" if "section_results" in names else "NULL"
@@ -325,7 +330,9 @@ def feature_rows(parent, document, spec, config):
                         }
 
 
-def derive_analysis(parent, document, spec, config):
+def derive_analysis(
+    parent: Path, document: JSON, spec: JSON, config: ResourceConfig
+) -> tuple[dict[str, list[Row]], JSON]:
     from election_audit.analysis_ledgers import (
         SCHEMAS as LEDGER_SCHEMAS,
     )
@@ -414,7 +421,7 @@ def derive_analysis(parent, document, spec, config):
     return result, schemas
 
 
-def validate_evidence(value, source_hashes) -> None:
+def validate_evidence(value: Any, source_hashes: set[str]) -> None:
     """Publication resolves anchors to preserved bytes; review truth remains asserted."""
     from election_audit.electoral_results import _anchor
 
@@ -430,7 +437,7 @@ def validate_evidence(value, source_hashes) -> None:
             validate_evidence(item, source_hashes)
 
 
-def validate_impact_target(db, payload, names) -> None:
+def validate_impact_target(db: duckdb.DuckDBPyConnection, payload: JSON, names: set[str]) -> None:
     target = payload["target"]
     if (
         not isinstance(target, dict)
@@ -470,7 +477,9 @@ def validate_impact_target(db, payload, names) -> None:
             )
 
 
-def validate_populations(assignments, records, fresh) -> None:
+def validate_populations(
+    assignments: list[Row], records: dict[str, Row], fresh: Iterable[Row]
+) -> None:
     from election_audit.analysis_ledgers import access_status
 
     units = {r["stable_location_id"] for r in assignments if r["eligible"]}
@@ -531,7 +540,7 @@ def validate_populations(assignments, records, fresh) -> None:
             )
 
 
-def _logical(rows):
+def _logical(rows: Iterable[Any]) -> JSON:
     count, total = 0, 0
     for row in rows:
         count += 1
@@ -544,7 +553,7 @@ def _logical(rows):
     }
 
 
-def validate_analysis(path, document, connection) -> None:
+def validate_analysis(path: Path, document: JSON, connection: duckdb.DuckDBPyConnection) -> None:
     spec = _read_checked(path, "import.json")["analysis"]
     pin = document["identity"]["adapter"]["configuration_sha256"]
     checked = read_analysis(
@@ -579,7 +588,7 @@ def validate_analysis(path, document, connection) -> None:
             raise PublicationError(f"Analysis derivation mismatch: {name}")
 
 
-def protect_test_query(connection, document, sql) -> None:
+def protect_test_query(connection: duckdb.DuckDBPyConnection, document: JSON, sql: str) -> None:
     """Require an immutable inspection record before exposing any untouched test outcomes."""
     import re
 
@@ -610,13 +619,19 @@ def protect_test_query(connection, document, sql) -> None:
             )
 
 
-def publish_analysis(parent, bundle, store, *, config=None):
+def publish_analysis(
+    parent: str | Path,
+    bundle: str | Path,
+    store: str | Path,
+    *,
+    config: ResourceConfig | None = None,
+) -> Path:
     from election_audit.derivatives import publish_derivative
 
     return publish_derivative(parent, bundle, store, config=config, _analysis=True)
 
 
-def analysis_main(argv=None) -> int:
+def analysis_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("parent", type=Path)
     parser.add_argument("--bundle", required=True, type=Path)

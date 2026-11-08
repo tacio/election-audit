@@ -9,8 +9,10 @@ import os
 import re
 import shutil
 import tempfile
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 import duckdb
 import pyarrow as pa
@@ -43,6 +45,7 @@ from election_audit.publication import (
 )
 from election_audit.snapshots import _fsync_directory
 from election_audit.source_inventory import canonical, digest, hash_file
+from election_audit.types import JSON, Argv, Row, one
 
 VERSION = "derivative-release-v1"
 RESULT_FACTS = {
@@ -54,13 +57,13 @@ RESULT_FACTS = {
 }
 
 
-def _identifier(name):
+def _identifier(name: str) -> str:
     if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", name):
         raise PublicationError("Unsafe derivative table/column identifier")
     return '"' + name + '"'
 
 
-def _parent_path(path, document):
+def _parent_path(path: Path, document: JSON) -> Path:
     parent = document["identity"]["parent"]
     locator = parent["locator"]
     if (
@@ -83,7 +86,13 @@ def _parent_path(path, document):
     return candidate
 
 
-def inspect_derivative(path, document, *, seen=None, cache=None):
+def inspect_derivative(
+    path: str | Path,
+    document: JSON,
+    *,
+    seen: set[Path] | None = None,
+    cache: dict[Path, JSON] | None = None,
+) -> JSON:
     """Verify each chain member once, including pinned manifests and exact local files."""
     from election_audit.publication import inspect_release
 
@@ -195,13 +204,13 @@ def inspect_derivative(path, document, *, seen=None, cache=None):
         seen.remove(path)
 
 
-def release_layers(path, document):
+def release_layers(path: str | Path, document: JSON) -> Iterator[tuple[Path, JSON]]:
     if document["identity"]["version"] == VERSION:
         yield from release_layers(Path(document["_parent_path"]), document["_parent_document"])
     yield Path(path), document
 
 
-def allowed_fact_paths(path, document):
+def allowed_fact_paths(path: Path, document: JSON) -> list[Path | str]:
     return [
         str(root / locator)
         for root, doc in release_layers(path, document)
@@ -210,7 +219,7 @@ def allowed_fact_paths(path, document):
     ]
 
 
-def _empty_sql(columns):
+def _empty_sql(columns: Mapping[str, str]) -> str:
     return (
         "SELECT "
         + ",".join(f"CAST(NULL AS {TYPES[k]}) AS {_identifier(n)}" for n, k in columns.items())
@@ -218,7 +227,7 @@ def _empty_sql(columns):
     )
 
 
-def attach_layers(connection, path, document):
+def attach_layers(connection: duckdb.DuckDBPyConnection, path: Path, document: JSON) -> JSON:
     """Connection-local views over read-only parent databases and original Parquet."""
     views, schemas = {}, {}
     for number, (root, doc) in enumerate(release_layers(path, document)):
@@ -252,7 +261,9 @@ def attach_layers(connection, path, document):
     return schemas
 
 
-def open_derivative(path, document, *, config=None):
+def open_derivative(
+    path: Path, document: JSON, *, config: ResourceConfig | None = None
+) -> duckdb.DuckDBPyConnection:
     config = config or ResourceConfig(**document["settings_applied"])
     # Every attached database is read-only; the coordinator stores temporary views.
     connection = duckdb.connect()
@@ -276,7 +287,7 @@ def open_derivative(path, document, *, config=None):
         raise
 
 
-def _encoded(columns, rows):
+def _encoded(columns: Mapping[str, str], rows: Iterable[Row]) -> pa.Table:
     values = []
     for row in rows:
         item = {
@@ -296,8 +307,17 @@ def _encoded(columns, rows):
 
 
 def _store_table(
-    connection, staging, name, rows, schema, config, *, mode="append", facts=False, partitions=None
-):
+    connection: duckdb.DuckDBPyConnection,
+    staging: Path,
+    name: str,
+    rows: Iterable[Row],
+    schema: JSON,
+    config: ResourceConfig,
+    *,
+    mode: str = "append",
+    facts: bool = False,
+    partitions: Any = None,
+) -> JSON:
     columns = schema["columns"]
     files = []
     if facts:
@@ -324,19 +344,28 @@ def _store_table(
     return {**schema, "mode": mode, "storage": "facts" if facts else "compact", "files": files}
 
 
-def _check_keys(connection, tables) -> None:
+def _check_keys(connection: duckdb.DuckDBPyConnection, tables: Mapping[str, JSON]) -> None:
     for name, spec in tables.items():
         keys = ",".join(_identifier(k) for k in spec["key"])
         null = " OR ".join(f"{_identifier(k)} IS NULL" for k in spec["key"])
-        if connection.execute(f'SELECT count(*) FROM "{name}" WHERE {null}').fetchone()[0]:
+        if one(connection.execute(f'SELECT count(*) FROM "{name}" WHERE {null}').fetchone())[0]:
             raise PublicationError(f"Null extension key: {name}")
-        if connection.execute(
-            f'SELECT count(*) FROM (SELECT {keys} FROM "{name}" GROUP BY {keys} HAVING count(*)>1)'
-        ).fetchone()[0]:
+        if one(
+            connection.execute(
+                f'SELECT count(*) FROM (SELECT {keys} FROM "{name}" GROUP BY {keys} HAVING count(*)>1)'
+            ).fetchone()
+        )[0]:
             raise PublicationError(f"Conflicting immutable parent/child key: {name}")
 
 
-def publish_derivative(parent, bundle, store, *, config=None, _analysis=False):
+def publish_derivative(
+    parent: str | Path,
+    bundle: str | Path,
+    store: str | Path,
+    *,
+    config: ResourceConfig | None = None,
+    _analysis: bool = False,
+) -> Path:
     """Explicit normalized import → immutable child. No base bytes are rewritten/copied."""
     from election_audit.electoral_results import derive_electoral, validate_electoral
     from election_audit.publication import inspect_release, open_release
@@ -556,7 +585,7 @@ def publish_derivative(parent, bundle, store, *, config=None, _analysis=False):
             raise
 
 
-def validate_derivative(path, document):
+def validate_derivative(path: Path, document: JSON) -> JSON:
     from election_audit.electoral_results import derive_electoral
     from election_audit.release_tools import validate_release
 
@@ -625,7 +654,7 @@ def validate_derivative(path, document):
     }
 
 
-def derivative_main(argv=None) -> int:
+def derivative_main(argv: Argv = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
