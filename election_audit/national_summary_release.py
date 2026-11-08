@@ -20,15 +20,16 @@ from election_audit.national_migration import atomic, sha
 from election_audit.national_parallel import encoded, load
 from election_audit.national_resources import apply
 from election_audit.national_summary_tools import verify_shard
+from election_audit.types import JSON
 
 VERSION = "source-summary-analysis-release-v1"
 
 
-def allocated(path):
+def allocated(path: str | Path) -> int:
     return sum(p.stat().st_blocks * 512 for p in [Path(path), *Path(path).rglob("*")])
 
 
-def settle_budget(live_path, output) -> None:
+def settle_budget(live_path: str | Path, output: str | Path) -> None:
     actual = allocated(output)
     with closing(sqlite3.connect(live_path)) as budget:
         budget.execute("PRAGMA synchronous=FULL")
@@ -52,7 +53,9 @@ def settle_budget(live_path, output) -> None:
         budget.commit()
 
 
-def publish_release(directory, output, *, target_bytes=128 * 1024**2):
+def publish_release(
+    directory: str | Path, output: str | Path, *, target_bytes: int = 128 * 1024**2
+) -> JSON:
     if not 1024**2 <= target_bytes <= 256 * 1024**2:
         raise ValueError("Parquet targets must be 1..256MiB; portable default128MiB")
     directory, output = Path(directory).absolute(), Path(output).absolute()
@@ -248,8 +251,8 @@ def publish_release(directory, output, *, target_bytes=128 * 1024**2):
                 self.buffer_bytes = 0
                 self.count = 0
                 self.part = 0
-                self.writer = None
-                self.sink = None
+                self.writer: pq.ParquetWriter | None = None
+                self.sink: pa.OSFile | None = None
                 self.paths = []
 
             def open(self) -> None:
@@ -276,16 +279,19 @@ def publish_release(directory, output, *, target_bytes=128 * 1024**2):
                     return
                 if self.writer is None:
                     self.open()
-                self.writer.write_table(pa.Table.from_pylist(self.rows, schema=self.schema))
+                writer, sink = self.writer, self.sink
+                assert writer is not None and sink is not None  # set by open()
+                writer.write_table(pa.Table.from_pylist(self.rows, schema=self.schema))
                 self.rows = []
                 self.buffer_bytes = 0
-                if self.sink.tell() >= target_bytes:
+                if sink.tell() >= target_bytes:
                     self.close_part()
 
             def close_part(self) -> None:
                 nonlocal spent
                 if self.writer is None:
                     return
+                assert self.sink is not None  # opened with the writer
                 self.writer.close()
                 self.sink.close()
                 self.writer = self.sink = None

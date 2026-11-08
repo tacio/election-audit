@@ -7,9 +7,10 @@ import json
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
-from election_audit.elections import coerce_election
+from election_audit.elections import ElectionDescriptor, coerce_election
 from election_audit.source_inventory import (
     ALL_UFS,
     aux_url,
@@ -20,7 +21,10 @@ from election_audit.source_inventory import (
     section_directory,
     section_key,
 )
+from election_audit.types import JSON, Row
 from scripts.download_tse_logs import sections
+
+type ElectionLike = ElectionDescriptor | dict[str, Any] | None
 
 SELECTION_VERSION = "frozen-index-current-assets-v1"
 PACKAGE_STATUS_VERSION = "tse-package-status-exact-v1"
@@ -29,15 +33,17 @@ PACKAGE_STATUS_MAP = {"Totalizado": "totalized"}
 PENDING_SNAPSHOT = "pending-snapshot"
 
 
-def election_id(election=None):
+def election_id(election: ElectionLike = None) -> str:
     return identity("election", coerce_election(election).as_dict())
 
 
-def section_id(key, election=None):
+def section_id(key: tuple[str, ...], election: ElectionLike = None) -> str:
     return identity("section", [election_id(election), *key])
 
 
-def verified_json(inventory, url, checks=None):
+def verified_json(
+    inventory: JSON, url: str, checks: dict[str, Row] | None = None
+) -> tuple[Any, Row]:
     check = (
         checks.get(url)
         if checks is not None
@@ -51,7 +57,7 @@ def verified_json(inventory, url, checks=None):
     return json.loads(body), check
 
 
-def _lineage(table, key, check, pointer):
+def _lineage(table: str, key: Any, check: Row, pointer: str) -> Row:
     return {
         "derived_table": table,
         "derived_key": canonical(key).decode(),
@@ -70,7 +76,7 @@ def _lineage(table, key, check, pointer):
     }
 
 
-def _index_records(config, uf, election=None):
+def _index_records(config: JSON, uf: str, election: ElectionLike = None) -> list[tuple[Any, str]]:
     # Reuse the acquisition adapter's phase/pleito/UF checks, preserving raw records.
     validated = list(sections(config, uf, coerce_election(election).pleito_code))
     pointers = []
@@ -92,7 +98,7 @@ def build_population(inventory: dict) -> dict:
     election = coerce_election(inventory["selection"]["election"])
     selected_election_id = election_id(election)
 
-    def selected_section_id(key):
+    def selected_section_id(key: tuple[str, ...]) -> str:
         return section_id(key, election)
 
     indexes, issues, candidates, index_checks = {}, [], defaultdict(list), {}
@@ -165,7 +171,7 @@ def build_population(inventory: dict) -> dict:
         "inventory-run", [inventory["manifest_rows_sha256"], inventory["manifest_captured_at"]]
     )
 
-    def asset_observation(url):
+    def asset_observation(url: str) -> Row:
         if url not in by_url:
             row = {
                 "observation_id": identity(

@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 from datetime import UTC, datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
+
+import duckdb
+
+from election_audit.types import JSON, Row
 
 MART_VERSION = "operational-marts-v1"
 BRASILIA = ZoneInfo("America/Sao_Paulo")
 LIFECYCLE_KINDS = ("receipt", "processing", "generation", "publication", "observation")
 
 
-def _instant(value):
+def _instant(value: str | None) -> datetime | None:
     if not value:
         return None
     instant = datetime.fromisoformat(value)
@@ -19,7 +25,17 @@ def _instant(value):
     return instant.astimezone(UTC)
 
 
-def coverage_rows(context, selected_objects, parsed_sections=()):
+def _known_instant(value: str) -> datetime:
+    """``_instant`` of a value already checked to be present."""
+    instant = _instant(value)
+    if instant is None:
+        raise ValueError("Normalized clock missing")
+    return instant
+
+
+def coverage_rows(
+    context: JSON, selected_objects: Iterable[str], parsed_sections: Iterable[str] = ()
+) -> Iterator[Row]:
     """Preserve every frozen expected section; absence is never an observed zero."""
     tables = context["context_tables"]
     ledger = {r["section_id"]: r for r in tables.get("coverage_ledger", [])}
@@ -60,7 +76,7 @@ def coverage_rows(context, selected_objects, parsed_sections=()):
         }
 
 
-def processing_availability_rows(context, events=()):
+def processing_availability_rows(context: JSON, events: Iterable[Row] = ()) -> Iterator[Row]:
     """Package/type denominators, preserving event multiplicity without fact joins.
 
     Optional lifecycle rows must already be authoritative contract events. Client
@@ -117,8 +133,8 @@ def processing_availability_rows(context, events=()):
                 else "unresolved"
                 if relevant
                 else "missing_source",
-                "first_event_at": min(times, key=_instant) if times else None,
-                "last_event_at": max(times, key=_instant) if times else None,
+                "first_event_at": min(times, key=_known_instant) if times else None,
+                "last_event_at": max(times, key=_known_instant) if times else None,
                 "source_event_ids": [e["processing_event_id"] for e in relevant],
                 "observation_ids": [o["observation_id"] for o in original_observations],
                 "latency_seconds": None,
@@ -127,16 +143,16 @@ def processing_availability_rows(context, events=()):
 
 
 def late_session_row(
-    session,
-    summary,
-    cycles,
-    events,
-    section,
-    election,
+    session: Row,
+    summary: Row,
+    cycles: list[Row],
+    events: list[Row],
+    section: Row,
+    election: Row,
     *,
-    clock_bounds=None,
-    cross_shard_overlap=False,
-):
+    clock_bounds: JSON | None = None,
+    cross_shard_overlap: bool = False,
+) -> Row:
     """Strict Brasilia completion boundary, separate open state and bounded sensitivity.
 
     Bounds are explicit normalized UTC [lower, upper] instants keyed by event_id;
@@ -216,7 +232,9 @@ def late_session_row(
         )
     ):
         remaining_open = (
-            _instant(opening[0]["normalized_at"]) <= cutoff < _instant(closing[0]["normalized_at"])
+            _known_instant(opening[0]["normalized_at"])
+            <= cutoff
+            < _known_instant(closing[0]["normalized_at"])
         )
     eligible = not blockers
     return {
@@ -249,7 +267,14 @@ def late_session_row(
     }
 
 
-def materialize_marts(connection, context, selected_objects, shards, *, cross_shard_overlap=False):
+def materialize_marts(
+    connection: duckdb.DuckDBPyConnection,
+    context: JSON,
+    selected_objects: Iterable[str],
+    shards: Iterable[Path],
+    *,
+    cross_shard_overlap: bool = False,
+) -> list[str]:
     """One bounded shard at a time; no package/member/lineage fact multiplication."""
     from collections import defaultdict
 
