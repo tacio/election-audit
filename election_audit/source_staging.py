@@ -24,9 +24,14 @@ import shutil
 import sqlite3
 import struct
 import time
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 from election_audit.national_migration import atomic, relative_object, sha
+from election_audit.types import JSON, Argv
+
+type ObjectRow = tuple[str, str, int]
 
 VERSION = "certified-source-staging-v1"
 ORDERS = ("path", "inode", "physical")
@@ -39,7 +44,7 @@ BATCH_OBJECTS = 2000
 BATCH_BYTES = 512 * 1024**2
 
 
-def load_binding(certificate_path, manifest_path):
+def load_binding(certificate_path: str | Path, manifest_path: str | Path) -> JSON:
     """Return the certificate after proving the manifest copy is the certified one."""
     certificate_path = Path(certificate_path)
     certificate = json.loads(certificate_path.read_bytes())
@@ -58,7 +63,7 @@ def load_binding(certificate_path, manifest_path):
     }
 
 
-def manifest_objects(manifest_path):
+def manifest_objects(manifest_path: str | Path) -> list[ObjectRow]:
     """Distinct (relative path, sha256, bytes) rows, validated, in path order."""
     uri = Path(manifest_path).resolve().as_uri() + "?mode=ro&immutable=1"
     with contextlib.closing(sqlite3.connect(uri, uri=True)) as db:
@@ -75,7 +80,7 @@ def manifest_objects(manifest_path):
     return rows
 
 
-def inode_numbers(root, rows):
+def inode_numbers(root: str | Path, rows: Iterable[ObjectRow]) -> dict[str, int]:
     """Directory-entry inode numbers, read without stat()ing each object."""
     root = Path(root)
     wanted = {}
@@ -94,7 +99,7 @@ def inode_numbers(root, rows):
     return inodes
 
 
-def physical_offset(path):
+def physical_offset(path: str | Path) -> int:
     """Physical byte offset of the file's first extent (FIEMAP); 0 for no extents."""
     request = bytearray(_FIEMAP_HEADER.size + _FIEMAP_EXTENT.size)
     _FIEMAP_HEADER.pack_into(request, 0, 0, 2**64 - 1, 0, 0, 1, 0)
@@ -109,7 +114,9 @@ def physical_offset(path):
     return _FIEMAP_EXTENT.unpack_from(request, _FIEMAP_HEADER.size)[1]
 
 
-def order_rows(root, rows, order, inodes=None):
+def order_rows(
+    root: str | Path, rows: Iterable[ObjectRow], order: str, inodes: Mapping[str, int] | None = None
+) -> list[ObjectRow]:
     """Return rows in the requested read order."""
     if order == "path":
         return sorted(rows)
@@ -123,7 +130,9 @@ def order_rows(root, rows, order, inodes=None):
     raise ValueError(f"Unknown order {order!r}")
 
 
-def read_verified(root, relative, expected_sha, size, *, evict=False):
+def read_verified(
+    root: str | Path, relative: str, expected_sha: str, size: int, *, evict: bool = False
+) -> bytes:
     """Read one object fully and prove it matches the manifest."""
     fd = os.open(Path(root) / relative, os.O_RDONLY | os.O_NOFOLLOW)
     try:
@@ -151,7 +160,7 @@ def read_verified(root, relative, expected_sha, size, *, evict=False):
     return body
 
 
-def url_order(manifest_path):
+def url_order(manifest_path: str | Path) -> list[str]:
     """Object paths in the order of their first manifest URL (section order)."""
     uri = Path(manifest_path).resolve().as_uri() + "?mode=ro&immutable=1"
     with contextlib.closing(sqlite3.connect(uri, uri=True)) as db:
@@ -160,7 +169,15 @@ def url_order(manifest_path):
         ]
 
 
-def benchmark(certificate, manifest, output, *, window=2000, orders=ORDERS, seed=20261103):
+def benchmark(
+    certificate: str | Path,
+    manifest: str | Path,
+    output: str | Path,
+    *,
+    window: int = 2000,
+    orders: Sequence[str] = ORDERS,
+    seed: int = 20261103,
+) -> JSON:
     """Read disjoint fresh windows in each order and record throughput."""
     output = Path(output)
     if output.exists():
@@ -234,12 +251,12 @@ def benchmark(certificate, manifest, output, *, window=2000, orders=ORDERS, seed
     return report
 
 
-def _free_bytes(path):
+def _free_bytes(path: str | Path) -> int:
     value = os.statvfs(path)
     return value.f_bavail * value.f_frsize
 
 
-def _ledger(destination):
+def _ledger(destination: Path) -> sqlite3.Connection:
     db = sqlite3.connect(destination / "staging-ledger.sqlite")
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA synchronous=FULL")
@@ -251,7 +268,15 @@ def _ledger(destination):
     return db
 
 
-def stage(certificate, manifest, destination, *, order="inode", floor_gib=100, resume=False):
+def stage(
+    certificate: str | Path,
+    manifest: str | Path,
+    destination: str | Path,
+    *,
+    order: str = "inode",
+    floor_gib: float = 100,
+    resume: bool = False,
+) -> JSON:
     """Copy every certified object to a new root, verifying both sides."""
     destination = Path(destination).expanduser().absolute()
     binding = load_binding(certificate, manifest)
@@ -285,7 +310,7 @@ def stage(certificate, manifest, destination, *, order="inode", floor_gib=100, r
     started_unix = time.time()
     status_path = destination / "staging-status.json"
 
-    def report(stage_name, **extra) -> None:
+    def report(stage_name: str, **extra: Any) -> None:
         atomic(
             status_path,
             {
@@ -398,7 +423,7 @@ def stage(certificate, manifest, destination, *, order="inode", floor_gib=100, r
         lock.close()
 
 
-def verify_destination(destination, rows):
+def verify_destination(destination: str | Path, rows: Sequence[ObjectRow]) -> JSON:
     """Hash every staged object and prove the object tree has nothing extra."""
     destination = Path(destination)
     began = time.monotonic()
@@ -425,7 +450,7 @@ def verify_destination(destination, rows):
     return {"objects": len(rows), "bytes": total, "seconds": round(time.monotonic() - began, 1)}
 
 
-def stage_sources_main(argv=None) -> int:
+def stage_sources_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit stage-sources",
         description="Benchmark read orders or stage certified raw objects onto a new root.",

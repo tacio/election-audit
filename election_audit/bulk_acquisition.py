@@ -23,11 +23,15 @@ import sqlite3
 import time
 import urllib.request
 import zipfile
+from collections.abc import Callable, Iterable, Sequence
 from datetime import UTC, datetime
+from http.client import HTTPResponse
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 from election_audit.national_migration import atomic, sha
+from election_audit.types import JSON, Argv
 
 VERSION = "tse-bulk-acquisition-v1"
 CATALOG_API = "https://dadosabertos.tse.jus.br/api/3/action/package_show?id="
@@ -51,18 +55,20 @@ CREATE TABLE IF NOT EXISTS files(
 LATER_COLUMNS = {"sha512": "TEXT", "published_sha512": "TEXT"}
 
 
-def _now():
+def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def _request(url, *, method="GET", headers=None, timeout=60):
+def _request(
+    url: str, *, method: str = "GET", headers: dict[str, str] | None = None, timeout: float = 60
+) -> HTTPResponse:
     request = urllib.request.Request(
         url, method=method, headers={"User-Agent": USER_AGENT, **(headers or {})}
     )
     return urllib.request.urlopen(request, timeout=timeout)
 
 
-def fetch_catalog(dataset, api=CATALOG_API):
+def fetch_catalog(dataset: str, api: str = CATALOG_API) -> tuple[str, bytes, list[JSON]]:
     """Return the raw catalog bytes and the parsed resource list."""
     url = api + dataset
     with _request(url) as response:
@@ -73,7 +79,9 @@ def fetch_catalog(dataset, api=CATALOG_API):
     return url, body, value["result"]["resources"]
 
 
-def select_resources(resources, include, allowed_prefixes=ALLOWED_PREFIXES):
+def select_resources(
+    resources: Iterable[JSON], include: str, allowed_prefixes: Sequence[str] = ALLOWED_PREFIXES
+) -> list[JSON]:
     """Filter resources by URL regex, refusing hosts outside the allow list."""
     pattern = re.compile(include)
     selected = []
@@ -105,7 +113,7 @@ def select_resources(resources, include, allowed_prefixes=ALLOWED_PREFIXES):
     return selected
 
 
-def head(url):
+def head(url: str) -> JSON:
     # CDN edges cache HEAD and GET separately and can hold copies stored without
     # Content-Length or from an earlier republication. A throwaway query reaches the
     # current version; downloads must then match its ETag and length.
@@ -118,7 +126,7 @@ def _revalidate(url) -> str:
     return f"{url}{separator}revalidate={time.time_ns()}"
 
 
-def _head(url):
+def _head(url: str) -> JSON:
     with _request(url, method="HEAD") as response:
         return {
             "bytes": (
@@ -132,12 +140,19 @@ def _head(url):
         }
 
 
-def _free(path):
+def _free(path: str | Path) -> int:
     value = os.statvfs(path)
     return value.f_bavail * value.f_frsize
 
 
-def download_one(url, target, expected, *, reserve, progress=None):
+def download_one(
+    url: str,
+    target: Path,
+    expected: JSON,
+    *,
+    reserve: float,
+    progress: Callable[[int], None] | None = None,
+) -> tuple[str, str, int, int | None]:
     """Download to ``target``.part with ETag-guarded range resume.
 
     Returns (sha256, sha512, bytes, zip members or None).
@@ -215,14 +230,14 @@ def download_one(url, target, expected, *, reserve, progress=None):
     return digest.hexdigest(), long_digest.hexdigest(), offset, members
 
 
-def published_digest(path):
+def published_digest(path: str | Path) -> str | None:
     """The single SHA-512 hex digest in a TSE ``.sha512`` file, or None."""
     text = Path(path).read_bytes()[:4096].decode("ascii", errors="replace")
     found = re.findall(r"(?<![0-9A-Fa-f])[0-9A-Fa-f]{128}(?![0-9A-Fa-f])", text)
     return found[0].lower() if len(set(found)) == 1 else None
 
 
-def reconcile_published(db, output):
+def reconcile_published(db: sqlite3.Connection, output: Path) -> list[tuple[str, str]]:
     """Record, per archive, whether a published SHA-512 matches the received bytes."""
     rows = db.execute(
         "SELECT url, path, sha512 FROM files WHERE status='complete' AND url NOT LIKE '%.sha512'"
@@ -258,16 +273,16 @@ def reconcile_published(db, output):
 
 
 def acquire(
-    datasets,
-    output,
+    datasets: Iterable[str],
+    output: str | Path,
     *,
-    include=r"\.zip$",
-    resume=False,
-    reserve_gib=20,
-    api=CATALOG_API,
-    allowed_prefixes=ALLOWED_PREFIXES,
-    dry_run=False,
-):
+    include: str = r"\.zip$",
+    resume: bool = False,
+    reserve_gib: float = 20,
+    api: str = CATALOG_API,
+    allowed_prefixes: Sequence[str] = ALLOWED_PREFIXES,
+    dry_run: bool = False,
+) -> JSON:
     output = Path(output).expanduser().absolute()
     # The host allow list is a safety policy, not part of the acquisition identity.
     binding = {"version": VERSION, "datasets": sorted(datasets), "include": include, "api": api}
@@ -283,7 +298,7 @@ def acquire(
     started = time.time()
     status_path = output / "status.json"
 
-    def report(stage, **extra) -> None:
+    def report(stage: str, **extra: Any) -> None:
         atomic(
             status_path,
             {
@@ -396,7 +411,7 @@ def acquire(
             if target.exists():
                 raise FileExistsError(f"Refusing to overwrite an unrecorded file: {target}")
 
-            def progress(current, url=url, index=index) -> None:
+            def progress(current: int, url: str = url, index: int = index) -> None:
                 elapsed = time.monotonic() - began
                 rate = (done_bytes + current) / elapsed if elapsed else 0
                 report(
@@ -455,7 +470,7 @@ def acquire(
         lock.close()
 
 
-def verify(output):
+def verify(output: str | Path) -> JSON:
     """Re-hash every completed archive against the manifest (read-only)."""
     output = Path(output)
     uri = (output / "manifest.sqlite").resolve().as_uri() + "?mode=ro"
@@ -470,7 +485,7 @@ def verify(output):
     return {"verified_files": len(rows), "verified_bytes": sum(r[2] for r in rows)}
 
 
-def bulk_download_main(argv=None) -> int:
+def bulk_download_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(
         prog="election-audit bulk-download",
         description="Acquire or verify TSE open-data bulk archives with checksums.",

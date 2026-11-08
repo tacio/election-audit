@@ -9,9 +9,11 @@ import shutil
 import sqlite3
 import tempfile
 import time
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict
 from importlib import metadata
 from pathlib import Path
+from typing import Any
 
 from election_audit.archive_parsing import FrozenParseReader, inspect_parse, parse_snapshot
 from election_audit.derivatives import publish_derivative, release_layers
@@ -26,6 +28,7 @@ from election_audit.reconstruction import reconstruct_parse
 from election_audit.release_tools import report_release, validate_release
 from election_audit.snapshots import create_snapshot, inspect_snapshot
 from election_audit.source_inventory import canonical, digest, hash_file, utc_now
+from election_audit.types import JSON, Argv
 from election_audit.walkthrough import (
     analysis_config,
     normalized_demo,
@@ -38,7 +41,7 @@ VERSION = "offline-reproduction-v1"
 EXCLUDED = {".git", ".aws", ".codex", ".agents", ".venv", ".local-state", "__pycache__"}
 
 
-def _copy_tree(source, destination) -> None:
+def _copy_tree(source: Path, destination: Path) -> None:
     """Reject links before copytree can dereference them; walk explicit trees only."""
     for directory, folders, files in os.walk(source, followlinks=False):
         folders[:] = [name for name in folders if name not in EXCLUDED]
@@ -50,7 +53,7 @@ def _copy_tree(source, destination) -> None:
     shutil.copytree(source, destination, ignore=shutil.ignore_patterns(*EXCLUDED, "*.pyc"))
 
 
-def relative_file(root, locator):
+def relative_file(root: Path, locator: str) -> Path:
     candidate = Path(locator)
     if candidate.is_absolute() or ".." in candidate.parts:
         raise PublicationError("Review locator must be confined and relative")
@@ -60,7 +63,7 @@ def relative_file(root, locator):
     return target
 
 
-def runtime():
+def runtime() -> JSON:
     return {
         "python": platform.python_version(),
         "platform": platform.platform(),
@@ -77,7 +80,7 @@ def runtime():
     }
 
 
-def logical_results(release, identities):
+def logical_results(release: Path, identities: Mapping[str, str]) -> JSON:
     """Multiset digests normalize only explicit parent_release_id provenance.
 
     Exact unmodified logical/physical pins remain in each release manifest. Fresh
@@ -86,7 +89,7 @@ def logical_results(release, identities):
     """
     document = inspect_release(release)
 
-    def normalize(value):
+    def normalize(value: Any) -> Any:
         if isinstance(value, dict):
             return {
                 key: identities.get(item, item) if key == "parent_release_id" else normalize(item)
@@ -112,7 +115,14 @@ def logical_results(release, identities):
     return result
 
 
-def frozen_pipeline(snapshot, output, *, config=None, evidence=None, object_groups=None):
+def frozen_pipeline(
+    snapshot: Path,
+    output: str | Path,
+    *,
+    config: ResourceConfig | None = None,
+    evidence: Any = None,
+    object_groups: list[list[str]] | None = None,
+) -> tuple[Path, list[Path], Path, float]:
     """Usable bounded API; repeated calls resume immutable parse/shard/release hits."""
     config = config or ResourceConfig()
     output = Path(output)
@@ -138,18 +148,18 @@ def frozen_pipeline(snapshot, output, *, config=None, evidence=None, object_grou
 
 
 def describe_run(
-    root,
-    snapshot,
-    parsed,
-    shards,
-    releases,
+    root: Path,
+    snapshot: Path,
+    parsed: Path,
+    shards: Sequence[Path],
+    releases: Sequence[Path],
     *,
-    config,
-    evidence=None,
-    steps=(),
-    synthetic=False,
-    elapsed_seconds=None,
-):
+    config: ResourceConfig,
+    evidence: Any = None,
+    steps: Sequence[JSON] = (),
+    synthetic: bool = False,
+    elapsed_seconds: float | None = None,
+) -> JSON:
     root = Path(root).resolve()
     identities = {release.name: f"stage:{index}" for index, release in enumerate(releases)}
     descriptors = []
@@ -194,7 +204,7 @@ def describe_run(
     return descriptor
 
 
-def demo(output):
+def demo(output: str | Path) -> JSON:
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     config = ResourceConfig()
@@ -247,7 +257,7 @@ def demo(output):
     return descriptor
 
 
-def file_pins(root):
+def file_pins(root: Path) -> dict[str, JSON]:
     pins = {}
     for path in sorted(Path(root).rglob("*")):
         if path.is_symlink():
@@ -258,7 +268,7 @@ def file_pins(root):
     return pins
 
 
-def verify_bundle(bundle):
+def verify_bundle(bundle: str | Path) -> JSON:
     bundle = Path(bundle).resolve()
     raw = (bundle / "review-bundle.json").read_bytes()
     if hashlib.sha256(raw).hexdigest() != (bundle / "review-bundle.sha256").read_text().strip():
@@ -299,7 +309,9 @@ def verify_bundle(bundle):
     return manifest
 
 
-def review_bundle(run, output, *, source_root=None):
+def review_bundle(
+    run: str | Path, output: str | Path, *, source_root: str | Path | None = None
+) -> Path:
     """Export only declared inputs, frozen stages/chain, reports and source whitelist."""
     run, output = Path(run).resolve(), Path(output).resolve()
     descriptor = json.loads((run / "reproduction.json").read_text())
@@ -372,7 +384,7 @@ def review_bundle(run, output, *, source_root=None):
     return output
 
 
-def reproduce(bundle, output):
+def reproduce(bundle: str | Path, output: str | Path) -> JSON:
     """Verify relocated evidence, replay frozen inputs into a fresh directory."""
     bundle, output = Path(bundle).resolve(), Path(output).resolve()
     verify_bundle(bundle)
@@ -454,7 +466,7 @@ def reproduce(bundle, output):
     return result
 
 
-def reproduction_main(command, argv=None) -> int:
+def reproduction_main(command: str, argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     if command == "backfill":
         parser.add_argument("snapshot", type=Path)
