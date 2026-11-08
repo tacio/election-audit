@@ -8,9 +8,11 @@ import tempfile
 import unittest
 import warnings
 import zipfile
+from collections.abc import Iterable
 from contextlib import redirect_stdout
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from test_snapshots import SourceFixture
@@ -32,12 +34,14 @@ from election_audit.source_inventory import aux_url
 
 
 def log_line(
-    message="O voto do eleitor foi computado", timestamp="25/10/2026 08:00:00", app="VOTA"
-):
+    message: str = "O voto do eleitor foi computado",
+    timestamp: str = "25/10/2026 08:00:00",
+    app: str = "VOTA",
+) -> bytes:
     return f"{timestamp}\tINFO\t1234\t{app}\t{message}\tSECRET-TOKEN\n".encode("latin-1")
 
 
-def archive_bytes(members):
+def archive_bytes(members: Iterable[tuple[str, bytes]]) -> bytes:
     body = io.BytesIO()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
@@ -47,7 +51,7 @@ def archive_bytes(members):
     return body.getvalue()
 
 
-def rows(path, name):
+def rows(path: Path, name: str) -> list[Any]:
     return [json.loads(line) for line in (path / name).read_bytes().splitlines()]
 
 
@@ -59,12 +63,18 @@ class ArchiveTests(unittest.TestCase):
         self.source = self.root / "input.jez"
         self.store = self.root / "derived"
 
-    def parse(self, members=None, *, body=None, config=None):
+    def parse(
+        self,
+        members: Iterable[tuple[str, bytes]] | None = None,
+        *,
+        body: bytes | None = None,
+        config: ParseConfig | None = None,
+    ) -> tuple[Path, list[Any], list[Any]]:
         self.source.write_bytes(body if body is not None else archive_bytes(members))
         path, hit = parse_object(self.source, self.store, config=config)
         return path, rows(path, "events.jsonl"), rows(path, "issues.jsonl")
 
-    def codes(self, issues):
+    def codes(self, issues: Iterable[dict[str, Any]]) -> set[str]:
         return {row["issue_code"] for row in issues}
 
     def test_nested_duplicate_occurrences_order_and_no_path_extraction(self) -> None:
@@ -270,7 +280,7 @@ class ParseSnapshotTests(SourceFixture):
         super().setUp()
         self.store = Path(self.temporary.name) / "derived"
 
-    def frozen(self):
+    def frozen(self) -> Path:
         self.save_index([{"ns": "0001", "da": "date"}, {"ns": "0002", "da": "date"}])
         self.record_section()
         self.save(self.log_url, archive_bytes([("logd.dat", log_line() + b"malformed SECRET\n")]))

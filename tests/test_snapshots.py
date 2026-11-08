@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from election_audit.contracts import validate_rows
@@ -52,13 +53,13 @@ class SourceFixture(unittest.TestCase):
                               url TEXT,package_status TEXT,package_hash TEXT,filename TEXT,
                               PRIMARY KEY(run,url));
         """)
-        self.run = "2026-10-28T10:00:00+00:00"
-        self.db.execute("INSERT INTO runs VALUES (?,?,NULL,'running')", (self.run, self.run))
+        self.run_id = "2026-10-28T10:00:00+00:00"
+        self.db.execute("INSERT INTO runs VALUES (?,?,NULL,'running')", (self.run_id, self.run_id))
         self.db.commit()
         self.key = ("ac", "01120", "0001", "0001")
         self.log_url = f"{BASE}/ele2026/arquivo-urna/3221/dados/ac/01120/0001/0001/pkg/a-log.dat"
 
-    def save(self, url, body):
+    def save(self, url: str, body: bytes | dict[str, Any] | list[Any]) -> Path:
         if not isinstance(body, bytes):
             body = json.dumps(body).encode()
         sha = hashlib.sha256(body).hexdigest()
@@ -68,16 +69,22 @@ class SourceFixture(unittest.TestCase):
         path.write_bytes(body)
         self.db.execute(
             "INSERT OR REPLACE INTO files VALUES (?,?,?,?,?,NULL,NULL)",
-            (url, relative, sha, len(body), self.run),
+            (url, relative, sha, len(body), self.run_id),
         )
         self.db.commit()
         return path
 
-    def record_section(self, code="0001", status="downloaded", metadata=None, run=None) -> None:
+    def record_section(
+        self,
+        code: str = "0001",
+        status: str = "downloaded",
+        metadata: dict[str, Any] | None = None,
+        run: str | None = None,
+    ) -> None:
         self.db.execute(
             "INSERT OR REPLACE INTO sections VALUES (?,?,?,?,?,?,?,NULL)",
             (
-                run or self.run,
+                run or self.run_id,
                 *self.key[:3],
                 code,
                 status,
@@ -86,14 +93,14 @@ class SourceFixture(unittest.TestCase):
         )
         self.db.commit()
 
-    def advertise(self, url=None, run=None, code="0001") -> None:
+    def advertise(self, url: str | None = None, run: str | None = None, code: str = "0001") -> None:
         self.db.execute(
             "INSERT INTO logs VALUES (?,?,?,?,?,?,?,?,?)",
-            (run or self.run, *self.key[:3], code, url or self.log_url, "1", "pkg", "a-log.dat"),
+            (run or self.run_id, *self.key[:3], code, url or self.log_url, "1", "pkg", "a-log.dat"),
         )
         self.db.commit()
 
-    def save_index(self, entries):
+    def save_index(self, entries: list[dict[str, Any]]) -> Path:
         return self.save(
             index_url("ac"),
             {
@@ -178,7 +185,7 @@ class InventoryTests(SourceFixture):
 
 
 class PopulationTests(SourceFixture):
-    def population(self, **kwargs):
+    def population(self, **kwargs: Any) -> dict[str, Any]:
         return build_population(inventory_sources(self.root, ["ac"], **kwargs))
 
     def test_expected_members_and_unique_principals_never_multiply(self) -> None:
@@ -213,7 +220,7 @@ class PopulationTests(SourceFixture):
         )
         self.assertEqual(summary["national_status"], "partial_national")
         self.assertIsNone(summary["national_expected_members"])
-        self.assertEqual(summary["unfinished_runs"], [self.run])
+        self.assertEqual(summary["unfinished_runs"], [self.run_id])
         for table, rows in population["tables"].items():
             self.assertEqual(validate_rows(table, rows), [], table)
         self.assertEqual(
@@ -282,7 +289,7 @@ class PopulationTests(SourceFixture):
             with self.subTest(status=status):
                 self.db.execute(
                     "UPDATE runs SET status=?,finished_at=?",
-                    (status, None if status == "running" else self.run),
+                    (status, None if status == "running" else self.run_id),
                 )
                 self.db.commit()
                 population = self.population()
@@ -347,7 +354,7 @@ class SnapshotTests(SourceFixture):
         self.advertise()
         self.raw_log = self.save(self.log_url, b"original")
 
-    def captured(self):
+    def captured(self) -> tuple[dict[str, Any], dict[str, Any]]:
         inventory = inventory_sources(self.root, ["ac"])
         return inventory, build_population(inventory)
 
@@ -369,7 +376,7 @@ class SnapshotTests(SourceFixture):
         before = inspect_snapshot(path, verify_objects=True)
         self.save(self.log_url, b"changed!")
         self.raw_log.unlink()
-        self.db.execute("UPDATE runs SET status='finished',finished_at=?", (self.run,))
+        self.db.execute("UPDATE runs SET status='finished',finished_at=?", (self.run_id,))
         self.db.commit()
         after = inspect_snapshot(path, verify_objects=True)
         self.assertEqual(before, after)

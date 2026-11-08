@@ -6,7 +6,9 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from collections.abc import Iterable, Mapping
 from pathlib import Path
+from typing import Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -23,18 +25,25 @@ OPEN, INSERTED, DELETED, REPLACED, CLOSED = (
 )
 
 
-def lines(messages, device, *, date="04/10/2026", hour=18, app="VOTA"):
+def lines(
+    messages: Iterable[str],
+    device: str,
+    *,
+    date: str = "04/10/2026",
+    hour: int = 18,
+    app: str = "VOTA",
+) -> bytes:
     return "".join(
         f"{date} {hour:02d}:{i // 60:02d}:{i % 60:02d}\tINFO\t{device}\t{app}\t{m}\t{TOKEN}\n"
         for i, m in enumerate(messages)
     ).encode("latin-1")
 
 
-def split(body):
+def split(body: bytes) -> list[bytes]:
     return body.splitlines(keepends=True)
 
 
-def urn_bodies(device):
+def urn_bodies(device: str) -> tuple[bytes, ...]:
     """Round-1 log, later round-1 lines, runoff lines and a new round-1 block of one urn."""
     return (
         log_body(CYCLES, round_number=1, date="04/10/2026", device=device),
@@ -49,7 +58,7 @@ def urn_bodies(device):
     )
 
 
-def staged(root, round_number, bodies) -> None:
+def staged(root: Path, round_number: int, bodies: Mapping[Any, bytes]) -> None:
     pleito = 3220 if round_number == 1 else 3221
     rows, logs = [], []
     for key, body in bodies.items():
@@ -76,7 +85,7 @@ def staged(root, round_number, bodies) -> None:
 
 class DescribeTests(unittest.TestCase):
     @staticmethod
-    def records(names):
+    def records(names: Iterable[str]) -> list[tuple[str, str, str, str]]:
         return [(n, f"2026-10-04T08:00:{i:02d}", "VOTA", n) for i, n in enumerate(names)]
 
     def test_insertion_deletion_and_replacement(self) -> None:
@@ -109,7 +118,7 @@ class PrefixPassTests(unittest.TestCase):
         middle = len(r1[OPEN]) // 2
         malformed = b"not a log line\n"
 
-        def body(key, block):
+        def body(key: Any, block: Iterable[bytes]) -> bytes:
             return jez(b"".join(block) + urn[key][2])
 
         runoff = {
@@ -175,7 +184,7 @@ class PrefixPassTests(unittest.TestCase):
         self.output = base / "prefix"
         self.statuses = statuses
 
-    def run_prefix(self, **options):
+    def run_prefix(self, **options: Any) -> dict[str, Any]:
         return rp.run_prefix(
             self.logs, self.semantic[2], self.semantic[1], self.output, workers=1, **options
         )

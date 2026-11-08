@@ -8,12 +8,13 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from election_audit import source_staging as staging
 
 
-def digest(path):
+def digest(path: str | Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
@@ -56,7 +57,7 @@ class StagingTests(unittest.TestCase):
         )
         self.destination = base / "stage" / "turno-2"
 
-    def copy(self, **options):
+    def copy(self, **options: Any) -> dict[str, Any]:
         return staging.stage(
             self.certificate, self.manifest, self.destination, floor_gib=0, **options
         )
@@ -113,7 +114,7 @@ class StagingTests(unittest.TestCase):
         original = staging.read_verified
         calls = []
 
-        def failing(root, relative, *args, **kwargs):
+        def failing(root: Any, relative: str, *args: Any, **kwargs: Any) -> bytes:
             calls.append(relative)
             if len(calls) == 7:
                 raise KeyboardInterrupt
@@ -134,7 +135,7 @@ class StagingTests(unittest.TestCase):
             self.copy(order="inode", resume=True)
         seen = []
 
-        def recording(root, relative, *args, **kwargs):
+        def recording(root: Any, relative: str, *args: Any, **kwargs: Any) -> bytes:
             seen.append(relative)
             return original(root, relative, *args, **kwargs)
 
