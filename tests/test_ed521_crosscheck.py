@@ -7,7 +7,7 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
-from tests.test_integrity_checks import FIXTURE, ITEM
+from test_integrity_checks import FIXTURE, ITEM
 
 AGREEING = """
 from election_audit import ed521

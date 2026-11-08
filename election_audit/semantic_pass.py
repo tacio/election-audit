@@ -59,8 +59,8 @@ from election_audit.types import JSON, Argv, Row
 
 type Segment = tuple[str, int, int]
 
-VERSION = (
-    "session-aggregates-v4"  # v2: int64 seconds; v3: device and clock columns; v4: sessions-v2
+VERSION = (  # v2: int64 seconds; v3: device and clock columns; v4: sessions-v2; v5: markers
+    "session-aggregates-v5"
 )
 ADAPTER_VERSION = "real-operational-v1"
 SHARD_OBJECTS = 500
@@ -145,6 +145,34 @@ SEGMENT_SCHEMA = pa.schema(
         ("last_line_sha256", pa.string()),
         ("first_reading", pa.string()),
         ("last_reading", pa.string()),
+    ]
+)
+# Zerésima and readiness lines (masked templates), kept one row per line for I-Z (Phase 20b).
+MARKERS = {
+    ("VOTA", "Aguardando data e hora para emissão da zerésima"): "await_datetime",
+    ("VOTA", "Aguardando confirmação para emissão da zerésima"): "await_confirmation",
+    ("VOTA", "Mesário indagado se quer imprimir a zerésima"): "asked_to_print",
+    ("VOTA", "Gerando relatório [ZERÉSIMA] [INÍCIO]"): "zeresima_start",
+    ("VOTA", "Gerando relatório [ZERÉSIMA] [TÉRMINO]"): "zeresima_end",
+    ("VOTA", "Gerando relatório [RESUMO DA ZERÉSIMA] [INÍCIO]"): "summary_start",
+    ("VOTA", "Gerando relatório [RESUMO DA ZERÉSIMA] [TÉRMINO]"): "summary_end",
+    ("VOTA", "Imprimindo relatório [ZERÉSIMA] via nº [#]"): "zeresima_print",
+    ("VOTA", "Imprimindo relatório [RESUMO DA ZERÉSIMA] via nº [#]"): "summary_print",
+    ("VOTA", "Urna pronta para receber votos"): "ready",
+    ("SA", "Imprimindo relatório [ZERÉSIMA DE APURAÇÃO]"): "sa_zeresima",
+}
+MARKER_SCHEMA = pa.schema(
+    [
+        ("object_sha256", pa.string()),
+        ("stream_ordinal", pa.int32()),
+        ("segment_ordinal", pa.int32()),
+        ("session_ordinal", pa.int32()),  # null outside a session
+        ("device_id", pa.string()),
+        ("kind", pa.string()),  # MARKERS values, or "other" for any other zerésima template
+        ("template", pa.string()),  # digit-masked
+        ("line", pa.int64()),  # line number in the object (file order)
+        ("reading", pa.string()),
+        ("completions_before", pa.int32()),  # completed cycles earlier in the same segment
     ]
 )
 OBJECT_SCHEMA = pa.schema(
@@ -291,6 +319,8 @@ class ObjectSummary:
         self.election_seconds = self.election_day.toordinal() * 86400
         self.sessions: list[dict[str, Any]] = []
         self.segments: list[dict[str, Any]] = []
+        self.markers: list[dict[str, Any]] = []
+        self.segment_completions = 0
         self.kinds, self.vocabulary = Counter(), Counter()
         self.vocabulary_overflow = 0
         self.lines = self.events = self.malformed = self.members = 0
@@ -351,6 +381,7 @@ class ObjectSummary:
             "last_reading": None,
         }
         self._segment_ordinal += 1
+        self.segment_completions = 0
 
     def _close_segment(self) -> None:
         if self.segment is not None:
@@ -548,6 +579,22 @@ class ObjectSummary:
             }
             self._last_reading = None
         session = self.session
+        marker = MARKERS.get(template)
+        if marker is not None or "zerésima" in template[1].lower():
+            self.markers.append(
+                {
+                    "object_sha256": self.sha,
+                    "stream_ordinal": self.stream_ordinal,
+                    "segment_ordinal": segment["segment_ordinal"],
+                    "session_ordinal": None if session is None else session["session_ordinal"],
+                    "device_id": device,
+                    "kind": marker or "other",
+                    "template": template[1],
+                    "line": self.lines,
+                    "reading": iso_reading(reading),
+                    "completions_before": self.segment_completions,
+                }
+            )
         if session is not None:
             session["events"] += 1
             session["end_reading"] = reading
@@ -639,6 +686,7 @@ class ObjectSummary:
         elif kind == "completion":
             if pending and pending["authorized"]:
                 self._finish_cycle("completed")
+                self.segment_completions += 1
                 session["_completions"].append(reading)
                 session["completions_by_reading_hour"][(reading % 86400) // 3600] += 1
             else:
@@ -835,7 +883,7 @@ def run_shard(
     task: tuple[str | None, int, str, int, list[Row], list[bytes] | None, int],
 ) -> tuple[int, int, int]:
     staged_root, round_number, shard_dir, index, items, bodies, year = task
-    sessions, segments, objects, vocabulary = [], [], [], Counter()
+    sessions, segments, markers, objects, vocabulary = [], [], [], [], Counter()
     for position, item in enumerate(items):
         if bodies is None:
             assert staged_root is not None  # staged shards carry their root
@@ -859,6 +907,7 @@ def run_shard(
             continue
         sessions.extend(summary.sessions)
         segments.extend(summary.segments)
+        markers.extend(summary.markers)
         for (application, template), count in summary.vocabulary.items():
             vocabulary[(application, template)] += count
         row.update(
@@ -880,6 +929,7 @@ def run_shard(
     temporary.mkdir()
     _write(temporary / "sessions.parquet", sessions, SESSION_SCHEMA)
     _write(temporary / "segments.parquet", segments, SEGMENT_SCHEMA)
+    _write(temporary / "markers.parquet", markers, MARKER_SCHEMA)
     _write(temporary / "objects.parquet", objects, OBJECT_SCHEMA)
     (temporary / "vocabulary.json").write_text(
         json.dumps(sorted([a, t, c] for (a, t), c in vocabulary.items()))
@@ -1057,6 +1107,7 @@ def merge(output: Path, shards: Sequence[Sequence[Row]], binding: JSON, excluded
     for name, schema in (
         ("sessions", SESSION_SCHEMA),
         ("segments", SEGMENT_SCHEMA),
+        ("markers", MARKER_SCHEMA),
         ("objects", OBJECT_SCHEMA),
     ):
         with pq.ParquetWriter(temporary / f"{name}.parquet", schema, compression="zstd") as w:
@@ -1098,6 +1149,7 @@ def merge(output: Path, shards: Sequence[Sequence[Row]], binding: JSON, excluded
         "excluded_objects": excluded,
         "sessions": counts["sessions"],
         "segments": counts["segments"],
+        "markers": counts["markers"],
         "vocabulary_templates": len(rows),
         "files": files,
         "readings": "local urn clock readings; not normalized times",

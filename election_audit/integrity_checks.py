@@ -2556,7 +2556,20 @@ def integrity_check_main(argv: Argv = None) -> int:
     cross.add_argument("--uf", action="append", help="Restrict to UF (repeatable; lower case).")
     cross.add_argument("--limit", type=int, help="Process at most this many sections.")
     cross.add_argument("--resume", action="store_true", help="Resume the same pass.")
+    zer = sub.add_parser("zeresima", help="Z1-Z5: the zerésima in every log against the votes.")
+    zer.add_argument("--sections", required=True, help="Section-pass output root (same round).")
+    zer.add_argument("--semantic", required=True, help="Semantic-pass v5 root (same round).")
+    zer.add_argument("--output", required=True, help="New output directory.")
+    zer.add_argument("--memory-limit", default="2GB", help="DuckDB memory limit.")
     args = parser.parse_args(argv)
+    if args.command == "zeresima":
+        from election_audit.zeresima import run_zeresima
+
+        result = run_zeresima(
+            args.sections, args.semantic, args.output, memory_limit=args.memory_limit
+        )
+        print(json.dumps(result["summary"]))
+        return 0
     if args.command == "ed521-crosscheck":
         from election_audit.ed521_crosscheck import run_crosscheck
 

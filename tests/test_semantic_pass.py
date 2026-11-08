@@ -195,6 +195,37 @@ class SessionMachineTests(unittest.TestCase):
         # The restart line stays in the official block.
         self.assertEqual([g["context"] for g in restart.segments], ["initial", "official_round_2"])
 
+    def test_zeresima_markers_keep_their_place_among_the_votes(self) -> None:
+        zeresima = [
+            "Aguardando data e hora para emissão da zerésima",
+            "Gerando relatório [ZERÉSIMA] [INÍCIO]",
+            "Gerando relatório [ZERÉSIMA] [TÉRMINO]",
+            "Imprimindo relatório [ZERÉSIMA] via nº [1]",
+            "Urna pronta para receber votos",
+        ]
+        late = "Imprimindo relatório [ZERÉSIMA] via nº [2]"
+        body = log_body([*zeresima, *CYCLES[:4], late, "Zerésima nova 7"])
+        with tempfile.TemporaryDirectory() as d:
+            original = Path(d) / "x.jez"
+            original.write_bytes(jez(body))
+            summary = sp.summarize_object(original, "x", 2)
+        rows = [(m["kind"], m["completions_before"], m["session_ordinal"]) for m in summary.markers]
+        self.assertEqual(
+            rows,
+            [
+                ("await_datetime", 0, 0),
+                ("zeresima_start", 0, 0),
+                ("zeresima_end", 0, 0),
+                ("zeresima_print", 0, 0),
+                ("ready", 0, 0),
+                ("zeresima_print", 1, 0),
+                ("other", 1, 0),
+            ],
+        )
+        self.assertEqual(summary.markers[-1]["template"], "Zerésima nova #")
+        self.assertEqual(summary.markers[0]["reading"], "2026-10-25T08:00:03")
+        self.assertEqual({m["segment_ordinal"] for m in summary.markers}, {1})
+
     def test_readings_are_validated_exactly(self) -> None:
         self.assertIsNone(sp.reading_seconds("31/02/2026 10:00:00"))
         self.assertIsNone(sp.reading_seconds("25/10/2026 24:00:00"))
@@ -262,7 +293,8 @@ class PassTests(unittest.TestCase):
         self.assertNotIn(VOTER.encode(), exported)
         files = json.loads((self.output / "release" / "manifest.json").read_text())["files"]
         self.assertEqual(
-            set(files), {f"{n}.parquet" for n in ("objects", "sessions", "segments", "vocabulary")}
+            set(files),
+            {f"{n}.parquet" for n in ("objects", "sessions", "segments", "markers", "vocabulary")},
         )
         with self.assertRaises(FileExistsError):
             self.run_pass(shard_objects=2)
