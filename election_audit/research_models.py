@@ -9,7 +9,9 @@ import pickle
 import shutil
 import sqlite3
 import tempfile
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from pathlib import Path
+from typing import Any
 
 from election_audit.research_evaluation import (
     append_record,
@@ -19,6 +21,7 @@ from election_audit.research_evaluation import (
 )
 from election_audit.research_protocol import hash_file, load_protocol, read_only
 from election_audit.source_inventory import canonical, digest
+from election_audit.types import JSON, Argv, Row
 
 VERSION = "research-models-v1"
 TARGETS = {
@@ -33,7 +36,7 @@ TARGETS = {
 QUANTILES = [0.025, 0.25, 0.5, 0.75, 0.975]
 
 
-def _catalog(feature_release, protocol):
+def _catalog(feature_release: str | Path, protocol: JSON) -> Path:
     root = Path(feature_release).resolve()
     manifest = json.loads((root / "manifest.json").read_text())
     spec = manifest["catalog"]
@@ -49,7 +52,14 @@ def _catalog(feature_release, protocol):
     return path
 
 
-def _rows(features, protocol_path, document, target, partitions, variant):
+def _rows(
+    features: str | Path,
+    protocol_path: str | Path,
+    document: JSON,
+    target: str,
+    partitions: Iterable[str],
+    variant: str,
+) -> Iterator[Row]:
     feature_id, component = TARGETS[target]
     catalog = _catalog(features, document)
     with read_only(catalog) as db:
@@ -106,7 +116,7 @@ def _rows(features, protocol_path, document, target, partitions, variant):
             }
 
 
-def _predict(model, matrix):
+def _predict(model: Any, matrix: Any) -> Any:
     """The pinned QRF release needs dense prediction input; bound conversion by row."""
     import numpy as np
 
@@ -119,7 +129,7 @@ def _predict(model, matrix):
     return np.concatenate(output) if output else np.empty((0, len(QUANTILES)))
 
 
-def _loss(y, predictions):
+def _loss(y: Any, predictions: Any) -> float:
     import numpy as np
 
     error = np.asarray(y)[:, None] - predictions
@@ -128,7 +138,7 @@ def _loss(y, predictions):
     )
 
 
-def _baseline(training, rows):
+def _baseline(training: Sequence[Row], rows: Sequence[Row]) -> Any:
     import numpy as np
 
     all_values = [r["y"] for r in training]
@@ -145,7 +155,7 @@ def _baseline(training, rows):
     return np.asarray(result)
 
 
-def _score(y, predictions):
+def _score(y: Any, predictions: Any) -> Any:
     import numpy as np
 
     p = np.asarray(predictions)
@@ -155,8 +165,14 @@ def _score(y, predictions):
 
 
 def fit_models(
-    features, protocol, output, *, target="turnout", variant="no_first_round", max_rows=500000
-):
+    features: str | Path,
+    protocol: str | Path,
+    output: str | Path,
+    *,
+    target: str = "turnout",
+    variant: str = "no_first_round",
+    max_rows: int = 500000,
+) -> JSON:
     """Load compact eligible matrices only; test/stress outcomes are never selected."""
     import numpy as np
     from quantile_forest import RandomForestQuantileRegressor
@@ -302,7 +318,7 @@ def fit_models(
         raise
 
 
-def _load_model(path):
+def _load_model(path: str | Path) -> tuple[JSON, Any]:
     path = Path(path)
     manifest = json.loads((path / "model.json").read_text())
     if (
@@ -315,7 +331,14 @@ def _load_model(path):
     return (manifest, model)
 
 
-def evaluate_models(features, protocol, model_path, output, *, final=False):
+def evaluate_models(
+    features: str | Path,
+    protocol: str | Path,
+    model_path: str | Path,
+    output: str | Path,
+    *,
+    final: bool = False,
+) -> JSON:
     import numpy as np
 
     document = load_protocol(protocol)
@@ -429,7 +452,9 @@ def evaluate_models(features, protocol, model_path, output, *, final=False):
     return payload
 
 
-def simulate_models(features, protocol, model_path, output):
+def simulate_models(
+    features: str | Path, protocol: str | Path, model_path: str | Path, output: str | Path
+) -> JSON:
     """Frozen synthetic sensitivity experiments on calibration outcomes; no source writes."""
     import numpy as np
 
@@ -466,7 +491,7 @@ def simulate_models(features, protocol, model_path, output):
                 for fraction in spec["affected_fractions"]:
                     for repetition in range(spec["repetitions"]):
                         rng = np.random.default_rng(spec["seed"] + repetition)
-                        mask = np.zeros(len(rows), dtype=bool)
+                        mask: Any = np.zeros(len(rows), dtype=bool)
                         if fraction:
                             if concentration == "dispersed":
                                 mask[
@@ -480,7 +505,7 @@ def simulate_models(features, protocol, model_path, output):
                                         groups, max(1, int(len(groups) * fraction)), replace=False
                                     )
                                 )
-                                mask = np.asarray([r["group"] in chosen for r in rows])
+                                mask = np.asarray([r["group"] in chosen for r in rows], dtype=bool)
                         changed = original.copy()
                         if mechanism in {"additions", "duplicated_history"}:
                             changed[mask] += 0.05 * np.maximum(1, np.abs(changed[mask]))
@@ -512,7 +537,9 @@ def simulate_models(features, protocol, model_path, output):
     return result
 
 
-def perturb_mechanism(records, mechanism, *, seed, fraction, concentration):
+def perturb_mechanism(
+    records: Sequence[Row], mechanism: str, *, seed: int, fraction: float, concentration: float
+) -> Sequence[Row]:
     """Transform reconciled anonymous counts or sanitized histories on independent copies."""
     import copy
 
@@ -597,16 +624,16 @@ def perturb_mechanism(records, mechanism, *, seed, fraction, concentration):
 
 
 def run_mechanism_validation(
-    training,
-    calibration,
-    evaluation,
-    output,
+    training: Sequence[Row],
+    calibration: Sequence[Row],
+    evaluation: Sequence[Row],
+    output: str | Path,
     *,
-    fit_calibrate_score,
-    callback_id,
-    specification,
-    max_experiments=None,
-):
+    fit_calibrate_score: Callable[..., list[bool]],
+    callback_id: str,
+    specification: JSON,
+    max_experiments: int | None = None,
+) -> JSON:
     """Resume per-mechanism/seed refit experiments; callback must run the complete estimator pipeline.
 
     The caller supplies development-only populations. All callback inputs are independent
@@ -710,7 +737,7 @@ def run_mechanism_validation(
     return result
 
 
-def _count_outcome(row, target):
+def _count_outcome(row: Row, target: str) -> float | None:
     total = row["a"] + row["b"] + row["other"]
     if target == "turnout":
         return total / row["electorate"] if row["electorate"] else None
@@ -733,10 +760,12 @@ def _count_outcome(row, target):
     return sum(values) / len(values)
 
 
-def mechanism_refit_callback(manifest):
+def mechanism_refit_callback(manifest: JSON) -> Callable[..., list[bool]]:
     """Repeat leaf selection, estimator choice, fitting and calibration after each injection."""
 
-    def refit(training, calibration, evaluation, seed):
+    def refit(
+        training: Sequence[Row], calibration: Sequence[Row], evaluation: Sequence[Row], seed: int
+    ) -> list[bool]:
         import numpy as np
         from quantile_forest import RandomForestQuantileRegressor
         from sklearn.feature_extraction import DictVectorizer
@@ -745,7 +774,7 @@ def mechanism_refit_callback(manifest):
         target = manifest["config"]["target"]
         spec = manifest["config"]["forest"]
 
-        def transform(rows):
+        def transform(rows: Iterable[Row]) -> list[JSON]:
             result = []
             for row in rows:
                 value = _count_outcome(row, target)
@@ -808,15 +837,15 @@ def mechanism_refit_callback(manifest):
 
 
 def validate_mechanisms(
-    features,
-    protocol,
-    model_path,
-    output,
+    features: str | Path,
+    protocol: str | Path,
+    model_path: str | Path,
+    output: str | Path,
     *,
-    max_experiments=None,
-    histories=None,
-    repetitions=None,
-):
+    max_experiments: int | None = None,
+    histories: str | Path | None = None,
+    repetitions: int | None = None,
+) -> JSON:
     """Refit on reconciled development-copy injections, never the protected test set."""
     document = load_protocol(protocol)
     manifest, _ = _load_model(model_path)
@@ -848,7 +877,7 @@ def validate_mechanisms(
                 ):
                     raise ValueError("Unresolved choice/destination evidence")
 
-                def value(code):
+                def value(code: str) -> Any:
                     entry = choices.get(code)
                     return entry.get("count") if isinstance(entry, dict) else entry
 
@@ -900,7 +929,7 @@ def validate_mechanisms(
     )
 
 
-def research_models_main(argv=None) -> int:
+def research_models_main(argv: Argv = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["fit", "evaluate", "simulate", "validate-mechanisms"])
     parser.add_argument("--features", type=Path, required=True)

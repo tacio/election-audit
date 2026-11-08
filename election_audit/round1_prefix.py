@@ -25,7 +25,9 @@ import os
 import shutil
 import time
 from collections import Counter, defaultdict
+from collections.abc import Collection, Sequence
 from pathlib import Path
+from typing import Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -40,6 +42,10 @@ from election_audit.semantic_pass import (
     log_members,
     reading_seconds,
 )
+from election_audit.types import JSON
+
+type Target = tuple[int, int, Collection[int], bool]
+type LineRecord = tuple[str, str, str, str]
 
 VERSION = "integrity-round1-prefix-v1"
 CHUNK_OBJECTS = 2000
@@ -187,7 +193,7 @@ SECTION_SCHEMA = pa.schema(
 )
 
 
-def template(application, message):
+def template(application: str, message: str) -> tuple[str, str]:
     """The semantic pass's digit-masked vocabulary template."""
     return application, HEXRUN.sub("<hex>", DIGITS.sub("#", message))[:200]
 
@@ -195,7 +201,7 @@ def template(application, message):
 class _Target:
     __slots__ = ("offset", "lines", "prefixes", "keep", "hash", "seen", "first", "found", "records")
 
-    def __init__(self, offset, lines, prefixes, keep) -> None:
+    def __init__(self, offset: int, lines: int, prefixes: Collection[int], keep: bool) -> None:
         self.offset, self.lines, self.prefixes, self.keep = offset, lines, set(prefixes), keep
         self.hash, self.seen, self.first, self.found, self.records = (
             hashlib.sha256(),
@@ -206,7 +212,7 @@ class _Target:
         )
 
 
-def scan(source, targets):
+def scan(source: bytes, targets: dict[tuple[int, int], Target]) -> dict[tuple[int, int], JSON]:
     """Rebuild segments of one log object and hash the requested line ranges.
 
     ``targets`` maps ``(stream_ordinal, segment_ordinal)`` to ``(line_offset, lines,
@@ -268,14 +274,16 @@ def scan(source, targets):
     }
 
 
-def read_object(staged_root, path, object_sha256):
+def read_object(staged_root: str | Path, path: str, object_sha256: str) -> bytes:
     body = (Path(staged_root) / path).read_bytes()
     if hashlib.sha256(body).hexdigest() != object_sha256:
         raise ValueError(f"Staged object differs from its certified hash: {path}")
     return body
 
 
-def run_chunk(task):
+def run_chunk(
+    task: tuple[str, int, list[tuple[str, str, str, list[list[Any]]]]],
+) -> tuple[int, int, int]:
     """Prefix hashes for one chunk of objects; written as one atomic JSON shard."""
     shard_dir, index, items = task
     results = []
@@ -308,7 +316,7 @@ def _init_worker() -> None:
         os.environ[name] = "1"
 
 
-def _release(root):
+def _release(root: str | Path) -> tuple[Path, JSON]:
     """A finished semantic or logs release whose files still match its manifest."""
     release = Path(root).expanduser().absolute() / "release"
     manifest = json.loads((release / "manifest.json").read_text())
@@ -318,7 +326,7 @@ def _release(root):
     return release, manifest
 
 
-def _staged_root(semantic_root):
+def _staged_root(semantic_root: str | Path) -> tuple[Path, JSON]:
     root = Path(semantic_root).expanduser().absolute()
     binding = json.loads((root / "binding.json").read_text())
     staged = Path(binding["staged_root"])
@@ -327,7 +335,7 @@ def _staged_root(semantic_root):
     return staged, binding
 
 
-def compare(pair, side_results) -> str:
+def compare(pair: JSON, side_results: JSON) -> str:
     """Status of one block pair from the re-read results of its longer side."""
     l1, l2 = pair["round1_lines"], pair["runoff_lines"]
     if l1 == l2:
@@ -360,7 +368,7 @@ def compare(pair, side_results) -> str:
     return "prefix_open" if pair["round1_is_last"] else "prefix_closed"
 
 
-def _resume(a, b, k):
+def _resume(a: Sequence[Any], b: Sequence[Any], k: int) -> int | None:
     """First j > k where all of ``a[k:]`` reappears in ``b`` starting at j, or None."""
     rest = len(a) - k
     if rest <= 0:
@@ -376,7 +384,9 @@ def _resume(a, b, k):
     return None
 
 
-def describe(r1_records, r2_records):
+def describe(
+    r1_records: Sequence[Sequence[Any]], r2_records: Sequence[Sequence[Any]]
+) -> tuple[int, int, str, JSON]:
     """Where two blocks part and whether the round-1 lines resume afterwards.
 
     ``insertion_in_runoff``: every round-1 line after the common prefix reappears,
@@ -415,7 +425,7 @@ def describe(r1_records, r2_records):
         kind, r1_middle, r2_middle = "replacement", (k, len(a) - m), (k, len(b) - m)
         realigned, tail = m, 0
 
-    def side(records, span):
+    def side(records: Sequence[Sequence[Any]], span: tuple[int, int]) -> JSON:
         middle = records[span[0] : span[1]]
         return {
             "lines": len(middle),
@@ -439,17 +449,17 @@ def describe(r1_records, r2_records):
 
 
 def run_prefix(
-    logs_root,
-    semantic_root,
-    semantic_round1,
-    output,
+    logs_root: str | Path,
+    semantic_root: str | Path,
+    semantic_round1: str | Path,
+    output: str | Path,
     *,
-    workers=4,
-    ufs=None,
-    chunk_objects=CHUNK_OBJECTS,
-    resume=False,
-    memory_limit="2GB",
-):
+    workers: int = 4,
+    ufs: Collection[str] | None = None,
+    chunk_objects: int = CHUNK_OBJECTS,
+    resume: bool = False,
+    memory_limit: str = "2GB",
+) -> JSON:
     """I6 with verified prefixes for every round-1 block pair of different length."""
     import duckdb
 
@@ -495,7 +505,7 @@ def run_prefix(
     started = time.monotonic()
     status_path = output / "status.json"
 
-    def report(stage, **extra) -> None:
+    def report(stage: str, **extra: Any) -> None:
         atomic(
             status_path,
             {
@@ -519,7 +529,7 @@ def run_prefix(
         db.execute("SET threads = 2")
         raw_pairs = db.execute(PAIRS_SQL, params).fetchall()
         section_rows = db.execute(SECTIONS_SQL, params).fetchall()
-    pairs = []
+    pairs: list[JSON] = []
     for row in raw_pairs:
         (w, _device, o1, p1, st1, sg1, off1, l1, fp1, first_sha, is_last,
          o2, p2, st2, sg2, off2, l2, fp2) = row  # fmt: skip
@@ -543,7 +553,9 @@ def run_prefix(
             }
         )
     # One read per object: (round, object) -> {(stream, segment): (offset, lines, prefixes)}
-    work = defaultdict(lambda: defaultdict(lambda: [None, None, set()]))
+    work: defaultdict[tuple[int, str, str], defaultdict[tuple[int, int], list[Any]]] = defaultdict(
+        lambda: defaultdict(lambda: [None, None, set()])
+    )
     for p in pairs:
         if p["runoff_lines"] > p["round1_lines"]:
             spec = work[(2, p["runoff_object_sha256"], p["runoff_path"])][p["r2_key"]]
@@ -605,7 +617,9 @@ def run_prefix(
     differing = [p for p in pairs if p["status"] == "differs"]
     cache = {}
 
-    def records(round_number, digest, path, key, offset, lines) -> None:
+    def records(
+        round_number: int, digest: str, path: str, key: tuple[int, int], offset: int, lines: int
+    ) -> None:
         wanted = (round_number, digest)
         targets = cache.setdefault(wanted, {"path": path, "targets": {}})["targets"]
         targets[key] = (offset, lines, (), True)
@@ -664,7 +678,7 @@ def run_prefix(
         logs_release / "sections.parquet", columns=["uf", "municipality", "zone", "section", "i6"]
     ).to_pylist()
     facts = {row[0]: row[1:] for row in section_rows}
-    sections = []
+    sections: list[JSON] = []
     for r in logs_rows:
         if ufs and r["uf"] not in ufs:
             continue
