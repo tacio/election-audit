@@ -1,0 +1,64 @@
+{
+  "reviewer": "codex",
+  "packet": "P8",
+  "round": "R1",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Found three reproducibility barriers. Fresh-environment setup, doctor, demo, bundling and reproduction completed; the clean-source gate failed. Socket-related failures were attributed to sandbox restrictions. Commands, adjustments and outcomes are recorded in review-scratch/p8-workflow.md. No tracked files changed.",
+  "findings": [
+    {
+      "local_id": "codex-P8-01",
+      "severity": "medium",
+      "category": "reproducibility",
+      "title": "The documented bundle installation path invalidates the bundle",
+      "location": [
+        "docs/en/reproduction.md:24",
+        "election_audit/reproduction.py:260",
+        "election_audit/reproduction.py:279",
+        "election_audit/reproduction.py:390"
+      ],
+      "claim": "Installing the bundled project from its lock in BUNDLE/source creates source/.venv inside the verified inventory. Subsequent verification and reproduction reject that environment; the documentation does not specify the necessary external environment directory.",
+      "evidence": "The guide offers: \"install the bundled project from its lock with a populated offline cache.\" file_pins walks every bundle entry and raises on `path.is_symlink()`; verify_bundle also requires `actual == manifest[\"files\"]`. On a copy of the verified demo bundle, running `PYTHONDONTWRITEBYTECODE=1 UV_OFFLINE=1 UV_CACHE_DIR=/tmp/election-audit-uv-cache uv sync --locked` from source/ succeeded and created .venv. Subsequent verify_bundle raised `PublicationError: Review bundle must not contain symlinks` (review-scratch/installed-bundle-verify.log). reproduce calls verify_bundle before rebuilding.",
+      "failure_scenario": "A recipient follows the documented installation alternative using uv's default environment location. Interpreter symlinks cause immediate rejection; even an environment without symlinks introduces unlisted files and fails inventory comparison.",
+      "falsification": "Copy a valid review bundle, run offline `uv sync --locked` from its source directory without UV_PROJECT_ENVIRONMENT, then verify or reproduce it. Repeat on another untouched copy with UV_PROJECT_ENVIRONMENT pointing outside the bundle. The first should fail and the second should preserve verification.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P8-02",
+      "severity": "medium",
+      "category": "reproducibility",
+      "title": "Gate fixtures require temporary storage to share the root filesystem",
+      "location": [
+        "tests/test_national_migration.py:25",
+        "tests/test_national_migration.py:66",
+        "tests/test_national_migration.py:312",
+        "election_audit/national_relocation.py:43"
+      ],
+      "claim": "Migration fixtures hardcode '/' as their destination mount while creating their data in TemporaryDirectory. The gate therefore fails on ordinary layouts where /tmp or TMPDIR resides on another filesystem.",
+      "evidence": "The fixture uses `self.temp = tempfile.TemporaryDirectory()` and records `\"mount\": \"/\"`; its continuation configuration also records `\"anchor\": \"/\"`. The loader rejects `root.stat().st_dev != anchor.stat().st_dev`. With TMPDIR under review-scratch, the isolated command `review-scratch/venv/bin/python -B -m unittest tests.test_national_migration.MigrationTests.test_no_old_fallback_unknown_root_or_ledger_pin -v` failed: `AssertionError: \"not in the pinned\" does not match \"Verified relocated source mount/root changed\"`. See review-scratch/mount-test.log. This failure is independent of the gate's sandbox socket failures.",
+      "failure_scenario": "A Linux newcomer uses a tmpfs-mounted /tmp, a separate temporary volume, or a checkout-mounted TMPDIR. The synthetic fixture's declared mount is wrong, so migration assertions fail before reaching the behavior they intend to test.",
+      "falsification": "Run the isolated test with TMPDIR on a filesystem distinct from '/'. Then make the fixture declare the actual temporary filesystem's mount, or mock mount identity consistently. The unrelated mount error should disappear.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P8-03",
+      "severity": "medium",
+      "category": "reproducibility",
+      "title": "Doctor reports readiness despite an unsupported native Windows runtime",
+      "location": [
+        "README.md:33",
+        "election_audit/cli.py:17",
+        "election_audit/cli.py:59",
+        "election_audit/archive_parsing.py:10"
+      ],
+      "claim": "The basic reproduction pipeline requires Unix's fcntl module, but the newcomer instructions omit that platform requirement and doctor does not check it. A native Windows installation can pass doctor and immediately fail when invoking demo or reproduction.",
+      "evidence": "doctor checks installed packages and `(\"uv\", \"just\")`, then returns success when those are present. CLI demo imports reproduction, which imports archive_parsing, whose unconditional import is `import fcntl`. In a fresh-interpreter Linux simulation with `sys.modules[\"fcntl\"] = None`, CLI doctor returned `doctor_exit= 0`, followed by CLI demo raising `ModuleNotFoundError: import of fcntl halted; None in sys.modules` (review-scratch/platform-probe.log). This simulated module absence; it was not a Windows execution.",
+      "failure_scenario": "A recipient installs Python 3.14, the locked dependencies and the named command-line tools on native Windows. Doctor reports success, but pipeline command dispatch crashes before processing inputs because fcntl is unavailable. The README and reproduction guide provide no instruction to use Linux or WSL.",
+      "falsification": "On native Windows, install the locked base/dev dependencies and make uv and just available, then invoke doctor and demo directly through the installed CLI. A supported-platform declaration with an early readiness refusal, or a working portable locking implementation, would resolve the finding.",
+      "confidence": "high",
+      "speculative": false
+    }
+  ],
+  "responses": []
+}

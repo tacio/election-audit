@@ -1,0 +1,153 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [
+    {
+      "category": "bug",
+      "claim": "ed521.verify implements cofactorless verification without validating that public key A or signature point R belong to the prime-order subgroup of order L. On low-order public keys (e.g. the identity point or order-4 points), the verification equation holds trivially for forged signatures on arbitrary messages without private key knowledge.",
+      "confidence": "high",
+      "evidence": "election_audit/ed521.py:167-173:\n```python\n    a, r = decode(public_key), decode(signature[:SIZE])\n    s = int.from_bytes(signature[SIZE:], \"little\")\n    if a is None or r is None or s >= L:\n        return False\n    k = _h(signature[:SIZE] + public_key + message) % L\n    return _equal(_base_multiply(s), _add(r, _fast_multiply(k, a)))\n```\nProbe output: with public_key = ed521.encode((0, 1, 1, 0)) and signature = ed521.encode((0, 1, 1, 0)) + bytes(66), ed521.verify and ed521rs return True on 100% of tested messages. With public_key = bytes(66), signature = bytes(132) verifies whenever k % 4 == 3 (25% rate).",
+      "failure_scenario": "An adversary presents a public key of small order (such as the neutral curve element (0, 1) or an order-4 point). The adversary can forge valid signatures over arbitrary messages with s=0, and ed521.verify as well as ed521rs accept them as cryptographically valid.",
+      "falsification": "Verify whether ed521.verify rejects points of order dividing 4 or requires points to belong to the prime-order subgroup of order L. Rejecting small-order points will cause the forged signatures to return False.",
+      "local_id": "gemini-P3-01",
+      "location": [
+        "election_audit/ed521.py:140-155",
+        "election_audit/ed521.py:163-173"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Cofactorless Ed521 verification accepts small-order points, permitting universal signature forgery on low-order keys"
+    },
+    {
+      "category": "vacuous-check",
+      "claim": "check_section computes urn PKI validation columns (issuer signature validity, revocation, certificate expiration) but never checks them or emits issues when they fail. Forged section packages signed with untrusted, self-signed, expired, or revoked certificates produce zero discrepancies in discrepancies.jsonl and manifest.json.",
+      "confidence": "high",
+      "evidence": "election_audit/integrity_checks.py:678-685:\n```python\n        if not all(signed):\n            issues.append(\n                {\n                    \"check\": \"I1\",\n                    \"kind\": \"bu_chain_signature\",\n                    **base,\n                    \"failed\": len(signed) - sum(signed),\n                }\n            )\n```\nelection_audit/printed_bu.py:605:\n```python\n    authentic = chain_status == \"ok\" and signature == \"verified\" and not detail[\"errors\"]\n```\nProbe output: Injecting pki_issuer_signature='failed' and pki_revoked=True or corrupted file hashes into check_section yields issues: [] and 0 discrepancies recorded.",
+      "failure_scenario": "An attacker fabricates a section package signed with a self-signed urn certificate or uses a revoked or expired urn certificate. check_section verifies the file signatures and BU chain against the key in the certificate, finds pki_issuer_signature='failed' and pki_revoked=True, but appends zero issues to discrepancies.jsonl, reporting 0 discrepancies. Similarly, printed_bu marks the status as 'equal'.",
+      "falsification": "Execute check_section on an item where the certificate is revoked or signed by an unknown issuer. If discrepancies.jsonl remains empty and issues is [], the finding is confirmed.",
+      "local_id": "gemini-P3-02",
+      "location": [
+        "election_audit/integrity_checks.py:414-442",
+        "election_audit/integrity_checks.py:572-578",
+        "election_audit/integrity_checks.py:666-685",
+        "election_audit/printed_bu.py:605-635"
+      ],
+      "severity": "critical",
+      "speculative": false,
+      "title": "Section pass and printed BU checks ignore urn certificate PKI results, accepting revoked, expired, or self-signed certificates"
+    },
+    {
+      "category": "unstated-assumption",
+      "claim": "check_key validates the JWS certificate chain entirely against certificates provided in the input key file and accepts any self-signed root certificate. The JWS verification does not verify the root certificate against any pinned repository trust anchor or public PKI.",
+      "confidence": "high",
+      "evidence": "election_audit/signed_results.py:200-205:\n```python\n    checks = {\n        \"certificate_key_is_jwk\": raw == _b64(jwk[\"x\"]),\n        \"kid_is_subject_key_identifier\": base64.urlsafe_b64encode(ski).rstrip(b\"=\").decode()\n        == jwk[\"kid\"],\n        \"end_entity_signed_by_intermediate\": _signed(leaf, middle),\n        \"intermediate_signed_by_root\": _signed(middle, root),\n        \"root_self_signed\": _signed(root, root),\n        \"valid_on_election_day\": all(\n            c.not_valid_before_utc <= day <= c.not_valid_after_utc for c in (leaf, middle, root)\n        ),\n    }\n```\nNo pin for key.json or root certificate exists in election_audit/resources/pins/.",
+      "failure_scenario": "An adversary fabricates unified result JSON files, creates a self-signed root CA certificate and subordinate leaf key, signs the falsified results into .jws files, and passes the generated key file via --key. check_key asserts root_self_signed, finds all checks passing, and accepts the forged signatures as valid.",
+      "falsification": "Generate a synthetic self-signed CA root, intermediate, and leaf key, bundle them in a key.json, and call check_key. If check_key returns success without error, the check is circular and lacks an external trust anchor.",
+      "local_id": "gemini-P3-03",
+      "location": [
+        "election_audit/signed_results.py:183-216"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Circular trust in JWS key verification allows arbitrary self-signed root certificates"
+    },
+    {
+      "category": "vacuous-check",
+      "claim": "signed_results.run_verify treats CRL revocation checking as optional, and when --crls is omitted, records revocation as 'not consulted' while allowing the verification to succeed with zero recorded failures.",
+      "confidence": "high",
+      "evidence": "election_audit/signed_results.py:374-378:\n```python\n    key, key_summary = check_key(key_file, election.election_date)\n    key_summary[\"revocation\"] = (\n        check_crls(key_file, Path(crls).expanduser().absolute(), election.election_date)\n        if crls is not None\n        else \"not consulted\"\n    )\n```\ntests/test_signed_results.py:197-198:\n```python\nplain = self.sr.run_verify(root, self.key_file, self.base / \"plain\")\nself.assertEqual(plain[\"key\"][\"revocation\"], \"not consulted\")\n```\nThe summary reports failed: {} with 0 failures.",
+      "failure_scenario": "An intermediate or end-entity certificate used by TSE to sign results is revoked due to key compromise. Running integrity-check jws without the --crls flag succeeds completely, reporting all JWS tokens verified and zero failures.",
+      "falsification": "Call run_verify without --crls using a key whose certificate is revoked in acdivulgacao.crl. If the run succeeds and reports failed: {}, the revocation check was bypassed.",
+      "local_id": "gemini-P3-04",
+      "location": [
+        "election_audit/signed_results.py:374-378"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Optional CRL verification in signed_results permits revocation bypass with 'not consulted' reported as success"
+    },
+    {
+      "category": "vacuous-check",
+      "claim": "JWS check J4 passes vacuously when the signed payload differs from the audited EA20 snapshot whenever the generation metadata (dg, hg, idg) also differs. This hides discrepancies between the published signed results and the snapshot analyzed by I4.",
+      "confidence": "high",
+      "evidence": "election_audit/signed_results.py:340-342:\n```python\n    if not row[\"payload_equals_ea20\"] and row[\"payload_generation\"] == row[\"ea20_generation\"]:\n        failed.append(\"J4\")  # same publication, different bytes\n    row[\"failed_json\"] = json.dumps(failed, separators=(\",\", \":\"))\n```\ntests/test_signed_results.py:134-137:\n```python\n    newer = BODY.replace(b'\"idg\" : \"1\"', b'\"idg\" : \"2\"')\n    republished = self.sr.check_file(self.jws(newer), self.public(), self.kid, newer, BODY)\n    self.assertEqual(json.loads(republished[\"failed_json\"]), [])  # reported, not failed\n```",
+      "failure_scenario": "TSE or an external party modifies the published election results after the EA20 snapshot audited by I4, altering candidate vote totals and incrementing idg. integrity-check jws outputs failed_json: [] for J4, concealing the fact that the signed published results disagree with the audited totals.",
+      "falsification": "Provide a JWS payload with modified candidate votes and an incremented idg against the EA20 snapshot. Observe that check_file does not append 'J4' to failed_json and reports zero failures.",
+      "local_id": "gemini-P3-05",
+      "location": [
+        "election_audit/signed_results.py:340-342"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "JWS rule J4 passes vacuously when payload differs from EA20 snapshot if generation stamps differ"
+    },
+    {
+      "category": "threat-to-validity",
+      "claim": "The BU internal hardware signature covers only ultimoHashVotosVotavel, leaving attendance, electorate, polling place, urn serial, and timestamps outside the signed hash chain. Operations in I5 and I7 evaluate data that is not authenticated by this hardware signature.",
+      "confidence": "high",
+      "evidence": "election_audit/integrity_checks.py:458-467:\n```python\n    header = \"|\".join(\n        [\n            str(pleito).zfill(5),\n            str(election[\"idEleicao\"]).zfill(5),\n            str(section[\"municipioZona\"][\"municipio\"]).zfill(5),\n            str(section[\"municipioZona\"][\"zona\"]).zfill(4),\n            str(section[\"secao\"]).zfill(4),\n            str(load).zfill(24),\n        ]\n    )\n```\nelection_audit/resources/bu-2026-official.asn1:329-340: the hash chain connects only cargo and votosVotaveis blocks to ultimoHashVotosVotavel. Attendance (qtdEleitoresCompareceram), electorate (qtdEleitoresAptos), and polling place (local) are outside the hash chain.",
+      "failure_scenario": "An analysis or third-party auditor relying on the BU hardware signature to corroborate attendance (I5) or voting hours (I7) cannot detect modifications to attendance counts, polling place numbers, or session timestamps, because they are not covered by assinaturaUltimoHashVotosVotavel.",
+      "falsification": "Modify qtdEleitoresCompareceram or identificacaoSecao.local in a binary BU. Recompute chain() and verify assinaturaUltimoHashVotosVotavel: both checks pass without detecting the alteration.",
+      "local_id": "gemini-P3-06",
+      "location": [
+        "election_audit/integrity_checks.py:454-475",
+        "election_audit/integrity_checks.py:598-609",
+        "election_audit/integrity_checks.py:754-764"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "BU vote-chain hardware signature does not cover attendance, electorate, or urn metadata read by downstream checks"
+    },
+    {
+      "category": "bug",
+      "claim": "check_section discards the urn metadata of EntidadeResultadoRDV, failing to verify that the RDV was generated by the same urn or load code as the BU. Mismatched or substituted RDV files from other urns are accepted and recounted under I3 without detecting equipment divergence.",
+      "confidence": "high",
+      "evidence": "election_audit/integrity_checks.py:636-643:\n```python\n    rdv = rdv_codec().decode(\"EntidadeResultadoRDV\", blobs[\"rdv\"])[\"rdv\"]\n    identity = _key_of(rdv[\"identificacao\"]) == (municipality, zone, section)\n    row.update(\n        rdv_status=\"decoded\",\n        rdv_error=None,\n        rdv_identity=\"match\" if identity else \"mismatch\",\n    )\n    if not identity or rdv[\"pleito\"] != pleito or rdv[\"fase\"] != \"oficial\":\n        issues.append(...)\n```\nEntidadeResultadoRDV in rdv-2026-official.asn1:134-138 contains urna (Urna), which holds correspondenciaResultado.carga with numeroInternoUrna and codigoCarga; this structure is dropped on line 636.",
+      "failure_scenario": "In a contingency situation or media swap, a section package contains an RDV produced on a replacement urn whose serial or load code differs from the BU. check_section discards EntidadeResultadoRDV.urna and reports rdv_identity='match' and i3='equal', hiding the equipment discrepancy.",
+      "falsification": "Modify EntidadeResultadoRDV.urna to point to a different urn serial while keeping section number and vote entries intact. check_section accepts the RDV and emits zero identity issues.",
+      "local_id": "gemini-P3-07",
+      "location": [
+        "election_audit/integrity_checks.py:634-644"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "RDV recount drops envelope metadata, failing to verify that the RDV originated from the same urn as the BU"
+    },
+    {
+      "category": "doc-mismatch",
+      "claim": "docs/en/integrity-checks.md claims that integrity-check ed521-crosscheck runs the 53 vectors of ed521rs through both verifiers, but run_vectors only tests the external reference against pre-recorded static fields and never invokes the internal verifiers (ed521.py or ed521rs).",
+      "confidence": "high",
+      "evidence": "election_audit/ed521_crosscheck.py:64-70:\n```python\n    for name in VECTOR_FILES:\n        for v in json.loads((vectors / name).read_bytes())[\"vectors\"]:\n            key, message, signature = (bytes.fromhex(v[k]) for k in (\"key\", \"message\", \"signature\"))\n            theirs = bool(reference(key, message, signature))\n            expected = {m: v[m] for m in (\"strict\", \"ecpy\", \"valid\") if m in v}\n            if \"valid\" in expected:  # real or published signatures: one verdict for every mode\n                expected = {\"strict\": expected[\"valid\"], \"ecpy\": expected[\"valid\"]}\n            matches = sorted(m for m, verdict in expected.items() if verdict == theirs)\n```\ndocs/en/integrity-checks.md:536-537: 'It also runs the 53 vectors of ed521rs (33 edge cases, 2 from ECPy, 18 from 2026 urns) through both verifiers.'",
+      "failure_scenario": "If a regression occurs in ed521.py or ed521rs affecting vector edge cases, integrity-check ed521-crosscheck still reports 100% vector matches because neither internal implementation is ever executed on the vector suite.",
+      "falsification": "Introduce a deliberate failure into ed521.verify. Execute run_vectors; observe that the vector matches count and results remain unchanged.",
+      "local_id": "gemini-P3-08",
+      "location": [
+        "election_audit/ed521_crosscheck.py:60-82"
+      ],
+      "severity": "low",
+      "speculative": false,
+      "title": "ed521_crosscheck.run_vectors does not execute internal verifiers against test vectors"
+    },
+    {
+      "category": "vacuous-check",
+      "claim": "hash_lists.py parses SHA-512 digests from TSE HTML tables but discards them without checking, comparing only program path strings. In addition, the hash list archives are unauthenticated and not pinned against expected digests.",
+      "confidence": "high",
+      "evidence": "election_audit/hash_lists.py:70-74:\n```python\n        elif len(cells) == 2 and block is not None:\n            name, digest = cells\n            if \" - /\" in name:  # UF blocks prefix the path with the UF\n                name = name.split(\" - \", 1)[1]\n            blocks[block][name] = digest\n```\nelection_audit/hash_lists.py:103:\n```python\nnames = {model: {p for block in b.values() for p in block} for model, b in lists.items()}\n```\ndigest is never used after read_list. listing() only tests path in names.",
+      "failure_scenario": "An unauthenticated or tampered path1u*.zip containing arbitrary paths causes unrecognized log binaries to be classified as 'exact'. Furthermore, modified binaries that reuse standard paths cannot be detected because actual file hashes are never compared.",
+      "falsification": "Alter the SHA-512 strings in path1u*.zip to invalid values. run_hash_lists parses the archives and outputs identical classification and failure summaries.",
+      "local_id": "gemini-P3-09",
+      "location": [
+        "election_audit/hash_lists.py:70-77",
+        "election_audit/hash_lists.py:101-103",
+        "election_audit/hash_lists.py:144"
+      ],
+      "severity": "low",
+      "speculative": false,
+      "title": "hash_lists.py parses file SHA-512 hashes but discards them without verification"
+    }
+  ],
+  "packet": "P3",
+  "responses": [],
+  "reviewer": "gemini",
+  "round": "R1",
+  "summary": "Independent adversarial review of Packet P3 (cryptography, PKI, and signed artifacts) identified 9 findings across ed521.py, urn_pki.py, integrity_checks.py, signed_results.py, ed521_crosscheck.py, and hash_lists.py. Highlights include: (1) cofactorless Ed521 point verification accepting small-order keys, enabling universal signature forgery on low-order keys; (2) vacuous PKI checks in the section pass and printed BU where revoked, expired, or self-signed certificates and file signature failures emit zero discrepancies; (3) circular trust in JWS key verification accepting arbitrary self-signed root CAs; (4) vacuous JWS revocation checking when --crls is omitted, recording 'not consulted' as success; (5) vacuous JWS rule J4 passing when payload differs from the EA20 snapshot if generation stamps differ; (6) BU hardware signature covering only vote totals while leaving attendance, electorate, and urn metadata unauthenticated; (7) RDV recount discarding urn metadata; (8) ed521_crosscheck failing to execute internal verifiers against test vectors despite documentation claims; and (9) hash_lists.py discarding parsed SHA-512 digests and accepting unauthenticated lists."
+}

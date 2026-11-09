@@ -76,6 +76,12 @@ class CrossReviewTests(unittest.TestCase):
                 gemini_tool({"CommandLine": f"ls {cross_review.ROOT}/data"}),
                 gemini_tool({"CommandLine": f"ls {cross_review.ROOT}-review/clone"}),
                 gemini_tool({"AbsolutePath": "docs/en/semantic-pass.md"}),
+                {
+                    "step_update": {
+                        "state": "ACTIVE",
+                        "tool_info": {"name": "finish", "parameters": {"x": "https://doi.org/1"}},
+                    }
+                },
             ],
         )
         flagged = cross_review.audit(transcript)
@@ -93,6 +99,12 @@ class CrossReviewTests(unittest.TestCase):
         self.assertEqual(cross_review.gemini_result(text), report)
         broken = write_events(self.folder, [{"result": {"response": "not json"}}])
         self.assertIsNone(cross_review.gemini_result(broken))
+
+    def test_each_lane_runs_only_its_own_providers_models(self) -> None:
+        self.assertTrue(cross_review.LANES["gemini"].match(cross_review.MODELS["gemini"]))
+        self.assertTrue(cross_review.LANES["codex"].match(cross_review.MODELS["codex"]))
+        self.assertIsNone(cross_review.LANES["gemini"].match("claude-opus-4-6-thinking"))
+        self.assertIsNone(cross_review.LANES["codex"].match("claude-sonnet-4-6"))
 
     def test_campaign_ids_are_plain(self) -> None:
         with self.assertRaises(SystemExit):

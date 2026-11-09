@@ -31,6 +31,10 @@ TRANSCRIPTS = Path(
     os.environ.get("REVIEW_TRANSCRIPTS", Path.home() / "data/election-audit-stage/review")
 )
 REVIEWERS = ("codex", "gemini")
+MODELS = {"codex": "gpt-6.1-sol", "gemini": "gemini-3.8-flash-high"}
+"""Pinned per run, so that a change of a CLI's default never changes the reviewer silently."""
+LANES = {"codex": re.compile(r"(?!.*claude)"), "gemini": re.compile(r"gemini-")}
+"""Each lane must run its own provider's model; a Claude model would review its own work."""
 ROUNDS = ("R1", "R3", "R5")
 UV_CACHE = os.environ.get("UV_CACHE_DIR", "/tmp/election-audit-uv-cache")
 FORBIDDEN = re.compile(
@@ -143,7 +147,11 @@ def command_texts(transcript: Path) -> list[str]:
             texts.append(str(item.get("command", "")))
         step = event.get("step_update") or {}
         info = step.get("tool_info") if isinstance(step, dict) else None
-        if isinstance(info, dict) and step.get("state") == "ACTIVE":
+        if (
+            isinstance(info, dict)
+            and step.get("state") == "ACTIVE"
+            and info.get("name") != "finish"
+        ):
             texts.append(json.dumps(info.get("parameters", {}), ensure_ascii=False))
     return texts
 
@@ -191,18 +199,20 @@ def session(args: argparse.Namespace, reviewer: str, packet: str, sha: str, lock
     transcript = TRANSCRIPTS / args.campaign / f"{args.round}-{packet}-{reviewer}-{stamp}.jsonl"
     transcript.parent.mkdir(parents=True, exist_ok=True)
     model = getattr(args, f"{reviewer}_model")
+    if not LANES[reviewer].match(model):
+        raise SystemExit(f"the {reviewer} lane cannot run model {model}")
     if reviewer == "codex":
         last = transcript.with_suffix(".last.json")
         command = ["codex", "exec", "-s", "workspace-write", "--ephemeral", "-C", str(clone)]
         command += ["--json", "--output-schema", str(SCHEMA), "-o", str(last)]
         command += ["-c", f'model_reasoning_effort="{args.effort}"']
-        command += ["-m", model] if model else []
+        command += ["-m", model]
         command += ["-"]
         stdin = prompt
     else:
         command = ["agy", "--sandbox", "--output-format", "stream-json"]
         command += ["--json-schema", str(SCHEMA), "--effort", args.effort]
-        command += ["--model", model] if model else []
+        command += ["--model", model]
         command += ["-p", prompt]
         stdin = ""
     started, clock = now(), time.monotonic()
@@ -246,7 +256,7 @@ def session(args: argparse.Namespace, reviewer: str, packet: str, sha: str, lock
         "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
         "started": started,
         "minutes": round((time.monotonic() - clock) / 60, 1),
-        "status": status,
+        "status": status if result is not None or status != 0 else "no-report",
         "report": report.name if result is not None else None,
         "transcript": transcript.name,
         "findings": len(result.get("findings", [])) if result else None,
@@ -308,8 +318,8 @@ def main(argv: Argv = None) -> None:
         sub.add_argument("--fixes", help="R5 only: commit range A..B holding the fixes")
     run_parser = commands.choices["run"]
     run_parser.add_argument("--effort", default="high", choices=("medium", "high", "xhigh"))
-    run_parser.add_argument("--codex-model")
-    run_parser.add_argument("--gemini-model")
+    run_parser.add_argument("--codex-model", default=MODELS["codex"])
+    run_parser.add_argument("--gemini-model", default=MODELS["gemini"])
     run_parser.add_argument("--timeout-minutes", type=int, default=90)
     args = parser.parse_args(argv)
     if args.command == "prepare":

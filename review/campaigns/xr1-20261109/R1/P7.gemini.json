@@ -1,0 +1,140 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [
+    {
+      "category": "bug",
+      "claim": "`measures` requires `set(candidate) == {candidate_a, candidate_b}` to calculate candidate shares. In sections where either candidate receives zero votes, `candidate_a_share` is marked unavailable and `candidate_b_share` is omitted, causing all unanimous sections to be dropped from model training and evaluation.",
+      "confidence": "high",
+      "evidence": "```python\n# election_audit/features.py:424-434\n    if (\n        unit[\"round\"] == 2\n        and candidate_a\n        and candidate_b\n        and candidate_a != candidate_b\n        and set(candidate) == {candidate_a, candidate_b}\n    ):\n        a, b = candidate.get(candidate_a), candidate.get(candidate_b)\n        denom = a + b if type(a) is int and type(b) is int else None\n        for code, label in [(candidate_a, \"candidate_a_share\"), (candidate_b, \"candidate_b_share\")]:\n```\nWhen candidate 22 receives 0 votes:\n`res = measures(unit, {\"choices\": {\"13\": {\"count\": 80}}, ...}, [], candidate_a=\"13\", candidate_b=\"22\")`\n`candidate_a_share: (None, None, None, 'fixed_candidate_pair_required')`\n`candidate_b_share: None`",
+      "failure_scenario": "In an indigenous or rural section where 100% of votes went to candidate 13 and 0 votes to candidate 22 (or an extreme stuffing anomaly), TSE BWEB omits candidate 22 from choices. `features.py` marks `candidate_a_share` unavailable with 'fixed_candidate_pair_required' and drops candidate_b_share. Downstream, `research_models.py` filters `WHERE readiness_state='ready'`, silently excluding the most extreme sections from the statistical models.",
+      "falsification": "Call `measures(unit, counts, [], candidate_a=\"13\", candidate_b=\"22\")` with counts containing only candidate 13 votes and verifying that `candidate_a_share` evaluates to 1.0 with readiness_state 'ready'.",
+      "local_id": "gemini-P7-01",
+      "location": [
+        "election_audit/features.py:424-449"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Unanimous and zero-vote sections are marked unavailable and excluded from candidate share targets"
+    },
+    {
+      "category": "bias",
+      "claim": "`perturb_mechanism` implements strictly one-directional fraud perturbations that only add votes to candidate A and subtract from B. Furthermore, `validate_mechanisms` hardcodes candidate numbers to \"13\" and \"22\", violating political neutrality and crashing on different candidate pairs.",
+      "confidence": "high",
+      "evidence": "```python\n# election_audit/research_models.py:596-606\n            q = max(1, int(0.05 * (row[\"a\"] + row[\"b\"] + row[\"other\"])))\n            if mechanism == \"additions\":\n                q = min(q, row[\"electorate\"] - row[\"a\"] - row[\"b\"] - row[\"other\"])\n                row[\"a\"] += q\n            elif mechanism == \"switching\":\n                q = min(q, row[\"b\"])\n                row[\"b\"] -= q\n                row[\"a\"] += q\n            else:\n                q = min(q, row[\"b\"])\n                row[\"b\"] -= q\n```\nand\n```python\n# election_audit/research_models.py:884-886\n                a, b = value(\"13\"), value(\"22\")\n                if type(a) is not int or type(b) is not int:\n                    raise ValueError(\"Explicit 13/22 runoff counts required\")\n```",
+      "failure_scenario": "An analyst running mechanism validation cannot simulate manipulation favoring Candidate B or victimization of Candidate A, because `perturb_mechanism` has no parameter to favor B. Additionally, if 2026 runoff candidates are anything other than 13 and 22, `validate_mechanisms` crashes with `ValueError: Explicit 13/22 runoff counts required`.",
+      "falsification": "Run `perturb_mechanism([row], \"switching\", seed=42, fraction=1.0, concentration=\"dispersed\")` and observe whether candidate `b` ever gains votes or candidate `a` loses votes.",
+      "local_id": "gemini-P7-02",
+      "location": [
+        "election_audit/research_models.py:596-606",
+        "election_audit/research_models.py:884-886"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Asymmetric perturbation and hardcoded candidate numbers violate political neutrality in mechanism validation"
+    },
+    {
+      "category": "threat-to-validity",
+      "claim": "The scoring function `_score` assigns 0.0 to all observations inside the 95% prediction interval, tying 95% of units at tail rank 1.0. Furthermore, when the predicted interquartile range collapses to zero, dividing by `1e-06` explodes minor residual differences into massive outlier scores.",
+      "confidence": "high",
+      "evidence": "```python\n# election_audit/research_models.py:163-165\n    scale = np.maximum(p[:, 3] - p[:, 1], 1e-06)\n    return np.maximum(np.maximum(p[:, 0] - values, values - p[:, 4]), 0) / scale\n```\nand\n```python\n# election_audit/research_models.py:401-402\n            cal = np.asarray(model[\"calibration_scores\"])\n            rank = float((1 + np.sum(cal >= score)) / (len(cal) + 1))\n```",
+      "failure_scenario": "In a normal calibration population, ~95% of sections have observations within `[p_0.025, p_0.975]`, receiving `score = 0.0` and `rank = 1.0`, destroying tail rank discrimination. In low-turnout or homogeneous sections where `p_0.75 == p_0.25`, a 0.01 deviation outside the interval produces a score of `0.01 / 1e-6 = 10,000.0`, dominating all other sections in triage purely due to precision artifacts.",
+      "falsification": "Evaluate `_score` with `values = 0.5` and `p = [[0.4, 0.5, 0.5, 0.5, 0.6]]`, producing 0.0, versus `values = 0.61`, producing 10000.0.",
+      "local_id": "gemini-P7-03",
+      "location": [
+        "election_audit/research_models.py:163-165",
+        "election_audit/research_models.py:401-402"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Degenerate scoring function ties 95% of units at zero and blows up on quantile collapse"
+    },
+    {
+      "category": "bug",
+      "claim": "In `fit_models`, cross-validation splits folds by municipality using `GroupKFold`, but `DictVectorizer` is fitted inside each fold. Because municipalities in validation folds are held out, their municipality indicator features are out-of-vocabulary and silently dropped.",
+      "confidence": "high",
+      "evidence": "```python\n# election_audit/research_models.py:214-226\n            for ti, vi in GroupKFold(n_splits=3).split(contexts, y, groups):\n                vec = DictVectorizer(sparse=True)\n                x = vec.fit_transform([contexts[i] for i in ti])\n                model = RandomForestQuantileRegressor(...)\n                model.fit(x, y[ti])\n                prediction = _predict(model, vec.transform([contexts[i] for i in vi]))\n                losses.append(_loss(y[vi], prediction))\n```",
+      "failure_scenario": "Hyperparameters are selected under an evaluation regime where municipality indicators are completely absent (all zeros in validation folds). When the selected tree depth and leaf size are applied to the full dataset, the model is trained with hundreds of municipality features active, creating an inconsistency between tuning and inference.",
+      "falsification": "Inspect `vec.transform([contexts[i] for i in vi])` inside the GroupKFold loop and verify that nonzeros per row drop because municipality indicator columns are discarded.",
+      "local_id": "gemini-P7-04",
+      "location": [
+        "election_audit/research_models.py:214-226"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "GroupKFold across municipalities causes DictVectorizer to silently drop municipal features during tuning"
+    },
+    {
+      "category": "unstated-assumption",
+      "claim": "The confirmatory test family C1–C6 and its Benjamini–Yekutieli multiplicity correction lack mathematical definitions, test statistics, and implementations. This leaves multiple testing parameters unconstrained and open to forking paths.",
+      "confidence": "high",
+      "evidence": "```markdown\n# research/analysis-plan.md:321-324\nMultiplicity is controlled across this family with Benjamini–Yekutieli at 5% FDR\n([Benjamini and Yekutieli 2001](https://doi.org/10.1214/aos/1013699998)). The\nfamily, statistics, nulls, seeds and thresholds are frozen in the pre-registration.\n```\nand\n```python\n# election_audit/analysis.py:70\n    \"multiplicity\": \"no_valid_null_pvalues_frozen_test_family_or_assessed_exchangeability\",\n```\nand\n```python\n# election_audit/research_protocol.py:49\n    \"multiplicity\": {\"method\": \"BY\", \"alpha\": 0.05, \"valid_pvalues_required\": True},\n```",
+      "failure_scenario": "An analyst running the confirmatory analysis can freely choose whether C5 consists of 1 joint test or 6 individual tests (3 operational measures × 2 directions), what spatial radius to use for C4, which integer percentages to count for C3, and what threshold defines an extreme tail probability in C1. Each variation alters the BY penalty factor and significance thresholds.",
+      "falsification": "Search the protocol and codebase for the mathematical formula or executable implementation of test statistics for C1–C6. None exists.",
+      "local_id": "gemini-P7-05",
+      "location": [
+        "research/analysis-plan.md:321-324",
+        "election_audit/analysis.py:70",
+        "election_audit/research_protocol.py:49"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Confirmatory test family C1–C6 and multiplicity correction lack formal definitions and implementation"
+    },
+    {
+      "category": "threat-to-validity",
+      "claim": "The primary swing model does not incorporate voter demographic covariates (age, sex, schooling), despite documentation claims. This omitted-variable bias induces severe ecological confounding in test C5.",
+      "confidence": "high",
+      "evidence": "```markdown\n# research/analysis-plan.md:279-281\nEach section's runoff outcome is predicted from its own first-round vector\n(candidate shares, blank, null, turnout), its voter profile (age bands, sex,\nschooling), its size and its location (UF, municipality, polling place).\n```\nand\n```python\n# election_audit/research_models.py:79-84\n            context = {\n                \"uf\": r[\"uf\"],\n                \"municipality\": r[\"uf\"] + \":\" + r[\"municipality_tse\"],\n                \"zone\": r[\"zone\"],\n            }\n```",
+      "failure_scenario": "Elderly and rural voters experience higher biometric verification failure rates and longer voting queues. In areas where Candidate A has stronger support among older or rural voters, Candidate A vote share residuals will naturally correlate with non-biometric authorizations and late cycles. Test C5 flags this association as evidence of stuffing/impersonation when it is driven by omitted demographic variables.",
+      "falsification": "Examine `_rows` in `election_audit/research_models.py` and confirm that age, sex, and schooling features from `section_table.py` or TSE voter profiles are never queried or passed to `context`.",
+      "local_id": "gemini-P7-06",
+      "location": [
+        "research/analysis-plan.md:279-282",
+        "research/analysis-plan.md:318",
+        "election_audit/research_models.py:79-89"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Omission of voter demographics in swing model induces ecological confounding in test C5"
+    },
+    {
+      "category": "leakage",
+      "claim": "Sections inspected during Phase 20b integrity reconciliation outside Acre were not recorded in an append-only inspection registry. Consequently, the partition generator in `research_protocol.py` will not mark them `development_inspected`, risking leakage into confirmatory and sealed holdout data.",
+      "confidence": "high",
+      "evidence": "```markdown\n# research/analysis-plan.md:74-77\n- **Integrity reconciliation (Phase 20b):** the I6 prefix re-read (line-by-line\n  content of the 113 differing round-1 block pairs, as digit-masked templates); for\n  the 121 sections that failed I5, their BU attendance, their log sessions and the\n  raw election-day lines of their logs, compared case by case with DataUrnas-BR;\n```\nand\n```python\n# election_audit/research_protocol.py:208-212\n                    elif db.execute(\n                        \"SELECT 1 FROM inspection_history WHERE stable_location_id=? LIMIT 1\",\n                        (stable,),\n                    ).fetchone():\n                        assigned = \"development_inspected\"\n```",
+      "failure_scenario": "When Phase 23 freezes the national partitions, the 121 sections whose raw election-day logs and BU attendance were scrutinized in Phase 20b, as well as the 83 GEDAI anomaly sections, are not listed in an inspection database. They are randomly assigned to the confirmatory or sealed holdout sets, violating the confirmatory data separation rule.",
+      "falsification": "Inspect the database passed to `--inspected-registry` and verify whether the stable location IDs of the 121 Phase 20b I5 sections or 83 GEDAI sections are present.",
+      "local_id": "gemini-P7-07",
+      "location": [
+        "research/analysis-plan.md:74-95",
+        "research/analysis-plan.md:370-381",
+        "election_audit/research_protocol.py:208-212"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Phase 20b inspected sections outside Acre were not registered and risk leaking into confirmatory partitions"
+    },
+    {
+      "category": "bias",
+      "claim": "`read_national_margin` requires Candidate A to lead by enforcing `nonnegative_count(margin, \"leading_margin\")`, and `conditional_scenario` only evaluates switches from A to B and counterfactual excess for A. The module cannot evaluate scenarios where Candidate B was the winner or beneficiary of irregularities.",
+      "confidence": "high",
+      "evidence": "```python\n# election_audit/investigations.py:330-331\n    margin = choices[candidate_a] - choices[candidate_b]\n    nonnegative_count(margin, \"leading_margin\")\n```\nand\n```python\n# election_audit/investigations.py:366-368\n        lo, hi = (\n            (0, maximum_switch_margin_change(a, cap))\n            if mechanism == \"switching_cap\"\n            else ...\n```\nand\n```python\n# election_audit/investigations.py:384\n            excess += 2 * (a - expected)\n```",
+      "failure_scenario": "If an auditor investigates whether Candidate B gained an improper advantage through vote manipulation, or passes Candidate B as `candidate_a` when Candidate B won the election, `read_national_margin` crashes with `ValueError: leading_margin must be a nonnegative integer`. Furthermore, `switching_cap` sets `lo = 0`, assuming no votes could have been switched from A to B.",
+      "falsification": "Call `read_national_margin` passing candidate A with fewer votes than candidate B, and observe the ValueError crash.",
+      "local_id": "gemini-P7-08",
+      "location": [
+        "election_audit/investigations.py:330-331",
+        "election_audit/investigations.py:366-368",
+        "election_audit/investigations.py:384"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "`read_national_margin` and `switching_cap` strictly assume Candidate A won and cannot evaluate fraud favoring Candidate B"
+    }
+  ],
+  "packet": "P7",
+  "responses": [],
+  "reviewer": "gemini",
+  "round": "R1",
+  "summary": "Review of Packet P7 (research design and statistics) identified 8 findings covering methodological bias, threat-to-validity, bugs, leakage, and unstated assumptions across `analysis-plan.md`, `features.py`, `research_protocol.py`, `research_models.py`, and `investigations.py`. Key issues include: (1) unanimous and zero-vote sections being marked unavailable and excluded from candidate share targets; (2) strictly asymmetric fraud injection and hardcoded candidate numbers 13 and 22 in mechanism validation; (3) degenerate scoring producing ~95% tied zero scores and catastrophic 1e-6 scale division on quantile collapse; (4) GroupKFold over municipalities silently zeroing out municipal features in DictVectorizer; (5) lack of mathematical specifications or implementations for confirmatory tests C1–C6 and BY correction; (6) omission of voter demographics inducing ecological confounding in test C5; (7) Phase 20b inspected sections outside Acre risking leakage into confirmatory partitions; and (8) outcome sensitivity assuming Candidate A won and failing to evaluate fraud favoring Candidate B."
+}

@@ -1,0 +1,81 @@
+{
+  "reviewer": "codex",
+  "packet": "P7",
+  "round": "R1",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Four findings: final-evaluation protection resets across model directories; an empty evaluation receives a completion certificate; minimum detectable manipulation is incorrectly treated as a bound on undetectable manipulation; and investigation records assert blinding while retaining candidate-direction information. Synthetic probes reproduce the implementation failures.",
+  "findings": [
+    {
+      "local_id": "codex-P7-01",
+      "severity": "critical",
+      "category": "leakage",
+      "title": "A new model directory resets the one-use protected evaluation",
+      "location": [
+        "election_audit/research_models.py:297",
+        "election_audit/research_models.py:357",
+        "election_audit/research_evaluation.py:189",
+        "research/analysis-plan.md:434"
+      ],
+      "claim": "The advertised one-use restriction operates per model-local journal, not per protocol or protected population. Ordinary repeated fitting into new output directories permits repeated final evaluations without treating previously inspected test locations as development data.",
+      "evidence": "research_models.py:297: `journal = open_journal(staging / \"journal.sqlite\", protocol)` creates a fresh journal for each fit.\nresearch_models.py:357: `journal = open_journal(Path(model_path) / \"journal.sqlite\", protocol)` selects only that model's journal during evaluation.\nresearch_evaluation.py:189–190: `if db.execute(\"SELECT 1 FROM ledger WHERE record_kind='final_evaluation' LIMIT 1\").fetchone(): raise ValueError(\"Final evaluation has already been used\")` checks only the supplied connection.\nRan `.venv/bin/python review-scratch/p7_probe.py` using synthetic fixtures and two normal fit/evaluate sequences for the same protocol. Output:\n`REPEATED_FINAL model-a predictions= 47 certificate= True`\n`REPEATED_FINAL model-b predictions= 47 certificate= True`",
+      "failure_scenario": "An analyst fits and finally evaluates one model, inspects its protected predictions, then fits another variant into a new directory. The second directory has no access history, so its final evaluation succeeds against the same protected population and receives another valid certificate. Model selection can consequently use protected outcomes while both runs appear compliant.",
+      "falsification": "Run the retained synthetic probe. Add a regression that finally evaluates one model directory and then attempts final evaluation from another directory under the same protocol; the second attempt must consult shared population-level access history and be rejected or explicitly marked exploratory.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P7-02",
+      "severity": "high",
+      "category": "vacuous-check",
+      "title": "Final evaluation certifies completion with zero predictions",
+      "location": [
+        "election_audit/research_models.py:416",
+        "election_audit/research_models.py:431",
+        "election_audit/research_evaluation.py:286"
+      ],
+      "claim": "The exact-population proof records every test key as evaluated regardless of whether it produced a prediction. When all protected targets are unavailable, the evaluator still declares completion and the certificate validator returns true.",
+      "evidence": "research_models.py:418–420: `\"state\": \"complete\", \"eligible_predictions\": n, \"quantile_loss\": sumloss / n if n else None` permits n=0.\nresearch_models.py:432–440 passes `SELECT unit_key FROM unit_partition WHERE partition_name='test'` to `record_evaluation_units`, independently of the prediction loop.\nresearch_evaluation.py:286–295 checks stage, completion state, model/protocol references and `_same_population`; it does not require any assessed outcomes.\nRan `.venv/bin/python review-scratch/p7_probe.py`, making only the synthetic test targets unavailable before freezing the protocol. Output:\n`EMPTY_FINAL protected_units= 47 predictions= 0 loss= None certificate= True`",
+      "failure_scenario": "Training and calibration turnout are available, but every protected turnout feature is unavailable. Fitting succeeds; final evaluation writes an empty predictions file, reports null loss, and nevertheless certifies that final evaluation is complete. Downstream consumers of the completion flag cannot distinguish this from an actual evaluation.",
+      "falsification": "Run the retained probe and assert that the zero-prediction case is unavailable rather than successfully evaluated. Test partial availability separately, retaining per-unit assessed/unavailable status and checking the assessed denominator rather than populating the evaluation ledger solely from the intended partition.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P7-03",
+      "severity": "high",
+      "category": "threat-to-validity",
+      "title": "Detectable-effect threshold cannot bound an observational blind spot",
+      "location": [
+        "research/analysis-plan.md:106",
+        "research/analysis-plan.md:290",
+        "research/analysis-plan.md:348",
+        "election_audit/research_models.py:152"
+      ],
+      "claim": "The threat model incorrectly says the size of a uniform switch resembling ordinary swing is bounded by minimum detectable manipulation. An 80%-power threshold under selected synthetic alternatives is not an upper bound after a null result, and a baseline fitted to the affected election can absorb systematic switching as ordinary swing.",
+      "evidence": "analysis-plan.md:106 describes the blind spot as `A small, spatially uniform switch that mimics ordinary swing; its size is bounded by the minimum detectable manipulation`.\nanalysis-plan.md:290–293 specifies cross-fitting across polling places; other affected polling places still supply training outcomes.\nanalysis-plan.md:348–350 defines minimum detectable manipulation as `the smallest national margin shift detected with 80% power by the family`.\nresearch_models.py:152–163 constructs baseline quantiles from training outcomes: `all_values = [r[\"y\"] for r in training]` and `result.append(np.quantile(values, QUANTILES))`.\nThe retained probe shifts training and evaluation shares together using the implemented baseline and score. Output:\n`UNIFORM_SHIFT share_shift= 0.2 margin_shift_per_100_ballots= 40 scores_unchanged= True`\nThis demonstrates baseline absorption, not a completed C1–C6 power experiment.",
+      "failure_scenario": "Consistent in-urn switching changes candidate shares across training and scored locations while preserving turnout and internally consistent artifacts. The fitted runoff relationship learns the shifted shares. Such a pattern can remain observationally compatible with legitimate swing even above an effect detected under a different injection pattern; reporting the latter threshold as a bound understates the blind spot.",
+      "falsification": "Before freeze, run the complete refitted family with switching applied across training, calibration and evaluation populations, including uniform and covariate-aligned alternatives. Report undetectable alternatives explicitly. An upper bound requires an independently justified identification or confidence-bound argument; an 80%-power crossing alone cannot establish it.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P7-04",
+      "severity": "medium",
+      "category": "bug",
+      "title": "Investigation blinding is asserted without hiding direction",
+      "location": [
+        "election_audit/investigations.py:209",
+        "election_audit/investigations.py:279",
+        "election_audit/features.py:804",
+        "election_audit/research_models.py:407"
+      ],
+      "claim": "Case packets retain signed predictions and directional selection labels while unconditionally declaring candidate blinding. Review records repeat that declaration without checking what the reviewer saw, so the recorded protection against directional review bias is unreliable for candidate-share models.",
+      "evidence": "investigations.py:209–216 includes `\"selection_reason\": row[2]`, `\"prediction\": prediction`, and `\"candidate_blinded\": True` in the same packet.\ninvestigations.py:279 unconditionally writes `\"candidate_blinded\": True` into review records.\nfeatures.py:804 publishes `\"candidate_pair\": [candidate_a, candidate_b]`.\nresearch_models.py:407 publishes `\"signed_residual\": float(row[\"y\"] - p[0, 2])`.\nThe retained probe produces:\n`BLINDING [(True, 'ranked_negative', -0.2), (True, 'ranked_positive', 0.2), (True, 'unflagged_control', -0.2)]`",
+      "failure_scenario": "A reviewer receives a packet from a known candidate_a_share model. Its positive residual and ranked_positive label reveal which fixed candidate benefits, using the published candidate mapping. The packet and subsequent review nevertheless record candidate_blinded=true, concealing potential directional review bias.",
+      "falsification": "Build packets for a synthetic candidate-share model with a public candidate mapping and test whether the reviewer-facing material reveals the favored candidate. Either produce a separate blinded view that removes the mapping and directional clues, or record the actual unblinded status; record_review must not overwrite that status with true.",
+      "confidence": "high",
+      "speculative": false
+    }
+  ],
+  "responses": []
+}

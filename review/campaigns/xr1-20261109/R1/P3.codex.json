@@ -1,0 +1,61 @@
+{
+  "reviewer": "codex",
+  "packet": "P3",
+  "round": "R1",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Three findings confirmed with local probes: JWS replay is misclassified as republication, missing signed files escape verification, and the Ed521 vector cross-check substitutes recorded verdicts for executing this project's verifier. All 45 scoped tests passed. No tracked files were changed.",
+  "findings": [
+    {
+      "local_id": "codex-P3-01",
+      "severity": "high",
+      "category": "vacuous-check",
+      "title": "J4 accepts replayed results for another election as a republication",
+      "location": [
+        "election_audit/signed_results.py:283",
+        "election_audit/signed_results.py:340",
+        "election_audit/signed_results.py:422"
+      ],
+      "claim": "Any generation-field difference exempts a payload mismatch from J4, without establishing that the payload describes the requested election and location or a later publication. A valid signature therefore permits replay of an unrelated or older result with no failed checks.",
+      "evidence": "The generation identifier contains only `return \" \".join(str(data.get(k)) for k in (\"dg\", \"hg\", \"idg\"))`. J4 uses:\n`if not row[\"payload_equals_ea20\"] and row[\"payload_generation\"] == row[\"ea20_generation\"]:`\n`    failed.append(\"J4\")`\nThe summary counts unequal generation strings as `republished_since_ea20`.\nCommand: `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python review-scratch/probe_p3.py` exited 0. Its end-to-end synthetic fetch and verification substituted an earlier-round payload (`ele=6257`, `t=1`, `dg=04/10/2026`) at the round-2 URL. Output included `\"failed\":{\"[]\":1}`, `\"signature\":{\"verified\":1}`, `\"payload_equals_ea20\":{\"False\":1}`, and `\"republished_since_ea20\":1`.",
+      "failure_scenario": "A server or intermediary serves a previously signed result and its matching plain JSON at another result URL. Provided its generation fields differ from the frozen snapshot, J1–J3 pass and J4 records no failure, even for an earlier round. This requires a reusable valid signature, not possession of the signing key.",
+      "falsification": "Run the saved probe. Add regression cases for an older generation and a different election or location signed by the same trusted key; verification should flag replay or identity mismatch. A legitimate republication exemption should require matching result identity and independently validated publication ordering.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P3-02",
+      "severity": "high",
+      "category": "vacuous-check",
+      "title": "JWS verification silently omits missing manifest rows",
+      "location": [
+        "election_audit/signed_results.py:369",
+        "election_audit/signed_results.py:382",
+        "election_audit/signed_results.py:393"
+      ],
+      "claim": "Verification iterates only the signed manifest's surviving rows, without comparing their URL set against the bound EA20 snapshot or their count against the completed fetch status. Deleted rows, including an empty manifest, produce a completed release without missing-file failures.",
+      "evidence": "The expected URLs are available as `ea20 = {r[\"url\"]: r for r in _ea20_rows(ea20_root)}`, but processing is driven solely by:\n`with contextlib.closing(sqlite3.connect(uri, uri=True)) as db:`\n`    db.row_factory = sqlite3.Row`\n`    files = [dict(r) for r in db.execute(\"SELECT * FROM files ORDER BY url\")]`\n`rows = []`\n`for f in files:`\nCommand: `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python review-scratch/probe_p3.py` exited 0. After deleting the sole files row from a successfully finished synthetic fetch, it printed `\"fetch_status_files\":1`, `\"release_exists\":true`, and a summary containing `\"files\":0,\"failed\":{}`.",
+      "failure_scenario": "A signed-results manifest loses one municipal row after fetching, while status.json and the bound EA20 snapshot remain unchanged. That municipality disappears from all verification denominators and failures. The same mechanism permits a wholly empty verification release.",
+      "falsification": "Run the saved probe and repeat with two expected URLs, deleting only one. Require exact equality between fetched and expected URL sets before verification, validate the completed fetch count, and reject an empty or incomplete population.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P3-03",
+      "severity": "high",
+      "category": "vacuous-check",
+      "title": "Ed521 edge-vector cross-check never executes the audited verifier",
+      "location": [
+        "election_audit/ed521_crosscheck.py:65",
+        "election_audit/ed521_crosscheck.py:77",
+        "docs/en/integrity-checks.md:536"
+      ],
+      "claim": "The documented check of vectors through both verifiers executes only the external reference. This project's strict and ECPy verdicts are copied from vector-file labels, so agreement on malformed signatures does not test the installed production implementation.",
+      "evidence": "The implementation uses:\n`theirs = bool(reference(key, message, signature))`\n`expected = {m: v[m] for m in (\"strict\", \"ecpy\", \"valid\") if m in v}`\n`matches = sorted(m for m, verdict in expected.items() if verdict == theirs)`\nand emits `\"strict\": expected[\"strict\"]` and `\"ecpy\": expected[\"ecpy\"]`.\nThe documentation says the 53 vectors run “through both verifiers.” Command: `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python review-scratch/probe_p3.py` exited 0. With production verification entry points mocked to accept invalid signatures or raise if constructed, the S+L vector still reported `\"matches\":{\"strict\":1},\"reported_strict\":false`; native verification, native key construction and pure-Python verification each had 0 calls.",
+      "failure_scenario": "An installed verifier regresses to accepting noncanonical points or out-of-range scalars while continuing to accept genuine signatures. The national positive-signature comparison still agrees, and the negative-vector report still claims strict-mode agreement because it reads the intended verdict from JSON.",
+      "falsification": "Run the saved probe. Execute the installed strict and ECPy implementations on every vector and compare their measured verdicts against both the reference and stored expectations. Inject an accepting verifier and require the negative-vector check to fail.",
+      "confidence": "high",
+      "speculative": false
+    }
+  ],
+  "responses": []
+}
