@@ -187,12 +187,13 @@ def version(tool: str) -> str:
     return (done.stdout or done.stderr).strip().splitlines()[0] if done.returncode == 0 else "?"
 
 
-def session(args: argparse.Namespace, reviewer: str, packet: str, sha: str, lock: Any) -> None:
+def session(args: argparse.Namespace, reviewer: str, packet: str, sha: str, lock: Any) -> bool:
+    """Run one session; False when it failed fast (quota or start-up error)."""
     folder = campaign_dir(args.campaign)
     report = folder / args.round / f"{packet}.{reviewer}.json"
     if report.exists():
         print(f"skip {report.relative_to(ROOT)}: exists (outputs are never overwritten)")
-        return
+        return True
     prompt = build_prompt(args.campaign, args.round, reviewer, packet, sha, args.fixes)
     clone = clone_path(args.campaign, sha)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
@@ -270,6 +271,7 @@ def session(args: argparse.Namespace, reviewer: str, packet: str, sha: str, lock
             f"{args.round} {packet} {reviewer}: status {status}, {row['minutes']} min, "
             f"{row['findings']} findings, {len(flagged)} boundary flags"
         )
+    return not (status != 0 and row["minutes"] < 1)
 
 
 def run(args: argparse.Namespace) -> None:
@@ -293,7 +295,9 @@ def run(args: argparse.Namespace) -> None:
 
     def lane(reviewer: str) -> None:
         for packet in chosen:
-            session(args, reviewer, packet, sha, lock)
+            if not session(args, reviewer, packet, sha, lock):
+                print(f"{reviewer}: failed within a minute, stopping this lane (quota?)")
+                return
 
     threads = [threading.Thread(target=lane, args=(reviewer,)) for reviewer in reviewers]
     for thread in threads:
