@@ -57,7 +57,7 @@ from election_audit import integrity_checks as ic
 from election_audit.national_migration import atomic, sha
 from election_audit.types import JSON, Row
 
-VERSION = "integrity-gedai-v3"
+VERSION = "integrity-gedai-v4"  # v4: zone coverage from the logs' own records
 ARCHIVE = re.compile(r"files/log_gedai_([12])t_([A-Z]{2})_(\d{12})\.zip")
 CORRESPONDENCE = re.compile(
     r"(?:Recebida|Transmitida a|Definida como atual a) correspondência de (seção|contingência): "
@@ -235,19 +235,32 @@ def section_rules(bu: Row, parsed: JSON) -> Row:
 MATCHED = ("section", "contingency", "contingency_other_zone")
 
 
-def zone_coverage(rows: list[Row]) -> None:
-    """Mark G1/G3 as not applicable in zones whose published logs hold nothing to match."""
-    matched, media = Counter(), Counter()
-    for r in rows:
-        zone = (r["uf"], r["zone"])
-        matched[zone] += r["correspondence"] in MATCHED
-        media[zone] += r.get("load_medium") == "covers_section"
+def recorded_zones(parsed: JSON, rows: Sequence[Row]) -> tuple[set[tuple[str, str]], ...]:
+    """(UF, zone) pairs holding any correspondence, and any load medium, in the logs.
+
+    The logs name municipality and zone, not the UF; TSE municipality codes are unique
+    nationally, so the sections being checked supply each municipality's UF.
+    """
+    uf_of = {r["municipality"]: r["uf"] for r in rows}
+    places = {(m, z) for m, z, _ in parsed["sections"]}
+    places |= {(m, z) for found in parsed["contingency"].values() for m, z, _, _ in found}
+    media = {(m, z) for found in parsed["media"].values() for m, z, _ in found}
+    return tuple({(uf_of[m], z) for m, z in pairs if m in uf_of} for pairs in (places, media))
+
+
+def zone_coverage(rows: list[Row], parsed: JSON) -> None:
+    """Mark G1/G3 as not applicable in zones whose published logs hold no record of that kind.
+
+    Coverage is read from the logs' own records, never from matches: a zone whose records
+    all contradict its BUs keeps its failures (xr1-20261109-P0-02).
+    """
+    correspondences, media = recorded_zones(parsed, rows)
     for r in rows:
         zone, failed = (r["uf"], r["zone"]), json.loads(r["failed_json"])
-        if "G1" in failed and not matched[zone]:
+        if "G1" in failed and zone not in correspondences:
             r["correspondence"] = "zone_unpublished"
             failed.remove("G1")
-        if "G3" in failed and not media[zone]:
+        if "G3" in failed and zone not in media:
             r["load_medium"] = "zone_unpublished"
             failed.remove("G3")
         r["failed_json"] = json.dumps(failed, separators=(",", ":"))
@@ -308,7 +321,7 @@ def run_gedai(
         base = {k: bu[k] for k in ("uf", "municipality", "zone", "section", "package")}
         rows.append({**base, **section_rules(bu, parsed)})
         loads.append({k: bu[k] for k in ("urn_serial", "load_code", "flash_serial", "loaded_at")})
-    zone_coverage(rows)
+    zone_coverage(rows, parsed)
     for row, bu in zip(rows, loads, strict=True):
         failed = json.loads(row["failed_json"])
         if failed:

@@ -136,16 +136,19 @@ class GedaiTests(unittest.TestCase):
         rows = []
         for zone, section, load in (("0002", "0088", "4" * 24), ("0002", "0089", "1" * 24)):
             rows.append(
-                {"uf": "ac", "zone": zone}
+                {"uf": "ac", "municipality": "01015", "zone": zone}
                 | gedai.section_rules(bu("0088", load, "2263093", "CB28DF40", zone=zone), parsed)
             )
-        unpublished = {"uf": "ac", "zone": "0009"}
+        unpublished = {"uf": "ac", "municipality": "01015", "zone": "0009"}
         unpublished |= gedai.section_rules(
             bu("0001", "5" * 24, "2000009", "00000009", zone="0009"), parsed
         )
         rows.append(unpublished)
-        gedai.zone_coverage(rows)
-        self.assertEqual(json.loads(rows[0]["failed_json"]), ["G1"])  # its zone has matches
+        mismatched = [{**r} for r in rows[:1]]  # xr1 P0-02: records, but every BU contradicts
+        gedai.zone_coverage(rows, parsed)
+        self.assertEqual(json.loads(rows[0]["failed_json"]), ["G1"])  # its zone has records
+        gedai.zone_coverage(mismatched, parsed)
+        self.assertEqual(json.loads(mismatched[0]["failed_json"]), ["G1"])  # no match: kept
         self.assertEqual(
             (rows[2]["correspondence"], json.loads(rows[2]["failed_json"])),
             ("zone_unpublished", []),
