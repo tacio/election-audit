@@ -2561,6 +2561,13 @@ def integrity_check_main(argv: Argv = None) -> int:
     zer.add_argument("--semantic", required=True, help="Semantic-pass v5 root (same round).")
     zer.add_argument("--output", required=True, help="New output directory.")
     zer.add_argument("--memory-limit", default="2GB", help="DuckDB memory limit.")
+    errs = sub.add_parser(
+        "signature-errors", help="E1-E2: votes after signature or integrity errors in the logs."
+    )
+    errs.add_argument("--sections", required=True, help="Section-pass output root (same round).")
+    errs.add_argument("--semantic", required=True, help="Semantic-pass v5 root (same round).")
+    errs.add_argument("--output", required=True, help="New output directory.")
+    errs.add_argument("--memory-limit", default="2GB", help="DuckDB memory limit.")
     gedai = sub.add_parser("gedai", help="G1-G3: BU urn loads against the GEDAI preparation logs.")
     gedai.add_argument("--sections", required=True, help="Section-pass output root.")
     gedai.add_argument(
@@ -2599,6 +2606,14 @@ def integrity_check_main(argv: Argv = None) -> int:
             args.gedai_root,
             args.output,
             ufs=[u.lower() for u in args.uf] if args.uf else None,
+        )
+        print(json.dumps(result["summary"]))
+        return 0
+    if args.command == "signature-errors":
+        from election_audit.signature_errors import run_signature_errors
+
+        result = run_signature_errors(
+            args.sections, args.semantic, args.output, memory_limit=args.memory_limit
         )
         print(json.dumps(result["summary"]))
         return 0
