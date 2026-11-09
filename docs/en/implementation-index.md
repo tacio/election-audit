@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 36 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 37 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -155,9 +155,12 @@ from restarts and replacements before voting ([O18](observations.md#operations))
 GEDAI matched 498444 and 498388 sections' urn loads; 482 sections in three zones and
 284 in three others cannot be checked because those zones' preparation logs are not
 published ([T11](observations.md#transparency)), and 281 and 337 sections fail G1,
-most in sp/0176. Every package name verified in the logs is in TSE's hash lists
+most in sp/0176; the other 13 and 70 are late loads whose correspondence never
+reached the published logs ([T13](observations.md#transparency)). Every package name verified in the logs is in TSE's hash lists
 except seven load-media and load files ([T12](observations.md#transparency)); 86
-start-up verification lines ended in `ERRO` ([O19](observations.md#operations)). All
+start-up verification lines ended in `ERRO` ([O19](observations.md#operations)), and
+no urn completed a vote in the session of a signature verification error: votes
+after an error come only after a restart. All
 5786 JWS-signed result files per round verify against TSE's official key and equal
 the EA20 snapshot. Semantic pass `session-aggregates-v5` adds the markers and package
 tables these checks read and is equal to version 4 elsewhere. See the
@@ -245,18 +248,17 @@ No national electoral result, national margin, fitted national model or fraud
 label exists.
 
 **Checks.** The full offline gate `just check` passes (lock, format, lint,
-type check, contracts, docs, documented commands and all 427 tests). Every
+type check, contracts, docs, documented commands and all 435 tests). Every
 function in `election_audit/`, `scripts/` and `tests/` is annotated (ruff `ANN`)
 and `ty check` (pinned 0.0.94) reports no diagnostics; the conventions are in
 `CLAUDE.md`.
 
 ## Next step
 
-Close the Phase 20b follow-ups, which gate the Phase 23 freeze: a per-session rule
-for the urns that logged a program signature error (did any record votes after it?),
-the 13 and 70 isolated GEDAI G1 sections and sp/0176, and the JWS revocation list.
-Then register the zerésima, GEDAI, hash-list and JWS checks in the protocol with the
-gaps that cannot be closed ([handoff](handoffs/task-20b.md)). TSE's reply to the root-certificate request (protocol
+Close the last Phase 20b follow-up, the JWS revocation list for `AC DIVULGACAO`,
+then register the zerésima, GEDAI, hash-list, signature-error and JWS checks in the
+protocol with the gaps that cannot be closed (T11–T13, the GEDAI log signatures, the
+root certificates); this gates the Phase 23 freeze ([handoff](handoffs/task-20b.md)). TSE's reply to the root-certificate request (protocol
 83529705172533) is due by 25 November 2026. File the TCU consolidated integrity test
 report when it is published (due within 30 days of the second round). The
 [study protocol](../../research/analysis-plan.md) (Revision 7) defines the claims,
@@ -335,7 +337,7 @@ checks (177 tests).
 | 20 | Complete: I1–I9 for 2026, both rounds, all sections; ECDSA verified, BWEB, EA20 and correspondences agree | Ed521 signatures, certificate chains, I6 prefix re-read, I5/I6 open differences, I8, 2022 | [20](handoffs/task-20.md) |
 | 21 | Complete: 2026 both rounds (v1, reproduced by v2 on AC) and 2022 both rounds (v2); ledgers reconcile every section; SA logs attributed | Grouping multi-run sessions and clock rules move to Phase 22 | [21](handoffs/task-21.md) |
 | 22 | Complete: semantic pass v3 nationally (2026 and 2022, equal to earlier releases on shared columns); section tables for both years with crosswalk, clock rules and ledger | Results and operational values unread until the freeze; model differences and Amazonas close rules move to Phase 20b | [22](handoffs/task-22.md) |
-| 20b | In progress: Ed521 verified nationally (`ed521rs`, equal to the pure-Python verifier), official TSE specifications, urn certificates checked against the published CAs and revocation lists, section tables v3 with the Amazonas list, I6 prefix re-read (every open block a verified prefix; 112 of 113 differing pairs explained, O14/O15), I8 (528 printed copies, all equal), I2 municipal gap recorded, I3/I5 reconciled (session rules v2, memory copies counted once, I5 85/36 → 10/7, O16/O17; semantic passes, I6 and section tables v4 rerun); checks added from DataUrnas-BR run (Ed521 cross-check 0 disagreements, zerésima v2, GEDAI v2 with T11, hash lists with T12/O19, JWS all verified; semantic pass v5); follow-ups open; gates the Phase 23 freeze | Roots requested from TSE | [20b](handoffs/task-20b.md) |
+| 20b | In progress: Ed521 verified nationally (`ed521rs`, equal to the pure-Python verifier), official TSE specifications, urn certificates checked against the published CAs and revocation lists, section tables v3 with the Amazonas list, I6 prefix re-read (every open block a verified prefix; 112 of 113 differing pairs explained, O14/O15), I8 (528 printed copies, all equal), I2 municipal gap recorded, I3/I5 reconciled (session rules v2, memory copies counted once, I5 85/36 → 10/7, O16/O17; semantic passes, I6 and section tables v4 rerun); checks added from DataUrnas-BR run (Ed521 cross-check 0 disagreements, zerésima v2, GEDAI v3 with T11/T13, hash lists with T12/O19, signature errors (O19 resolved: no vote in the session of an error), JWS all verified; semantic pass v5); JWS revocation list and protocol registration open; gates the Phase 23 freeze | Roots requested from TSE | [20b](handoffs/task-20b.md) |
 | 23–26 | Not started; defined in the [completion plan](../../research/completion-plan.md#revised-phases) | All | — |
 
 ## Where results are
@@ -357,7 +359,7 @@ paths are on the reference machine's output volume
 | Phase 20b semantic passes v4 (2026, 2022), AC equivalence samples, section tables v4, run logs and scripts | `~/data/election-audit-stage/phase20b-sessions/` |
 | DataUrnas-BR tables used in the I3/I5 reconciliation, frozen at commit `f5e8005` | `~/data/election-audit-stage/inputs/dataurnas-br-f5e8005-20261108/` |
 | Phase 20b Ed521 cross-check; its frozen references | `~/data/election-audit-stage/phase20b-ed521/`; `~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/` |
-| Phase 20b semantic passes v5 and zerésima checks; GEDAI checks; hash-list check; JWS files and checks | `~/data/election-audit-stage/phase20b-zeresima/`, `phase20b-gedai/`, `phase20b-hash-lists/`, `phase20b-jws/` |
+| Phase 20b semantic passes v5 and zerésima checks; GEDAI checks; hash-list check; signature-error checks; JWS files and checks | `~/data/election-audit-stage/phase20b-zeresima/`, `phase20b-gedai/`, `phase20b-hash-lists/`, `phase20b-signature-errors/`, `phase20b-jws/` |
 | TSE hash lists and JWS manual (browser downloads); the JWS key file | `~/data/election-audit-stage/inputs/tse-www-20261108/`, `tse-jws-key-20261108/` |
 | Phase 20b I8 printed BUs; its frozen inputs (CMInd, Arvor, TSE QR manual) | `~/data/election-audit-stage/phase20b-i8/`; `~/data/election-audit-stage/inputs/i8-cmind-20261107/`, `i8-arvor-20261107/`, `i8-tse-qrbu-20261107/` |
 | Phase 21 equivalence reports, AC development pass, AC v2 reproduction, national passes (2026 and 2022) | `~/data/election-audit-stage/phase21/` |
@@ -391,7 +393,7 @@ paths are on the reference machine's output volume
 | Operational reconstruction | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Phase 13), `semantic_pass` (`session-aggregates-v5`, session rules `sessions-v2`, Phases 21–22 and 20b; rules `real-log-rules.json` and `real-log-rules-2022.json`), `sa_logs` (`sa-log-summary-v1`); [reconstruction](reconstruction.md), [semantic pass](semantic-pass.md) |
 | Operational releases | `publication`, `operational_marts`, `release_tools`; [publication](publication.md) |
 | National structural processing | Summary path: `national_parallel`, `national_summary`, `national_summary_release`, `national_summary_tools`, `national_summary_tuning`, `national_resources`; [feature-oriented processing](feature-oriented-processing.md). Event-level path: `national_benchmark`, `national_tuning`, `national_workload`, `national`, `national_storage`, `national_relocation`, `national_migration`, `national_overnight`; [national processing](national-processing.md) |
-| Integrity checks | `integrity_checks` (`integrity-sections-v4`, `integrity-logs-v2`; signature layout `resources/assinatura-2026-observed.asn1`), `round1_prefix` (`integrity-round1-prefix-v1`, `integrity-check prefix`), `printed_bu` (`printed-bu-v1`, `integrity-check printed`), `ed521_crosscheck` (`ed521-crosscheck-v1`), `zeresima` (`integrity-zeresima-v2`), `gedai` (`integrity-gedai-v2`), `hash_lists` (`integrity-hash-lists-v1`), `signed_results` (`signed-results-fetch-v1`, `integrity-jws-v1`; `results-hierarchy fetch-signed`); [integrity checks](integrity-checks.md) |
+| Integrity checks | `integrity_checks` (`integrity-sections-v4`, `integrity-logs-v2`; signature layout `resources/assinatura-2026-observed.asn1`), `round1_prefix` (`integrity-round1-prefix-v1`, `integrity-check prefix`), `printed_bu` (`printed-bu-v1`, `integrity-check printed`), `ed521_crosscheck` (`ed521-crosscheck-v1`), `zeresima` (`integrity-zeresima-v2`), `gedai` (`integrity-gedai-v3`), `hash_lists` (`integrity-hash-lists-v1`), `signature_errors` (`integrity-signature-errors-v1`), `signed_results` (`signed-results-fetch-v1`, `integrity-jws-v1`; `results-hierarchy fetch-signed`); [integrity checks](integrity-checks.md) |
 | Electoral imports and verification | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` and `electoral_verification` (Phase 12); [electoral results](electoral-results.md). `electoral_references` is an unwired, untested prototype for official reference sets |
 | Analysis foundation | `analysis`, `analysis_partitions`, `analysis_ledgers`, `analysis_reports`; [analysis](analysis.md) |
 | Section table | `section_table` (`section-features-v4`, Phases 22 and 20b); [section table](section-table.md), [observation register](observations.md) |

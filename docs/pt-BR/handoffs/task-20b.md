@@ -1,6 +1,6 @@
 # Tarefa 20b — Conclusão da integridade: verificações trazidas do DataUrnas-BR
 
-Document-ID: EA-HANDOFF-20B · Revision: 1 · Language: pt-BR
+Document-ID: EA-HANDOFF-20B · Revision: 2 · Language: pt-BR
 
 Objetivo: executar nacionalmente, para 2026 e nos dois turnos, as verificações que o
 DataUrnas-BR faz e que faltavam a este projeto: uma comparação do Ed521 com o
@@ -23,27 +23,30 @@ Arquivos e interfaces:
   observados), `ed521_crosscheck.py` (`ed521-crosscheck-v1`).
 - `semantic_pass.py` (`session-aggregates-v5`: `markers.parquet`,
   `packages.parquet`).
-- `zeresima.py` (`integrity-zeresima-v2`), `gedai.py` (`integrity-gedai-v2`),
-  `hash_lists.py` (`integrity-hash-lists-v1`), `signed_results.py`
+- `zeresima.py` (`integrity-zeresima-v2`), `gedai.py` (`integrity-gedai-v3`),
+  `hash_lists.py` (`integrity-hash-lists-v1`), `signature_errors.py`
+  (`integrity-signature-errors-v1`), `signed_results.py`
   (`signed-results-fetch-v1`, `integrity-jws-v1`).
-- CLI: `integrity-check ed521-crosscheck|zeresima|gedai|hash-lists|jws` e
-  `results-hierarchy fetch-signed`.
+- CLI: `integrity-check ed521-crosscheck|zeresima|gedai|hash-lists|signature-errors|jws`
+  e `results-hierarchy fetch-signed`.
 - Testes: `tests/test_ed521_crosscheck.py`, `test_zeresima.py`, `test_gedai.py`,
-  `test_hash_lists.py`, `test_signed_results.py` e os testes de marcadores e pacotes
+  `test_hash_lists.py`, `test_signature_errors.py`, `test_signed_results.py` e os testes de marcadores e pacotes
   em `test_semantic_pass.py`.
 
 Entregas:
 
 - Releases em `~/data/election-audit-stage/`: `phase20b-ed521/national-r{1,2}-20261108`,
   `phase20b-zeresima/v5-national-r{1,2}-20261108` e
-  `national-r{1,2}-zeresima-v2-20261109`, `phase20b-gedai/national-r{1,2}-gedai-v2-20261109`,
-  `phase20b-hash-lists/national-v1-20261109`, `phase20b-jws/signed-r{1,2}-20261108`
-  e `national-r{1,2}-jws-v1-20261109`. Os releases v1 de zerésima e do GEDAI ficam
-  como registro das primeiras regras.
+  `national-r{1,2}-zeresima-v2-20261109`, `phase20b-gedai/national-r{1,2}-gedai-v3-20261109`,
+  `phase20b-hash-lists/national-v1-20261109`,
+  `phase20b-signature-errors/national-r{1,2}-signature-errors-v1-20261109`,
+  `phase20b-jws/signed-r{1,2}-20261108` e `national-r{1,2}-jws-v1-20261109`. Os
+  releases anteriores de zerésima e do GEDAI ficam como registro das primeiras regras.
 - Entradas congeladas: `inputs/ed521-crosscheck-refs-20261108/`,
   `inputs/tse-www-20261108/` (listas de hash e manual JWS, baixados pelo usuário num
   navegador) e `inputs/tse-jws-key-20261108/`.
-- Observações T11, T12, O18 e O19.
+- Observações T11, T12, T13, O18 e O19 (resolvida pela verificação de erros de
+  assinatura).
 
 Aceitação (9 de novembro de 2026):
 
@@ -56,14 +59,19 @@ Aceitação (9 de novembro de 2026):
   duas seções da O17.
 - GEDAI v2: 498444 e 498388 seções casadas, G2 nunca reprova; 482 (G1) e 284 (G3)
   seções ficam `zone_unpublished` (T11); 281 e 337 reprovações em G1, 268 e 267 delas
-  em sp/0176; uma reprovação em G3 no 2º turno.
+  em sp/0176; uma reprovação em G3 no 2º turno. O GEDAI v3 é igual ao v2 linha a linha
+  e acrescenta `absent_detail`: das 13 e 70 seções isoladas em G1, a mídia não foi lida
+  de volta depois da carga em 9 e 55, foi lida depois sem ela em 4 e 10, e nunca em 0
+  e 5 (T13); os 112 arquivos `.sha512` dos arquivos do GEDAI conferem.
 - Listas de hash: sete caminhos de programa não listados (T12); 86 linhas `ERRO` na
   inicialização (O19).
+- Erros de assinatura: 0 reprovações nos dois turnos; 181 e 307 seções com erros em
+  blocos oficiais; nenhum voto na sessão de um erro de verificação; um voto em curso
+  depois de um erro de assinatura em uma seção por turno, lido nos logs.
 - JWS: verificações da chave todas verdadeiras; 5786 arquivos por turno verificados,
   iguais aos arquivos simples e ao snapshot EA20; toda cópia alterada recusada.
-- `UV_OFFLINE=1 just check` passa com 427 testes.
-- Não feito: o acompanhamento por sessão da O19, a lista de revogação do JWS, os
-  arquivos de assinatura dos logs do GEDAI.
+- `UV_OFFLINE=1 just check` passa com 435 testes.
+- Não feito: a lista de revogação do JWS, os arquivos de assinatura dos logs do GEDAI.
 
 Decisões:
 
@@ -73,6 +81,13 @@ Decisões:
 - As regras do GEDAI não são aplicadas numa zona cujos logs publicados não têm nada
   para casar; essas seções ficam indisponíveis, não reprovadas. Uma zona com algum
   casamento mantém suas reprovações, então sp/0176 continua reprovada.
+- Um erro de assinatura é `verification` ou `signing` pelo seu modelo. Votos depois de
+  um reinício são contados, não reprovados, porque um reinício repete as verificações
+  de inicialização; depois de um erro de assinatura o único voto em curso é permitido
+  (E2).
+- Uma reprovação em G1 do GEDAI continua reprovada, diga o que disser
+  `absent_detail`: o detalhe descreve a publicação, com dois relógios diferentes, e
+  não prova por que falta uma carga.
 - As listas de hash são comparadas por nome e resultado; o ano do modelo num nome é
   relatado como `model_suffix`, não como casamento.
 - A chave JWS vem do manual do TSE (apêndice B), não dos arquivos `.jws` nem do
@@ -82,18 +97,15 @@ Decisões:
 
 Questões em aberto:
 
-- O19: se alguma urna que registrou erro de assinatura de programa registrou votos
-  depois dele. Os marcadores situam cada erro no seu bloco; falta uma regra sobre as
-  sessões.
-- GEDAI: sp/0176 (169 de 437 seções casadas, sem mídias de carga) e as 13 e 70 seções
-  isoladas reprovadas em G1; o 2º turno tem mais, talvez urnas preparadas de novo por
-  computadores cujos logs não foram publicados.
+- GEDAI: sp/0176 (169 de 437 seções casadas, sem mídias de carga; 192 das suas
+  reprovações têm uma mídia nunca lida de volta) e as 13 e 70 seções isoladas em G1
+  (T13): por que faltam as correspondências das cargas tardias não está estabelecido.
+  Os dois casos podem ir ao TSE no próximo pedido.
 - A verificação JWS não consulta a lista de revogação da `AC DIVULGACAO`.
 - As assinaturas dos logs do GEDAI (`.vsc`) não são verificadas: formato não revisto.
 - A memória agregada dos seis workers da comparação do Ed521 não foi medida.
 
-Próxima tarefa exata: as pendências da Fase 20b acima, começando pela regra por sessão
-para a O19 sobre `session-aggregates-v5`; depois registrar as verificações de
-zerésima, GEDAI, listas de hash e JWS e suas lacunas no
-[protocolo do estudo](../../../research/analysis-plan.pt-BR.md) antes do congelamento
-da Fase 23.
+Próxima tarefa exata: a lista de revogação da `AC DIVULGACAO` para o JWS; depois
+registrar as verificações de zerésima, GEDAI, listas de hash, erros de assinatura e
+JWS e suas lacunas no [protocolo do estudo](../../../research/analysis-plan.pt-BR.md)
+antes do congelamento da Fase 23.

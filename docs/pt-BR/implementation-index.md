@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 36 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 37 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -166,10 +166,13 @@ pacote, e várias zerésimas por seção vêm de reinícios e substituições an
 seções; 482 seções em três zonas e 284 em outras três não podem ser verificadas porque
 os logs de preparação dessas zonas não foram publicados
 ([T11](observations.md#transparência)), e 281 e 337 seções são reprovadas em G1, a
-maioria em sp/0176. Todo nome de pacote verificado nos logs está nas listas de hash do
+maioria em sp/0176; as outras 13 e 70 são cargas tardias cuja correspondência nunca
+chegou aos logs publicados ([T13](observations.md#transparência)). Todo nome de pacote verificado nos logs está nas listas de hash do
 TSE, exceto sete arquivos da mídia de carga e da carga
 ([T12](observations.md#transparência)); 86 linhas de verificação na inicialização
-terminaram em `ERRO` ([O19](observations.md#operação)). Os 5786 arquivos de resultado
+terminaram em `ERRO` ([O19](observations.md#operação)), e nenhuma urna concluiu um
+voto na sessão de um erro de verificação de assinatura: votos depois de um erro só vêm
+depois de um reinício. Os 5786 arquivos de resultado
 assinados com JWS por turno verificam com a chave oficial do TSE e são iguais ao
 snapshot EA20. O passe semântico `session-aggregates-v5` acrescenta as tabelas de
 marcadores e de pacotes que essas verificações leem e é igual à versão 4 no resto.
@@ -261,18 +264,17 @@ nem rótulo de fraude.
 
 **Verificações.** A verificação offline completa `just check` passa (lock, formato,
 lint, verificação de tipos, contratos, documentos, comandos documentados e todos os
-427 testes). Toda função em `election_audit/`, `scripts/` e `tests/` tem anotações
+435 testes). Toda função em `election_audit/`, `scripts/` e `tests/` tem anotações
 de tipo (ruff `ANN`) e `ty check` (fixado em 0.0.94) não relata diagnósticos; as
 convenções estão em `CLAUDE.md`.
 
 ## Próximo passo
 
-Fechar as pendências da Fase 20b, condição para o congelamento da Fase 23: uma regra
-por sessão para as urnas que registraram erro de assinatura de programa (alguma
-registrou votos depois?), as 13 e 70 seções isoladas reprovadas em G1 no GEDAI e
-sp/0176, e a lista de revogação do JWS. Depois, registrar no protocolo as verificações
-de zerésima, GEDAI, listas de hash e JWS com as lacunas que não puderem ser fechadas
-([handoff](handoffs/task-20b.md)). A resposta do TSE ao pedido dos
+Fechar a última pendência da Fase 20b, a lista de revogação da `AC DIVULGACAO` para o
+JWS, e depois registrar no protocolo as verificações de zerésima, GEDAI, listas de
+hash, erros de assinatura e JWS com as lacunas que não puderem ser fechadas (T11–T13,
+as assinaturas dos logs do GEDAI, os certificados raiz); isso é condição para o
+congelamento da Fase 23 ([handoff](handoffs/task-20b.md)). A resposta do TSE ao pedido dos
 certificados raiz (protocolo 83529705172533) é devida até 25 de novembro de 2026.
 Arquivar o relatório
 consolidado do TCU sobre o teste de integridade quando for publicado (previsto até
@@ -354,7 +356,7 @@ com verificações aritméticas reais do AC (177 testes).
 | 20 | Concluída: I1–I9 para 2026, nos dois turnos, todas as seções; ECDSA verificada, BWEB, EA20 e correspondências concordam | Assinaturas Ed521, cadeias de certificados, releitura por prefixo do I6, diferenças em aberto do I5/I6, I8, 2022 | [20](handoffs/task-20.md) |
 | 21 | Concluída: 2026 nos dois turnos (v1, reproduzida pela v2 no AC) e 2022 nos dois turnos (v2); os registros conciliam todas as seções; logs SA atribuídos | Agrupar sessões com várias execuções e regras de relógio passam para a Fase 22 | [21](handoffs/task-21.md) |
 | 22 | Concluída: passada semântica v3 no país todo (2026 e 2022, igual às versões anteriores nas colunas em comum); tabelas por seção dos dois anos com mapeamento entre turnos, regras de relógio e registro | Resultados e valores operacionais sem leitura até o congelamento; diferenças de modelo e regras de encerramento do Amazonas passam para a Fase 20b | [22](handoffs/task-22.md) |
-| 20b | Em andamento: Ed521 verificado no país todo (`ed521rs`, igual ao verificador em Python puro), especificações oficiais do TSE, certificados das urnas conferidos contra as ACs publicadas e listas de revogados, tabelas por seção v3 com a lista do Amazonas, releitura por prefixo do I6 (todo bloco aberto é prefixo verificado; 112 de 113 pares divergentes explicados, O14/O15), I8 (528 cópias impressas, todas iguais), lacuna municipal do I2 registrada, I3/I5 conciliados (regras de sessão v2, cópias de memória contadas uma vez, I5 85/36 → 10/7, O16/O17; passadas semânticas, I6 e tabelas por seção v4 refeitos); verificações trazidas do DataUrnas-BR executadas (comparação do Ed521 com 0 divergências, zerésima v2, GEDAI v2 com T11, listas de hash com T12/O19, JWS todo verificado; passe semântico v5); pendências abertas; condição para o congelamento da Fase 23 | Raízes pedidas ao TSE | [20b](handoffs/task-20b.md) |
+| 20b | Em andamento: Ed521 verificado no país todo (`ed521rs`, igual ao verificador em Python puro), especificações oficiais do TSE, certificados das urnas conferidos contra as ACs publicadas e listas de revogados, tabelas por seção v3 com a lista do Amazonas, releitura por prefixo do I6 (todo bloco aberto é prefixo verificado; 112 de 113 pares divergentes explicados, O14/O15), I8 (528 cópias impressas, todas iguais), lacuna municipal do I2 registrada, I3/I5 conciliados (regras de sessão v2, cópias de memória contadas uma vez, I5 85/36 → 10/7, O16/O17; passadas semânticas, I6 e tabelas por seção v4 refeitos); verificações trazidas do DataUrnas-BR executadas (comparação do Ed521 com 0 divergências, zerésima v2, GEDAI v3 com T11/T13, listas de hash com T12/O19, erros de assinatura (O19 resolvida: nenhum voto na sessão de um erro), JWS todo verificado; passe semântico v5); lista de revogação do JWS e registro no protocolo em aberto; condição para o congelamento da Fase 23 | Raízes pedidas ao TSE | [20b](handoffs/task-20b.md) |
 | 23–26 | Não iniciadas; definidas no [plano de conclusão](../../research/completion-plan.pt-BR.md#fases-revisadas) | Todas | — |
 
 ## Onde estão os resultados
@@ -376,7 +378,7 @@ absolutos ficam no volume de saída da máquina de referência
 | Passadas semânticas v4 da Fase 20b (2026, 2022), amostras de equivalência do AC, tabelas por seção v4, logs e scripts das execuções | `~/data/election-audit-stage/phase20b-sessions/` |
 | Tabelas do DataUrnas-BR usadas na conciliação de I3/I5, congeladas no commit `f5e8005` | `~/data/election-audit-stage/inputs/dataurnas-br-f5e8005-20261108/` |
 | Comparação do Ed521 da Fase 20b; suas referências congeladas | `~/data/election-audit-stage/phase20b-ed521/`; `~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/` |
-| Passadas semânticas v5 e verificações de zerésima da Fase 20b; verificações do GEDAI; verificação das listas de hash; arquivos e verificações JWS | `~/data/election-audit-stage/phase20b-zeresima/`, `phase20b-gedai/`, `phase20b-hash-lists/`, `phase20b-jws/` |
+| Passadas semânticas v5 e verificações de zerésima da Fase 20b; verificações do GEDAI; verificação das listas de hash; verificações de erros de assinatura; arquivos e verificações JWS | `~/data/election-audit-stage/phase20b-zeresima/`, `phase20b-gedai/`, `phase20b-hash-lists/`, `phase20b-signature-errors/`, `phase20b-jws/` |
 | Listas de hash e manual JWS do TSE (baixados num navegador); o arquivo da chave JWS | `~/data/election-audit-stage/inputs/tse-www-20261108/`, `tse-jws-key-20261108/` |
 | BUs impressos do I8 da Fase 20b; suas entradas congeladas (CMInd, Arvor, manual de QR do TSE) | `~/data/election-audit-stage/phase20b-i8/`; `~/data/election-audit-stage/inputs/i8-cmind-20261107/`, `i8-arvor-20261107/`, `i8-tse-qrbu-20261107/` |
 | Relatórios de equivalência, passada de desenvolvimento do AC, reprodução v2 do AC e passadas nacionais (2026 e 2022) da Fase 21 | `~/data/election-audit-stage/phase21/` |
@@ -410,7 +412,7 @@ absolutos ficam no volume de saída da máquina de referência
 | Reconstrução operacional | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Fase 13), `semantic_pass` (`session-aggregates-v5`, regras de sessão `sessions-v2`, Fases 21–22 e 20b; regras `real-log-rules.json` e `real-log-rules-2022.json`), `sa_logs` (`sa-log-summary-v1`); [reconstrução](reconstruction.md), [passada semântica](semantic-pass.md) |
 | Releases operacionais | `publication`, `operational_marts`, `release_tools`; [publicação](publication.md) |
 | Processamento estrutural nacional | Caminho de resumos: `national_parallel`, `national_summary`, `national_summary_release`, `national_summary_tools`, `national_summary_tuning`, `national_resources`; [processamento orientado a features](feature-oriented-processing.md). Caminho em nível de evento: `national_benchmark`, `national_tuning`, `national_workload`, `national`, `national_storage`, `national_relocation`, `national_migration`, `national_overnight`; [processamento nacional](national-processing.md) |
-| Verificações de integridade | `integrity_checks` (`integrity-sections-v4`, `integrity-logs-v2`; formato de assinatura `resources/assinatura-2026-observed.asn1`), `round1_prefix` (`integrity-round1-prefix-v1`, `integrity-check prefix`), `printed_bu` (`printed-bu-v1`, `integrity-check printed`), `ed521_crosscheck` (`ed521-crosscheck-v1`), `zeresima` (`integrity-zeresima-v2`), `gedai` (`integrity-gedai-v2`), `hash_lists` (`integrity-hash-lists-v1`), `signed_results` (`signed-results-fetch-v1`, `integrity-jws-v1`; `results-hierarchy fetch-signed`); [verificações de integridade](integrity-checks.md) |
+| Verificações de integridade | `integrity_checks` (`integrity-sections-v4`, `integrity-logs-v2`; formato de assinatura `resources/assinatura-2026-observed.asn1`), `round1_prefix` (`integrity-round1-prefix-v1`, `integrity-check prefix`), `printed_bu` (`printed-bu-v1`, `integrity-check printed`), `ed521_crosscheck` (`ed521-crosscheck-v1`), `zeresima` (`integrity-zeresima-v2`), `gedai` (`integrity-gedai-v3`), `hash_lists` (`integrity-hash-lists-v1`), `signature_errors` (`integrity-signature-errors-v1`), `signed_results` (`signed-results-fetch-v1`, `integrity-jws-v1`; `results-hierarchy fetch-signed`); [verificações de integridade](integrity-checks.md) |
 | Importação e verificação eleitoral | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` e `electoral_verification` (Fase 12); [resultados eleitorais](electoral-results.md). `electoral_references` é um protótipo sem integração na CLI e sem testes para conjuntos de referência oficiais |
 | Fundação analítica | `analysis`, `analysis_partitions`, `analysis_ledgers`, `analysis_reports`; [análise](analysis.md) |
 | Tabela por seção | `section_table` (`section-features-v4`, Fases 22 e 20b); [tabela por seção](section-table.md), [registro de observações](observations.md) |

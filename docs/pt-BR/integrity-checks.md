@@ -1,6 +1,6 @@
 # Verificações de integridade de nível 1 (Fase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 7 · Language: pt-BR
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 8 · Language: pt-BR
 
 [English](../en/integrity-checks.md) · [Índice de implementação](implementation-index.md)
 
@@ -623,7 +623,7 @@ just integrity-check zeresima \
 
 ### Logs de preparação do GEDAI
 
-`integrity-check gedai` (`integrity-gedai-v2`, módulo `gedai`) lê os logs do
+`integrity-check gedai` (`integrity-gedai-v3`, módulo `gedai`) lê os logs do
 GEDAI-UE publicados pelo TSE para os dois turnos (um pacote por computador de
 preparação, por UF) e guarda só as linhas de correspondência e de mídia de carga. Por
 seção, contra o código de carga, o número da urna e o número de série da mídia de
@@ -639,12 +639,27 @@ Uma regra não é aplicada numa zona cujos logs publicados não têm nada que el
 casar: G1 quando nenhuma seção da zona casou com uma correspondência, G3 quando
 nenhuma casou com uma mídia de carga. Essas seções ficam `zone_unpublished`.
 
+Uma correspondência entra no GEDAI como `Recebida` quando volta da mídia de carga
+que carregou a urna. Para cada reprovação em G1, a versão 3 registra o que os logs
+têm sobre essa mídia (`absent_detail`): `medium_never_read_back` (nenhuma
+correspondência recebida dela), `medium_not_read_back_after_load` (correspondências
+recebidas dela, todas datadas antes da hora de carga do BU) ou
+`medium_read_back_later_without_it` (recebidas depois da carga, com outras cargas).
+As duas horas vêm de relógios diferentes, o do computador do GEDAI e o da urna, com
+resolução de minuto. O detalhe descreve a publicação; não desfaz a reprovação.
+
+O TSE publica dois arquivos por UF e turno, exportados na véspera e no dia da eleição
+(`031020261345` e `041020261441`, `241020261329` e `251020261327`), cada um com um
+arquivo `.sha512`; os 112 resumos conferem com os arquivos, e a verificação lê as
+quatro exportações. O `leiame.pdf` de cada arquivo (datado de 2024) explica só os
+nomes dos arquivos.
+
 ```sh
 just integrity-check gedai \
   --sections ~/data/election-audit-stage/phase20/national-r1-sections-v4-20261107 \
   --gedai-root ~/data/election-audit-stage/inputs/resultados-2026-logs-do-sistema-de-preparacao-das-urnas-eletronicas-gedai-1-turno \
   --gedai-root ~/data/election-audit-stage/inputs/resultados-2026-logs-do-sistema-de-preparacao-das-urnas-eletronicas-gedai-2-turno \
-  --output ~/data/election-audit-stage/phase20b-gedai/national-r1-gedai-v2-20261109
+  --output ~/data/election-audit-stage/phase20b-gedai/national-r1-gedai-v3-20261109
 ```
 
 | Turno | Casamento de seção | Casamento de contingência | Zona não publicada (G1) | Zona não publicada (G3) | G1 reprovado | G3 reprovado | G2 reprovado |
@@ -657,13 +672,21 @@ just integrity-check gedai \
   que carregaram as urnas não foram publicados. Zonas sem mídias de carga: am/0042,
   pr/0018 e sp/0176 ([T11](observations.md#transparência)).
 - sp/0176 também casa as correspondências de só 169 das suas 437 seções; suas 268 e
-  267 reprovações em G1 são a maior parte das reprovações. O resto são 13 seções em
-  12 zonas no 1º turno e 70 em 56 zonas no 2º, cada uma numa zona em que todas as
-  outras seções casam. Estão listadas em `discrepancies.jsonl` e ainda não têm
-  explicação.
+  267 reprovações em G1 são a maior parte das reprovações. Delas, 192 por turno têm
+  uma mídia de carga da qual o GEDAI nunca recebeu correspondência: o computador que
+  as carregou também não está na publicação.
+- O resto são 13 seções em 12 zonas no 1º turno e 70 em 56 zonas no 2º, cada uma numa
+  zona em que todas as outras seções casam. Nenhum dos seus códigos de carga do BU
+  aparece em qualquer log do GEDAI, e a maioria foi carregada tarde: na véspera da
+  eleição (10 e 35 seções) ou entre os turnos (22 no 2º turno). Em 9 e 55 a mídia não
+  foi lida de volta depois da carga, em 4 e 10 foi lida depois com outras cargas, e em
+  0 e 5 nunca foi lida de volta ([T13](observations.md#transparência)). As cargas
+  tardias são em geral publicadas (em 24 de outubro, 663 seções casaram e 35 não),
+  então a lacuna está no que chegou ao GEDAI, não num corte de horário.
 - Todo número de série de mídia de carga casado no BU é igual ao do GEDAI (G2).
 - A versão 1 (`national-r{1,2}-gedai-v1-20261108`) reprovava as zonas não publicadas
-  (763 e 819 em G1, 284 e 285 em G3).
+  (763 e 819 em G1, 284 e 285 em G3). A versão 2 (`national-r{1,2}-gedai-v2-20261109`)
+  é igual à versão 3 linha a linha, fora `absent_detail`.
 
 ### Listas de hash
 
@@ -705,9 +728,57 @@ just integrity-check hash-lists \
   inicialização, em poucas urnas de cada modelo (por exemplo `/boot/boot/avboot.vst`
   14, `/lib/avlib.vst` 14; os logs do 2º turno repetem o histórico do 1º, então os
   turnos se sobrepõem). Depois de um erro assim a urna informa uma falha de
-  integridade e pede para ser desligada (`Desligue a urna`). Ainda não se verificou se
-  alguma dessas urnas registrou votos depois do erro: os marcadores semânticos situam
-  cada erro no seu bloco, e uma regra por sessão é o item em aberto.
+  integridade e pede para ser desligada (`Desligue a urna`). Se alguma urna registrou
+  votos depois de um erro assim é verificado em
+  [erros de assinatura e votos](#erros-de-assinatura-e-votos).
+
+### Erros de assinatura e votos
+
+`integrity-check signature-errors` (`integrity-signature-errors-v1`, módulo
+`signature_errors`) pergunta se uma urna que registrou um erro de assinatura ou de
+integridade seguiu registrando votos ([O19](observations.md#operação)). Lê os
+marcadores `signature_error` de `session-aggregates-v5` (um modelo que nomeia uma
+assinatura ou integridade junto com uma falha) nos blocos oficiais do turno do log de
+cada seção, e as sessões dos mesmos logs. Um erro é `verification` quando o modelo diz
+que a urna verificou ou validou algo (verificações de pacotes na inicialização, a
+autoverificação do aplicativo de votação, as mídias de carga) e `signing` quando a
+urna não conseguiu assinar um arquivo que grava. Os dois pedem que a urna seja
+desligada. Uma urna religada repete todas as verificações de inicialização, então
+votos depois de um reinício são contados, não reprovados:
+
+- E1: nenhum ciclo de voto é concluído na mesma sessão depois de um erro de
+  verificação;
+- E2: no máximo um ciclo de voto, o do eleitor em curso, é concluído na mesma sessão
+  depois de um erro de assinatura.
+
+Cópias de um bloco nas duas memórias contam uma vez.
+
+```sh
+just integrity-check signature-errors \
+  --sections ~/data/election-audit-stage/phase20/national-r1-sections-v4-20261107 \
+  --semantic ~/data/election-audit-stage/phase20b-zeresima/v5-national-r1-20261108 \
+  --output ~/data/election-audit-stage/phase20b-signature-errors/national-r1-signature-errors-v1-20261109
+```
+
+| Turno | Seções com erros | Erros de verificação (inicialização / em sessão) | Erros de assinatura (inicialização / em sessão) | Erros seguidos de votos depois de um reinício | Reprovadas |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 181 | 280 / 92 | 57 / 12 | 306 | 0 |
+| 2 | 307 | 360 / 51 | 66 / 24 | 423 | 0 |
+
+- Nenhuma urna concluiu um voto na sessão de um erro de verificação. Todo voto depois
+  de um erro vem numa sessão posterior, depois que a urna foi religada.
+- Depois de um erro de assinatura, uma seção por turno concluiu um voto na mesma
+  sessão. Lidos no log, os dois são o voto em curso: o eleitor confirmou o último
+  cargo, a urna informou a falha de assinatura (1º turno: uma falha do teclado do
+  eleitor ao assinar `UENUXDB INT`; 2º turno: a mídia externa falhou ao assinar
+  `RDV MI`), registrou `O voto do eleitor foi computado` em menos de um segundo, e foi
+  desligada e religada. Depois do reinício no 1º turno, todas as verificações de
+  pacotes da inicialização terminaram em `SUCESSO`.
+- Erros fora dos blocos oficiais do turno são contados só no manifesto (cópias de
+  memória incluídas): 674 marcadores no 1º turno, de preparação e testes; no 2º, 709
+  desses e 487 nos blocos do 1º turno que os logs do 2º turno carregam.
+- As contagens são consistentes em todo erro: os votos antes de um erro nunca passam
+  dos votos do seu bloco.
 
 ### Assinaturas JWS dos resultados publicados
 
@@ -757,6 +828,8 @@ recusada. A lista de revogação indicada nos certificados não foi consultada.
 | Verificação cruzada do Ed521, 2º turno (6 workers) | 2:31:06 | 56222 s | 1,15 GB | 24 MB |
 | Zerésima v2, 1º / 2º turno | 0:29 / 0:32 | — | 2,9 GB | 0,8 / 0,6 MB |
 | GEDAI v2, 1º / 2º turno | 0:49 / 0:45 | — | 2,2 GB | 0,8 / 0,7 MB |
+| GEDAI v3, 1º / 2º turno | 0:53 / 0:54 | — | 2,3 GB | 0,9 / 0,8 MB |
+| Erros de assinatura, 1º / 2º turno | 0:13 / 0:14 | — | 1,3 GB | 0,8 / 0,6 MB |
 | Listas de hash | 0:01 | — | 0,10 GB | 60 kB |
 | Download JWS, 1º / 2º turno | 3:11:27 / 2:30:26 | — | 0,08 GB | 256 / 166 MB |
 | Verificação JWS, 1º / 2º turno | 0:17 / 0:10 | — | 0,11 GB | 0,2 MB |
@@ -785,8 +858,9 @@ de zerésima e de listas de hash está no [guia do passe semântico](semantic-pa
   a verificação das listas de hash compara só nomes e resultados, pois os logs não
   trazem hash de programa; os arquivos de assinatura dos próprios logs do GEDAI não
   são verificados.
-- GEDAI: as 13 e 70 seções isoladas reprovadas em G1 e a zona sp/0176 não têm
-  explicação; as urnas que registraram erro de assinatura de programa ainda não foram
-  seguidas até os seus votos.
+- GEDAI: as 13 e 70 seções isoladas reprovadas em G1 são cargas tardias cuja
+  correspondência não chegou aos logs publicados (T13), até onde os logs mostram; por
+  que não chegou não está estabelecido. sp/0176 não tem os logs de preparação da
+  maior parte das suas urnas (T11).
 - A concordância entre artefatos da mesma cadeia de software mostra consistência, não
   a intenção do eleitor.

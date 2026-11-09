@@ -1,6 +1,6 @@
 # Tier 1 integrity checks (Phase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 7 · Language: en
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 8 · Language: en
 
 [Português](../pt-BR/integrity-checks.md) · [Implementation index](implementation-index.md)
 
@@ -600,7 +600,7 @@ just integrity-check zeresima \
 
 ### GEDAI preparation logs
 
-`integrity-check gedai` (`integrity-gedai-v2`, module `gedai`) reads TSE's GEDAI-UE
+`integrity-check gedai` (`integrity-gedai-v3`, module `gedai`) reads TSE's GEDAI-UE
 logs of both rounds (one package per preparation computer, per UF) and keeps only
 the correspondence and load-media lines. Per section, against the BU's load code,
 urn number and load-media serial:
@@ -614,12 +614,26 @@ A rule is not applied in a zone whose published logs hold nothing it could match
 G1 where no section of the zone matched a correspondence, G3 where none matched a
 load medium. Those sections are `zone_unpublished`.
 
+A correspondence enters GEDAI as `Recebida` when it comes back from the load medium
+that loaded the urn. For each G1 failure, version 3 records what the logs hold about
+that medium (`absent_detail`): `medium_never_read_back` (no correspondence received
+from it), `medium_not_read_back_after_load` (correspondences received from it, all
+dated before the BU's load time) or `medium_read_back_later_without_it` (received
+after the load, holding other loads). The two times come from different clocks, the
+GEDAI computer's and the urn's, at minute grain. The detail describes the publication;
+it does not clear the failure.
+
+TSE publishes two archives per UF and round, exported the day before and on election
+day (`031020261345` and `041020261441`, `241020261329` and `251020261327`), each with
+a `.sha512` file; all 112 digests match their archives, and the check reads all four
+exports. The `leiame.pdf` in each archive (dated 2024) explains only the file names.
+
 ```sh
 just integrity-check gedai \
   --sections ~/data/election-audit-stage/phase20/national-r1-sections-v4-20261107 \
   --gedai-root ~/data/election-audit-stage/inputs/resultados-2026-logs-do-sistema-de-preparacao-das-urnas-eletronicas-gedai-1-turno \
   --gedai-root ~/data/election-audit-stage/inputs/resultados-2026-logs-do-sistema-de-preparacao-das-urnas-eletronicas-gedai-2-turno \
-  --output ~/data/election-audit-stage/phase20b-gedai/national-r1-gedai-v2-20261109
+  --output ~/data/election-audit-stage/phase20b-gedai/national-r1-gedai-v3-20261109
 ```
 
 | Round | Section match | Contingency match | Zone unpublished (G1) | Zone unpublished (G3) | G1 failed | G3 failed | G2 failed |
@@ -632,12 +646,22 @@ just integrity-check gedai \
   loaded the urns are not published. Zones without load media: am/0042, pr/0018
   and sp/0176 ([T11](observations.md#transparency)).
 - sp/0176 also matches only 169 of its 437 sections' correspondences; its 268 and
-  267 G1 failures are most of the failures. The rest are 13 sections in 12 zones in
-  round 1 and 70 in 56 zones in round 2, each in a zone where every other section
-  matches. They are listed in `discrepancies.jsonl` and not yet explained.
+  267 G1 failures are most of the failures. Of those, 192 per round have a load
+  medium from which GEDAI never received a correspondence: the computer that loaded
+  them is not in the publication either.
+- The rest are 13 sections in 12 zones in round 1 and 70 in 56 zones in round 2,
+  each in a zone where every other section matches. None of their BU load codes
+  appears anywhere in the GEDAI logs, and most were loaded late: the day before the
+  election (10 and 35 sections) or between the rounds (22 in round 2). In 9 and 55 the
+  medium was not read back after the load, in 4 and 10 it was read back later holding
+  other loads, and in 0 and 5 it was never read back
+  ([T13](observations.md#transparency)). Late loads are mostly published (on 24
+  October, 663 sections matched and 35 did not), so the gap is in what reached
+  GEDAI, not in a cut-off.
 - Every matched BU load-media serial equals the GEDAI one (G2).
 - Version 1 (`national-r{1,2}-gedai-v1-20261108`) failed the unpublished zones
-  (763 and 819 G1, 284 and 285 G3).
+  (763 and 819 G1, 284 and 285 G3). Version 2 (`national-r{1,2}-gedai-v2-20261109`)
+  equals version 3 row for row apart from `absent_detail`.
 
 ### Hash lists
 
@@ -678,9 +702,55 @@ just integrity-check hash-lists \
   of each model (for example `/boot/boot/avboot.vst` 14, `/lib/avlib.vst` 14;
   round-2 logs repeat the round-1 history, so the rounds overlap). After such an
   error the urn reports an integrity failure and asks to be switched off
-  (`Desligue a urna`). Whether any of these urns recorded votes
-  after the error is not yet checked: the semantic markers place each error in its
-  block, and a per-session rule is the open item.
+  (`Desligue a urna`). Whether any urn recorded votes after such an error is
+  checked in [signature errors and votes](#signature-errors-and-votes).
+
+### Signature errors and votes
+
+`integrity-check signature-errors` (`integrity-signature-errors-v1`, module
+`signature_errors`) asks whether an urn that logged a signature or integrity error
+went on to record votes ([O19](observations.md#operations)). It reads the
+`signature_error` markers of `session-aggregates-v5` (a template naming a signature
+or integrity together with a failure) in each section's official blocks of the
+round, and the sessions of the same logs. An error is `verification` when its
+template says the urn verified or validated something (start-up package checks, the
+voting application's self-check, the load media) and `signing` when the urn failed
+to sign a file it writes. Both ask for the urn to be switched off. An urn switched on
+again repeats every start-up check, so votes after a restart are counted, not
+failed:
+
+- E1: no vote cycle is completed in the same session after a verification error;
+- E2: at most one vote cycle, the voter's cycle in flight, is completed in the same
+  session after a signing error.
+
+Copies of a block in both memories count once.
+
+```sh
+just integrity-check signature-errors \
+  --sections ~/data/election-audit-stage/phase20/national-r1-sections-v4-20261107 \
+  --semantic ~/data/election-audit-stage/phase20b-zeresima/v5-national-r1-20261108 \
+  --output ~/data/election-audit-stage/phase20b-signature-errors/national-r1-signature-errors-v1-20261109
+```
+
+| Round | Sections with errors | Verification errors (start-up / in session) | Signing errors (start-up / in session) | Errors followed by votes after a restart | Failed |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 181 | 280 / 92 | 57 / 12 | 306 | 0 |
+| 2 | 307 | 360 / 51 | 66 / 24 | 423 | 0 |
+
+- No urn completed a vote in the session of a verification error. Every vote after
+  an error comes in a later session, after the urn was switched on again.
+- After a signing error, one section per round completed one vote in the same
+  session. Read in the log, both are the vote in flight: the voter confirmed the
+  last office, the urn reported the signing failure (round 1: a voter-keyboard fault
+  while signing `UENUXDB INT`; round 2: the external medium failed while signing
+  `RDV MI`), logged `O voto do eleitor foi computado` within a second, and was
+  switched off and restarted. After the restart in round 1, every start-up package
+  check ended in `SUCESSO`.
+- Errors outside the round's official blocks are counted in the manifest only
+  (memory copies included): 674 markers in round 1 from preparation and tests; in
+  round 2, 709 such markers and 487 in the round-1 blocks that runoff logs carry.
+- The counts are consistent in every error: the votes before an error never exceed
+  its block's votes.
 
 ### JWS signatures on the published results
 
@@ -729,6 +799,8 @@ refused. The revocation list named in the certificates was not consulted.
 | Ed521 cross-check, round 2 (6 workers) | 2:31:06 | 56222 s | 1.15 GB | 24 MB |
 | Zerésima v2, round 1 / 2 | 0:29 / 0:32 | — | 2.9 GB | 0.8 / 0.6 MB |
 | GEDAI v2, round 1 / 2 | 0:49 / 0:45 | — | 2.2 GB | 0.8 / 0.7 MB |
+| GEDAI v3, round 1 / 2 | 0:53 / 0:54 | — | 2.3 GB | 0.9 / 0.8 MB |
+| Signature errors, round 1 / 2 | 0:13 / 0:14 | — | 1.3 GB | 0.8 / 0.6 MB |
 | Hash lists | 0:01 | — | 0.10 GB | 60 kB |
 | JWS fetch, round 1 / 2 | 3:11:27 / 2:30:26 | — | 0.08 GB | 256 / 166 MB |
 | JWS check, round 1 / 2 | 0:17 / 0:10 | — | 0.11 GB | 0.2 MB |
@@ -755,7 +827,8 @@ hash-list checks is in the [semantic pass guide](semantic-pass.md#version-5-phas
 - The JWS check does not consult TSE's revocation list for `AC DIVULGACAO`; the
   hash-list check compares names and results only, since the logs carry no program
   hash; the GEDAI logs' own signature files are not verified.
-- GEDAI: 13 and 70 isolated G1 sections and sp/0176 are unexplained; the urns that
-  logged a program signature error are not yet followed to their votes.
+- GEDAI: the 13 and 70 isolated G1 sections are late loads whose correspondence did
+  not reach the published logs (T13), as far as the logs show; why it did not is
+  not established. sp/0176 lacks the preparation logs of most of its urns (T11).
 - Agreement among artifacts of the same software chain shows consistency, not voter
   intent.
