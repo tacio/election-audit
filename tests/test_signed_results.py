@@ -59,9 +59,11 @@ class SignedResultsTests(unittest.TestCase):
                 )
             return builder.sign(signer, None)
 
+        self.root_key, self.middle_key = root_key, middle_key
         root = cert("ROOT", "ROOT", root_key.public_key(), root_key)
         middle = cert("AC DIV", "ROOT", middle_key.public_key(), root_key)
         leaf = cert("LEAF", "AC DIV", public, middle_key, ski=True)
+        self.certs = {"leaf": leaf, "middle": middle, "root": root}
         ski = leaf.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value.digest
         self.kid = b64(ski)
         jwk = {
@@ -144,6 +146,66 @@ class SignedResultsTests(unittest.TestCase):
         self.key_file.write_text(json.dumps(pinned))
         with self.assertRaises(ValueError):
             self.sr.check_key(self.key_file, "2026-10-25")
+
+    def crls(self, name: str, revoke: Any = None, signer: Any = None, **dates: Any) -> Path:
+        from cryptography import x509
+        from cryptography.hazmat.primitives.serialization import Encoding
+
+        folder = self.base / name
+        folder.mkdir()
+        lists = {
+            "acdivulgacao.crl": (self.certs["middle"], self.middle_key),
+            "actot.crl": (self.certs["root"], self.root_key),
+        }
+        for file, (issuer, key) in lists.items():
+            builder = (
+                x509.CertificateRevocationListBuilder()
+                .issuer_name(issuer.subject)
+                .last_update(dates.get("last", datetime.datetime(2026, 9, 27)))
+                .next_update(dates.get("next", datetime.datetime(2026, 12, 26)))
+            )
+            if revoke is not None and revoke.issuer == issuer.subject:
+                entry = (
+                    x509.RevokedCertificateBuilder()
+                    .serial_number(revoke.serial_number)
+                    .revocation_date(datetime.datetime(2026, 10, 1))
+                    .build()
+                )
+                builder = builder.add_revoked_certificate(entry)
+            crl = builder.sign(signer or key, None)
+            (folder / file).write_bytes(crl.public_bytes(Encoding.DER))
+        return folder
+
+    def test_revocation_lists_are_checked_when_given(self) -> None:
+        root = self.fetch(self.jws(BODY), BODY)
+        result = self.sr.run_verify(root, self.key_file, self.base / "out", crls=self.crls("ok"))
+        lists = result["key"]["revocation"]
+        self.assertEqual(set(lists), {"acdivulgacao.crl", "actot.crl"})
+        for entry in lists.values():
+            self.assertTrue(entry["signature_valid"] and entry["issuer_matches"])
+            self.assertTrue(entry["current_on_election_day"])
+            self.assertFalse(entry["revoked"])
+        stale = self.crls(
+            "stale", last=datetime.datetime(2024, 10, 4), next=datetime.datetime(2024, 11, 3)
+        )
+        lists = self.sr.check_crls(self.key_file, stale, "2026-10-25")
+        self.assertFalse(lists["actot.crl"]["current_on_election_day"])  # reported, not failed
+        plain = self.sr.run_verify(root, self.key_file, self.base / "plain")
+        self.assertEqual(plain["key"]["revocation"], "not consulted")
+
+    def test_a_revoked_certificate_or_a_forged_list_stops_the_run(self) -> None:
+        from cryptography.hazmat.primitives.asymmetric import ed448
+
+        with self.assertRaises(ValueError):
+            self.sr.check_crls(
+                self.key_file, self.crls("revoked", self.certs["leaf"]), "2026-10-25"
+            )
+        with self.assertRaises(ValueError):
+            self.sr.check_crls(
+                self.key_file,
+                self.crls("forged", signer=ed448.Ed448PrivateKey.generate()),
+                "2026-10-25",
+            )
 
     def public(self) -> Any:
         return self.key.public_key()

@@ -37,7 +37,9 @@ from election_audit.sa_logs import _get
 from election_audit.types import JSON, Row
 
 FETCH_VERSION = "signed-results-fetch-v1"
-VERSION = "integrity-jws-v1"
+VERSION = "integrity-jws-v2"
+# Revocation lists named in the certificates: the end entity's issuer and the intermediate's.
+CRLS = {"acdivulgacao.crl": ("end_entity", "intermediate"), "actot.crl": ("intermediate", "root")}
 SCHEMA = """
 CREATE TABLE binding(value TEXT NOT NULL);
 CREATE TABLE files(
@@ -214,6 +216,53 @@ def check_key(key_file: Path, election_date: str) -> tuple[Any, JSON]:
     return key, summary
 
 
+def check_crls(key_file: Path, crl_dir: Path, election_date: str) -> JSON:
+    """Each certificate's revocation list: issuer, signature, currency and the serial."""
+    from cryptography import x509
+    from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
+    from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+    pinned = json.loads(key_file.read_bytes())
+    certificates = {
+        name: x509.load_pem_x509_certificate(pem.encode())
+        for name, pem in pinned["certificates"].items()
+    }
+    day = datetime.fromisoformat(election_date).replace(tzinfo=UTC)
+    lists = {}
+    for name, (subject, issuer) in CRLS.items():
+        path = crl_dir / name
+        crl = x509.load_der_x509_crl(path.read_bytes())
+        cert, authority = certificates[subject], certificates[issuer]
+        next_update = crl.next_update_utc
+        issuer_key = authority.public_key()
+        signature = False
+        if isinstance(issuer_key, (Ed448PublicKey, Ed25519PublicKey, EllipticCurvePublicKey)):
+            try:
+                signature = crl.is_signature_valid(issuer_key)
+            except TypeError, ValueError:
+                signature = False
+        lists[name] = {
+            "sha256": sha(path),
+            "issuer_matches": crl.issuer == authority.subject,
+            "signature_valid": signature,
+            "this_update": crl.last_update_utc.isoformat(),
+            "next_update": next_update.isoformat() if next_update else None,
+            "current_on_election_day": crl.last_update_utc <= day
+            and (next_update is None or day <= next_update),
+            "certificate": subject,
+            "certificate_serial": hex(cert.serial_number),
+            "revoked": crl.get_revoked_certificate_by_serial_number(cert.serial_number) is not None,
+            "entries": len(crl),
+        }
+    failed = [n for n, v in lists.items() if not (v["issuer_matches"] and v["signature_valid"])] + [
+        n for n, v in lists.items() if v["revoked"]
+    ]
+    if failed:
+        raise ValueError(f"Revocation check failed: {failed} {lists}")
+    return lists
+
+
 def _signed(child: Any, issuer: Any) -> bool:
     from cryptography.exceptions import InvalidSignature
 
@@ -289,8 +338,20 @@ def check_file(body: bytes, key: Any, kid: str, plain: bytes, snapshot: bytes) -
     return row
 
 
-def run_verify(signed_root: str | Path, key_file: str | Path, output: str | Path) -> JSON:
-    """J1-J4 for every file of a finished signed-results fetch."""
+def run_verify(
+    signed_root: str | Path,
+    key_file: str | Path,
+    output: str | Path,
+    *,
+    crls: str | Path | None = None,
+) -> JSON:
+    """J1-J4 for every file of a finished signed-results fetch.
+
+    With ``crls`` (a directory holding ``acdivulgacao.crl`` and ``actot.crl``), the pinned
+    certificates are also checked against their revocation lists; a list not signed by its
+    issuer, or one that revokes a certificate, stops the run. Without it the revocation
+    status is recorded as not consulted.
+    """
     import pyarrow.parquet as pq
 
     from election_audit.elections import election_for_round
@@ -305,6 +366,11 @@ def run_verify(signed_root: str | Path, key_file: str | Path, output: str | Path
         raise ValueError("Signed-results fetch is not finished")
     election = election_for_round(status["round"])
     key, key_summary = check_key(key_file, election.election_date)
+    key_summary["revocation"] = (
+        check_crls(key_file, Path(crls).expanduser().absolute(), election.election_date)
+        if crls is not None
+        else "not consulted"
+    )
     ea20_root = Path(status["ea20_root"])
     if sha(ea20_root / "manifest.sqlite") != status["ea20_manifest_sha256"]:
         raise ValueError("EA20 snapshot changed since the fetch")
