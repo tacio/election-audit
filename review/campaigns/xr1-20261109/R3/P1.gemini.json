@@ -1,0 +1,60 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [],
+  "packet": "P1",
+  "responses": [
+    {
+      "argument": "Checked election_audit/bulk_acquisition.py:165-230 (download_one) and lines 473-485 (verify). On resume, download_one reads the existing .part prefix and incrementally feeds it to digest and long_digest without checking it against previously recorded bytes or remote hashes. It issues a Range request for the remainder and appends the server response. At completion, sha(partial) is compared only against digest.hexdigest() (which was initialized with the corrupted prefix). For bulk datasets without published SHA-512 files (such as bulk BU/RDV archives), this corrupted digest is stored in manifest.sqlite as the authoritative acquisition record, and bulk.verify() validates the corrupted file against that recorded hash without detecting the discrepancy.",
+      "finding_id": "xr1-20261109-P1-01",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/coverage.py:287-293, 323-324, and 437-446, and reproduced via review-scratch/p1-probes/probe.py. When a section's auxiliary file is missing or unverified, the exception handler falls back to log_history and current_log_urls, resetting per_section_assets[key] to only locally known URLs. In coverage.py:323, len(successes) == len(urls) evaluates to True whenever those local URLs are downloaded, classifying the section as acquired and available. Under an all-UF inventory where states[\"acquired\"] == expected_principals, build_population emits national_status: complete_indexed_local_assets with zero package/asset rows, promoting incomplete acquisition to a complete national verdict.",
+      "finding_id": "xr1-20261109-P1-02",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/bulk_acquisition.py:362-367 and 453-464, and reproduced via review-scratch/p1-probes/probe.py:bulk_probe(). During resume, acquire() queries SELECT status, etag, expected_bytes FROM files WHERE url=? and appends (url, None) for any row with status == \"complete\", skipping the download without checking (output / \"files\" / name).exists() or verifying its size on disk. The subsequent status report aggregates complete_files and complete_bytes from SQLite rows, reporting acquisition stage finished and counting completed bytes for missing files until the standalone verify() routine is executed.",
+      "finding_id": "xr1-20261109-P1-03",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/sevenzip.py:182-214 and election_audit/archive_parsing.py:310-314, and reproduced under a 256 MiB address-space limit in review-scratch/p1-probes/probe.py:sevenzip_child(). In _decode(), folder[\"size\"] is checked against limit, but dict_size parsed from LZMA1 properties (props[1:5]) or LZMA2 properties is passed unvalidated to lzma.LZMADecompressor(format=lzma.FORMAT_RAW, filters=[spec]). Liblzma allocates the dictionary buffer upon initialization up to 4 GiB, exhausting worker memory and raising MemoryError before any decoded byte bound is applied. Callers like archive_parsing.py catch only sevenzip.SevenZipError, allowing uncaught MemoryError exceptions to crash worker processes.",
+      "finding_id": "xr1-20261109-P1-04",
+      "stance": "agree"
+    },
+    {
+      "argument": "Accept duplicate of xr1-20261109-P1-02. Re-checked coverage.py:287-293 and 323. Both findings identify the identical issue where unverified or missing auxiliary metadata falls back to historical and current log URLs, evaluating len(successes) == len(urls) to mark sections as acquired and omitting package contract rows. Consolidating under xr1-20261109-P1-02 is correct.",
+      "finding_id": "xr1-20261109-P1-05",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept confirmed with medium severity. Re-checked election_audit/sevenzip.py:183 and 222-237, and verified via review-scratch/r3-p1/probe.py. _decode enforces the limit parameter on individual folder[\"size\"], but _unpack loops over all folders in streams and appends their decompressed parts into outputs without tracking cumulative output bytes against limit. A multi-folder archive with numerous folders beneath the per-folder limit accumulates memory without bound across folders.",
+      "finding_id": "xr1-20261109-P1-06",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept partly-confirmed with low severity. Re-checked election_audit/source_staging.py:68, 165, and stage() lines 291-296, and verified via review-scratch/r3-p1/probe.py. Opening the SQLite manifest with mode=ro&immutable=1 causes SQLite to bypass shared memory and ignore uncheckpointed WAL frames. However, stage() immediately validates len(rows) == binding[\"certified_objects\"] and total bytes, raising ValueError(\"Manifest rows do not reconcile with the certificate\") before modifying the destination directory. Because the system fails closed rather than producing a silent stale read, low severity with documentation of checkpoint requirements is appropriate.",
+      "finding_id": "xr1-20261109-P1-07",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept rejected. Re-checked all callers of sevenzip.read across the codebase (archive_parsing.py:311, operational_review.py:173, semantic_pass.py:270). Entry names returned by sevenzip.read are used exclusively as in-memory structured member locators and filtered against expected strings such as logd.dat. They are never passed to filesystem extraction APIs, written to disk, or resolved against base directories, precluding any directory traversal vulnerability in practice.",
+      "finding_id": "xr1-20261109-P1-08",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept partly-confirmed with low severity. Re-checked scripts/download_tse_logs.py:846-873 and election_audit/coverage.py:434. The downloader's national_coverage boolean in coverage.json does not compare saved_log_versions to advertised_log_versions nor check an independent section denominator. However, this is an acquisition run diagnostic rather than an audit coverage verdict; authoritative coverage verification is performed downstream by coverage.py, which explicitly records \"run_status_is_coverage_proof\": False.",
+      "finding_id": "xr1-20261109-P1-09",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept confirmed with low severity. Re-checked election_audit/source_inventory.py:146-150 and verified via review-scratch/r3-p1/probe.py. When explicit section_keys are supplied, read_manifest constructs an inline SQL predicate joining 4-column tuples with OR. When the number of selected sections reaches or exceeds 1,000, SQLite raises sqlite3.OperationalError: Expression tree is too large (maximum depth 1000).",
+      "finding_id": "xr1-20261109-P1-10",
+      "stance": "accept-disposition"
+    }
+  ],
+  "reviewer": "gemini",
+  "round": "R3",
+  "summary": "Round 3 review for Packet P1 (acquisition, snapshots and coverage). Evaluated all 10 ledger rows from Round 1: agreed with Codex on 4 findings (P1-01 bulk resume corrupted prefix, P1-02 missing auxiliary fallback, P1-03 bulk resume deleted files, P1-04 7z dictionary memory bomb) following independent code inspection and probe validation; accepted Claude's dispositions for all 6 Gemini rows (P1-05 duplicate of P1-02, P1-06 confirmed, P1-07 partly-confirmed, P1-08 rejected, P1-09 partly-confirmed, P1-10 confirmed) after verifying fail-closed checks, in-memory entry usage, and acquisition diagnostics. No new high or critical findings outside the ledger."
+}

@@ -1,0 +1,70 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [],
+  "packet": "P7",
+  "responses": [
+    {
+      "argument": "Checked election_audit/research_models.py:297, 357 and election_audit/research_evaluation.py:189-190. In research_models.py:297, open_journal creates a model-local journal.sqlite inside each fit's output directory. In research_evaluation.py:189-190, record_final_evaluation verifies db.execute(\"SELECT 1 FROM ledger WHERE record_kind='final_evaluation' LIMIT 1\") only on the journal passed from the model directory. When a new model is fitted into a fresh directory, its local journal starts with an empty ledger, bypassing the single-use check and allowing repeated final evaluations against the same protected population.",
+      "finding_id": "xr1-20261109-P7-01",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/research_models.py:418-440 and election_audit/research_evaluation.py:286-295, 301-305. When all protected evaluation targets are unavailable, n=0 predictions are computed, yet payload is recorded with state='complete' and quantile_loss=None. Furthermore, record_evaluation_units registers all test keys from unit_partition unconditionally, and final_evaluation_complete / _validate_final validates state='complete' without asserting n > 0 or a non-null loss. The evaluator thus certifies completion of an empty evaluation.",
+      "finding_id": "xr1-20261109-P7-02",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked research/analysis-plan.md:106, 348-350 and election_audit/research_models.py:152-163. The claim in analysis-plan.md:106 that a small, spatially uniform switch 'is bounded by the minimum detectable manipulation' is statistically invalid. An 80%-power detection threshold against chosen synthetic perturbations does not establish an observational upper bound following a null result. Because cross-fitted baseline and swing models learn the relationship between round 1 and round 2 directly from election data, a uniform shift is absorbed by the model baseline and remains observationally unidentifiable. Agree with Claude's triage as needs-user to formally revise the threat model and blind-spot framing before the protocol freeze.",
+      "finding_id": "xr1-20261109-P7-03",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/investigations.py:209, 215-216, 279, election_audit/features.py:804, and election_audit/research_models.py:407. In investigations.py:205-216, case packets retain the directional selection_reason (e.g. ranked_positive or ranked_negative) and signed_residual while unconditionally setting candidate_blinded=True. In review records (line 279), candidate_blinded=True is recorded without checking reviewer exposure. Because features.py:804 fixes candidate roles (candidate_pair: [candidate_a, candidate_b]), a positive or negative residual unambiguously identifies which candidate benefits, defeating blinding for candidate-share models.",
+      "finding_id": "xr1-20261109-P7-04",
+      "stance": "agree"
+    },
+    {
+      "argument": "Accept confirmed disposition. Re-checked election_audit/features.py:424-449. The guard set(candidate) == {candidate_a, candidate_b} requires non-zero vote counts for both candidates. In uncontested, unanimous, or extreme stuffing sections where TSE BWEB omits a candidate with zero votes, candidate_a_share is marked unavailable with 'fixed_candidate_pair_required' and candidate_b_share is omitted. Downstream models filtering on readiness_state='ready' silently drop these extreme sections (110 sections in the 2026 runoff data).",
+      "finding_id": "xr1-20261109-P7-05",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept confirmed disposition. Re-checked election_audit/research_models.py:596-606 and 884-886. In perturb_mechanism, manipulations only transfer votes from B to A or add votes to A, with no mechanism or parameter to evaluate manipulation favoring candidate B. In validate_mechanisms, candidate numbers 13 and 22 are hardcoded. Both aspects violate political neutrality by evaluating manipulation symmetrically in only one candidate direction.",
+      "finding_id": "xr1-20261109-P7-06",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept partly-confirmed disposition with medium severity. Re-checked election_audit/research_models.py:163-165 and 401-402. The triage rationale is correct that scoring 0.0 inside the 95% prediction interval is intended for tail-rank triage (ranking only extreme units outside the interval). However, the IQR scale floor of 1e-06 in np.maximum(p[:, 3] - p[:, 1], 1e-06) causes numerical blowup when predicted quartiles collapse. Defining a robust scaling metric in the pre-registered protocol before Phase 23 resolves this prototype limitation.",
+      "finding_id": "xr1-20261109-P7-07",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept partly-confirmed disposition with low severity. Re-checked election_audit/research_models.py:214-234. In GroupKFold cross-validation, DictVectorizer fitted inside each fold drops held-out municipality indicators, mimicking out-of-sample prediction for unseen municipalities. The inconsistency arises when the final model refits on all data with full municipality indicators active. Given that this occurs in prototype hyperparameter tuning for min_samples_leaf, low severity is appropriate and the feature set can be finalized in Phase 23.",
+      "finding_id": "xr1-20261109-P7-08",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept needs-user disposition. Re-checked research/analysis-plan.md:305-327, election_audit/analysis.py:70, and election_audit/research_protocol.py:49. While the analysis plan outlines confirmatory tests C1-C6 and cites Benjamini-Yekutieli multiplicity control, exact test statistics, directional hypotheses, scan radii, integer rounding thresholds, and multiplicity family partitions remain unspecified. Fixing these methodological definitions prior to the Phase 23 protocol freeze is a design decision requiring user determination.",
+      "finding_id": "xr1-20261109-P7-09",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept needs-user disposition. Re-checked research/analysis-plan.md:279-282, 318 and election_audit/research_models.py:79-89. The protocol specifies that the primary swing model includes voter profile covariates (age bands, sex, schooling), but the prototype code omits them. Because operational indicators (such as biometric failure rates and voting cadence) and candidate support both vary systematically with voter age and rurality, test C5 risks severe ecological confounding without demographic adjustment or an alternative within-location design. This methodological choice requires user guidance.",
+      "finding_id": "xr1-20261109-P7-10",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept confirmed disposition with upgraded severity high. Re-checked research/analysis-plan.md:74-95, 370-381 and election_audit/research_protocol.py:208-212. Sections inspected in Phase 20b (including 121 I5 check sections, GEDAI anomaly cases, and signature error investigations) were not recorded in an append-only inspection registry. Generating partitions using election_audit/research_protocol.py fails to mark them development_inspected, allowing previously scrutinized sections to leak into confirmatory or sealed holdout partitions.",
+      "finding_id": "xr1-20261109-P7-11",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept confirmed disposition with medium severity. Re-checked election_audit/investigations.py:330-331, 366-368, and 384. In read_national_margin, nonnegative_count(margin, 'leading_margin') crashes if candidate A does not lead. Furthermore, switching_cap and excess calculations in conditional_scenario exclusively model vote transfers from candidate A or excess votes for candidate A, preventing symmetric evaluation of scenarios where candidate B leads or benefits from irregularities.",
+      "finding_id": "xr1-20261109-P7-12",
+      "stance": "accept-disposition"
+    }
+  ],
+  "reviewer": "gemini",
+  "round": "R3",
+  "summary": "Round 3 review for Packet P7 (research design and statistics). Evaluated all 12 ledger rows: agreed with Codex on 4 rows (P7-01 confirmed critical model-local journal reset; P7-02 confirmed high vacuous evaluation with zero predictions; P7-03 needs-user high invalid observational bound on uniform switch; P7-04 confirmed medium unblinded direction in case packets); accepted Claude's dispositions on all 8 Gemini rows (P7-05 confirmed high exclusion of unanimous sections; P7-06 confirmed high asymmetric mechanism perturbations; P7-07 partly-confirmed medium scoring scale collapse; P7-08 partly-confirmed low DictVectorizer municipality indicator omission in tuning; P7-09 needs-user high unconstrained C1-C6 test statistics and multiplicity family; P7-10 needs-user medium voter demographic omission and C5 ecological confounding; P7-11 confirmed high Phase 20b inspected section registry leakage; P7-12 confirmed medium directional winner assumption in investigations). No new high or critical findings outside the ledger."
+}

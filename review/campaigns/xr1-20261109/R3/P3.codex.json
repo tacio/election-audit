@@ -1,0 +1,55 @@
+{
+  "reviewer": "codex",
+  "packet": "P3",
+  "round": "R3",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Independently checked all nine other-reviewer rows using code, committed fixtures and synthetic probes. Seventeen targeted tests passed. No new high or critical findings. National-data assertions were not independently checked because those inputs are outside the permitted checkout.",
+  "findings": [],
+  "responses": [
+    {
+      "finding_id": "xr1-20261109-P3-04",
+      "stance": "agree",
+      "argument": "Confirmed independently. review-scratch/r3_p3_probe.py used the identity public key with R=B and S=1: both ed521.verify and ed521rs accepted signatures for two different messages. Neither verifier rejects this low-order key. The pinned issuer-signature check bounds exploitation through urn certificates but does not repair the verifier."
+    },
+    {
+      "finding_id": "xr1-20261109-P3-05",
+      "stance": "agree",
+      "argument": "Agree with partial confirmation. Injecting issuer_signature='failed', revoked=True and certificate-validity=False into check_signatures output still produced issues=[] from check_section. summarize separately counts PKI verdicts, so the failures remain visible outside the discrepancy count. The printed-BU fixture also accepted an unknown issuer as equal_content_other_certificate, rather than not_authentic; the separate P4 finding appropriately covers that behavior."
+    },
+    {
+      "finding_id": "xr1-20261109-P3-06",
+      "stance": "agree",
+      "argument": "Confirmed the missing independently pinned anchor, with the stated scope limitation. The synthetic test-generated certificate chain passed all six check_key checks and completed JWS verification. check_key reads its root from the supplied key file and only records that file's digest afterward. However, check_file receives this separately supplied key; it does not obtain a verification key from the JWS token. This is an input-provenance assumption rather than token-controlled circular trust."
+    },
+    {
+      "finding_id": "xr1-20261109-P3-07",
+      "stance": "disagree",
+      "argument": "Disagree with the finding's claim that an unconsulted revocation check is reported as passing; the rejection is supported. The probe completed J1-J4 with revocation explicitly equal to 'not consulted'. Those checks concern headers, signatures and payload equality. Supplying a correctly signed CRL revoking the synthetic leaf caused run_verify to raise ValueError. Omitted revocation checking remains an explicit limitation, not a positive revocation verdict."
+    },
+    {
+      "finding_id": "xr1-20261109-P3-08",
+      "stance": "agree",
+      "argument": "Confirmed and agree this duplicates P3-01. A synthetic signed payload changed from election 6258 to 6257 and from 25/10/2026 to 04/10/2026 produced payload_equals_ea20=False but failed_json='[]'. The generation difference bypasses J4 without establishing a later publication or matching election identity."
+    },
+    {
+      "finding_id": "xr1-20261109-P3-09",
+      "stance": "agree",
+      "argument": "Agree with the narrow coverage observation and known-gap disposition. Mutating BU attendance, polling-place number and opening time left both internal chains and both chain signatures valid. Recomputing the published hash of those altered bytes nevertheless produced i1_hash_mismatches=1 and i1_file_signatures_failed=1: the VSC authenticates the whole BU. Thus the claimed metadata substitution is detectable by I1. Its absence from issues=[] is the separate discrepancy-reporting problem already covered by P3-05/P0."
+    },
+    {
+      "finding_id": "xr1-20261109-P3-10",
+      "stance": "agree",
+      "argument": "Confirmed independently. Changing numeroInternoUrna and codigoCarga in EntidadeResultadoRDV.urna still yielded rdv_identity='match', i3_equal=2 and no identity issue. check_section immediately extracts ['rdv'] and discards the envelope's urn fields. The altered file also produced one failed I1 file signature, supporting the triage's limitation that this is an incomplete equipment comparison rather than an unrestricted unsigned-RDV substitution."
+    },
+    {
+      "finding_id": "xr1-20261109-P3-11",
+      "stance": "agree",
+      "argument": "Confirmed and agree this duplicates P3-03. With ed521.verify patched to raise if invoked, run_vectors completed with zero internal-verifier calls and reported strict=False directly from the synthetic vector label. Inspection of run_vectors also shows no native-verifier invocation. The documentation's assertion that vectors run through both verifiers is unsupported."
+    },
+    {
+      "finding_id": "xr1-20261109-P3-12",
+      "stance": "agree",
+      "argument": "Agree with partial confirmation. Replacing every listed digest with an invalid string left the hash-list summary unchanged, while the recorded archive digests changed. read_list retains digest strings, but run_hash_lists uses only path sets. This matches the existing documented contract: logs provide names and verification results, not program hashes. The binding explicitly records that limitation and hashes the supplied archives, although it does not enforce an independently expected archive digest."
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "reviewer": "codex",
+  "packet": "P8",
+  "round": "R3",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Rechecked all seven Gemini-only rows. Their core issues or duplicate dispositions hold, with qualifications about documented rtk installation and redistributed verification resources. Offline demo, bundle verification and reproduction passed. The clean gate encountered mount failures and sandbox socket restrictions. Evidence is recorded in review-scratch/r3-p8/workflow.md. No new high or critical findings.",
+  "findings": [],
+  "responses": [
+    {
+      "finding_id": "xr1-20261109-P8-04",
+      "stance": "agree",
+      "argument": "Confirmed recipe coupling and doctor omission. With bash, uv and just available but rtk absent from PATH, just doctor exited 127 with 'rtk: command not found'. However, README.md:33 explicitly says to install rtk, so the prerequisite is named. The supported concern is the unnecessary mandatory wrapper and lack of documented wrapper-free instructions."
+    },
+    {
+      "finding_id": "xr1-20261109-P8-05",
+      "stance": "agree",
+      "argument": "Confirmed the duplicate of P8-01. Created and verified a fresh demo bundle, copied it, then successfully ran offline uv sync --locked from the copied source directory using default environment placement. Subsequent verification raised 'PublicationError: Review bundle must not contain symlinks'. Checked file_pins, verify_bundle and reproduce's initial verification."
+    },
+    {
+      "finding_id": "xr1-20261109-P8-06",
+      "stance": "agree",
+      "argument": "Confirmed the duplicate of P8-03. In a fresh interpreter simulating unavailable fcntl, doctor returned 0 and demo raised ModuleNotFoundError. This was a Linux simulation, not a Windows execution. Also checked the unconditional /proc/self/stat read in national_parallel.worker_init, supporting the separate Linux dependency of national processing."
+    },
+    {
+      "finding_id": "xr1-20261109-P8-07",
+      "stance": "agree",
+      "argument": "Reproduced by reporting 15 GiB free through a disk_usage mock and calling demo: it raised 'SSD free space cannot preserve reserve plus spill cap'. Checked demo's default ResourceConfig, the 10 GiB reserve plus 8 GiB spill guard, and the demo CLI's lack of resource overrides."
+    },
+    {
+      "finding_id": "xr1-20261109-P8-08",
+      "stance": "agree",
+      "argument": "Checked the cited commands in reproduction.md, backfill.md and acquisition-reference.md. They contain the author's username, drive UUID and absolute manifest path without replacement instructions alongside the examples. These commands require adaptation on another machine. I did not access the private locations."
+    },
+    {
+      "finding_id": "xr1-20261109-P8-09",
+      "stance": "agree",
+      "argument": "Confirmed the duplicate of P8-02 through code inspection and an isolated test. With TMPDIR under scratch, whose device differs from '/', test_no_old_fallback_unknown_root_or_ledger_pin failed because 'Verified relocated source mount/root changed' replaced the expected validation error. The fixture explicitly declares mount '/'."
+    },
+    {
+      "finding_id": "xr1-20261109-P8-10",
+      "stance": "agree",
+      "argument": "Agree with partly-confirmed. Checked the hash-list and JWS CLI input requirements and documentation pointing to private staging folders without a complete public acquisition manifest. The original claim overstates the missing resources: three urn CA certificates and five urn CRLs are redistributed, and all eight hashes matched pki.json; official ASN.1 metadata also supplies URL and hashes. I did not inspect private SOURCES.txt or SHA256SUMS files, so their contents remain unverified."
+    }
+  ]
+}

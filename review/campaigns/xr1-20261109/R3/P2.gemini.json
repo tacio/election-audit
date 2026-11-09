@@ -1,0 +1,60 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [],
+  "packet": "P2",
+  "responses": [
+    {
+      "argument": "Checked election_audit/semantic_pass.py:938-953 (run_shard) and election_audit/semantic_pass.py:765-773 (summarize_object). When processing staged shards (bodies is None), run_shard assigns source = Path(staged_root) / item['path'] and digest = item['sha256'] directly from manifest.sqlite, whereas the in-memory branch (bodies is not None) explicitly hashes source with hashlib.sha256(source).hexdigest(). summarize_object forwards source directly to log_members without verifying the digest. If an on-disk archive is replaced with an altered, valid ZIP, its modified cycles and sessions are processed and published under the manifest's original certified digest without detection.",
+      "finding_id": "xr1-20261109-P2-01",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/semantic_pass.py:508-515, 556-558, and election_audit/round1_prefix.py:113-117, 237-242. In semantic_pass.py, lines with len(fields) != 6 or failing reading_seconds() increment malformed and execute continue, bypassing _event() where segment['hash'].update(line) and segment['lines'] += 1 are called. Similarly, round1_prefix.py:_match_streams skips non-6-field and unparseable timestamp records. In round1_prefix.py:SECTIONS_SQL, prefix equality relies exclusively on b1.fingerprint = b2.fingerprint AND b1.lines = b2.lines. Consequently, inserting or modifying malformed records in the embedded round 1 history does not alter segment fingerprints or line counts, causing check I6 to certify physical histories as equal without rereading or flagging discrepancies.",
+      "finding_id": "xr1-20261109-P2-02",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/semantic_pass.py:568, 680-690, and election_audit/section_table.py:425, 1052-1054. In semantic_pass.py, an official election-day session start assigns session_kind = 'official_vota' regardless of software version, but if the software line does not match the pinned supported software, self.software remains False. This causes active to evaluate to False, silently skipping all voting cycle transitions. In section_table.py:425, SESSIONS_SQL queries WHERE session_kind = 'official_vota' without filtering on software_supported. Because unresolved cycles and orphan completions are all 0, line 1053 assigns operations_state = 'ready', publishing empty operational cycles as ready rather than flagging the unsupported software.",
+      "finding_id": "xr1-20261109-P2-03",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/semantic_pass.py:564, 682-690, 733-742, and election_audit/operational_review.py:484-503. The on_day gate requires the reading to fall within the 24-hour election window; when a timestamp excursion occurs outside election day, active becomes False and the handler returns early without updating or resetting self.pending. Intervening voter suspensions or re-authorizations occurring during the excursion are dropped. When readings return to election day, a subsequent completion links to the dangling pre-excursion authorization, improperly counting a completed cycle with the earlier voter's authorization method, while section_table records operations_state as ready.",
+      "finding_id": "xr1-20261109-P2-04",
+      "stance": "agree"
+    },
+    {
+      "argument": "Accept confirmed disposition with low severity. Re-checked election_audit/semantic_pass.py:733-740 and election_audit/operational_review.py:560-563. An orphan completion event increments orphan_completions but does not reset self.pending, allowing prior manual_request or operator flags to contaminate the subsequent voter's cycle state and misclassify a biometric authorization as manual. The triage rationale correctly notes that national exposure is strictly bounded (one orphan completion in round 1, zero in round 2 in the 2026 national dataset).",
+      "finding_id": "xr1-20261109-P2-05",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept partly-confirmed disposition with low severity. Re-checked election_audit/semantic_pass.py:564, 683-690, and election_audit/section_table.py:538-539. Events timestamped at or after midnight (00:00:00) fail the on_day check and are dropped, leaving in-flight cycles unresolved and ignoring closing. In real-world polling, official voting closes at 17:00 local time, so voting extending past midnight requires extraordinary delay or severe clock drift. Sessions keep all votes cast on election day up to 23:59:59. Explicitly documenting this boundary in docs/en/semantic-pass.md and tracking affected sessions as proposed in the rationale is appropriate.",
+      "finding_id": "xr1-20261109-P2-06",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept duplicate of xr1-20261109-P2-03. Both findings identify the exact same root cause and failure mode in election_audit/semantic_pass.py:680-688 and downstream aggregation: an exact-string mismatch on the supported_software template leaves self.software as False, silently suppressing all voting cycle events while session_kind remains 'official_vota', resulting in ready operational zero counts.",
+      "finding_id": "xr1-20261109-P2-07",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept confirmed disposition with medium severity. Re-checked election_audit/operational_review.py:42-52, 66, and election_audit/semantic_pass.py:1002-1004. TEMPLATES_2026 is defined directly in Python code rather than inside election_audit/resources/real-log-rules.json. Because _rules_sha(2026) computes a SHA-256 digest solely over rules_for(2026) (which returns real-log-rules.json without operational templates), altering the 2026 round markers, session starts, or authorization regexes in operational_review.py leaves rules_sha256 in the publication manifest unchanged, decoupling template execution from the manifest digest.",
+      "finding_id": "xr1-20261109-P2-08",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept partly-confirmed disposition with low severity. Re-checked election_audit/operational_review.py:578-581 and election_audit/section_table.py:435-472. In the Phase 13 single-object inspection tool (operational_review.py), copy candidates are matched using strict equality on cumulative stream events and whole-stream fingerprints (a.fingerprint=b.fingerprint AND a.events=b.events), failing to detect truncated copy pairs. However, the production national pipeline in section_table.distinct_sessions deduplicates sessions using (device_id, block_start, rank_in_segment) and selects the longest block, correctly handling truncated copies without requiring stream-end equality.",
+      "finding_id": "xr1-20261109-P2-09",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept rejected disposition. Re-checked election_audit/operational_review.py:142-160 and election_audit/semantic_pass.py:543-553. In the urn architecture, application transitions are mediated by GAP. When any non-official or test routine initiates, GAP emits an 'Iniciando aplicação' message that triggers context_reset, which executes _finish_session('context_transition') and clears self.phase, preventing subsequent events from being attributed to official_vota. Furthermore, empirical inspection of vocabulary.parquet across all urn logs for both rounds in the 2026 election confirms that no VOTA training or simulation start templates exist.",
+      "finding_id": "xr1-20261109-P2-10",
+      "stance": "accept-disposition"
+    }
+  ],
+  "reviewer": "gemini",
+  "round": "R3",
+  "summary": "Round 3 review for Packet P2 (parsing and log semantics). Evaluated all 10 ledger rows: agreed with Codex's 4 confirmed findings (P2-01, P2-02, P2-03, P2-04) after independent code verification of manifest hashing in staged workers, malformed-line exclusions in segment fingerprints/I6 prefix equality, unsupported software zero-count leakage into ready operational states, and clock excursions preserving pending authorization cycles; accepted Claude's dispositions for all 6 Gemini rows (P2-05 confirmed, P2-06 partly-confirmed, P2-07 duplicate of P2-03, P2-08 confirmed, P2-09 partly-confirmed, P2-10 rejected) after verifying code paths, deduplication logic in section_table, GAP context transitions, and national vocabulary invariants. No new high or critical findings outside the ledger."
+}

@@ -1,0 +1,80 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [],
+  "packet": "P0",
+  "responses": [
+    {
+      "argument": "Checked election_audit/section_table.py:100-117 (_manifest_files) and election_audit/section_table.py:171-193 (load_bweb). _manifest_files checks (root / path).stat().st_size != size against manifest.sqlite but never hashes the file, returning the manifest's recorded sha256. load_bweb then streams the unverified archive directly and outputs the unverified manifest digest as provenance. A modified archive with identical byte length is accepted and attributed to the original hash.",
+      "finding_id": "xr1-20261109-P0-01",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/gedai.py:238-254 (zone_coverage) and run_gedai (lines 311-320). If no section in a zone matches a correspondence (matched[zone] == 0) or covers a load medium (media[zone] == 0), zone_coverage removes 'G1' or 'G3' from failed_json and relabels correspondence/load_medium to 'zone_unpublished'. Consequently, when all loads in a zone disagree or fail matching, the failures are wiped and zero discrepancies are recorded in discrepancies.jsonl.",
+      "finding_id": "xr1-20261109-P0-02",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/features.py:136 (verified_member_sections) and election_audit/section_table.py:264-278 (compositions), lines 975-982, and lines 1164-1166. Non-standard composition tokens such as #NE#, #NE, or -3 cause verified_member_sections to return an empty list without raising ValueError, whereupon compositions sets members = [section] and composition_unknown = (raw is None), which evaluates to False. This treats unknown compositions as confirmed singletons, allowing them to qualify for profile readiness and cross-round comparability.",
+      "finding_id": "xr1-20261109-P0-03",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/integrity_checks.py:2287-2289 (clock_rules). Sessions are ordered by (s['stream_ordinal'], s['session_ordinal']) rather than chronological timestamps (start_reading/end_reading). In multi-urn sections with multiple archive streams, ordered[-1] checks the closing_reading of whichever stream has the highest stream_ordinal rather than the chronologically final session, potentially masking an unclosed final voting session.",
+      "finding_id": "xr1-20261109-P0-04",
+      "stance": "agree"
+    },
+    {
+      "argument": "Accept partly-confirmed with medium severity. Re-checked check_section (integrity_checks.py:666-685) and summarize() (integrity_checks.py:1072-1117). While check_section indeed omits appending issues for I1 hash mismatches, math/file signature failures, or broken certificates to issues (leaving discrepancies.jsonl and manifest['discrepancies'] at 0 for these failures), summarize() aggregates each of these status columns into manifest['summary'], and national summaries report them from parquet. Clarifying the documentation to state that discrepancies.jsonl only records disagreement issues resolves the ambiguity.",
+      "finding_id": "xr1-20261109-P0-05",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept duplicate of xr1-20261109-P4-10. The claim and evidence regarding replacement urns voting without a zerésima passing Z1-Z5 (zeresima.py:155-156) is identical to gemini-P4-06 under the dedicated Packet P4.",
+      "finding_id": "xr1-20261109-P0-06",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept partly-confirmed with low severity. Re-checked check I3 (integrity_checks.py:706-712) and check I5 (integrity_checks.py:2404-2430). When recount is None, i3 evaluates to 'no_rdv' or 'missing_in_rdv' without appending to issues; when bu is None or no official session is found, i5 evaluates to 'unavailable' without appending to issues. These non-comparison states are tracked in summary counters and parquet tables rather than discrepancies.jsonl. Updating documentation to explicitly specify that discrepancies.jsonl tracks discrepancy comparisons rather than input absences is appropriate.",
+      "finding_id": "xr1-20261109-P0-07",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept duplicate of xr1-20261109-P3-04. The claim and reproduction for universal Ed521 signature forgery via identity public key points (ed521.py:139-173) is identical to gemini-P3-01 under the dedicated Packet P3 (crypto).",
+      "finding_id": "xr1-20261109-P0-08",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept duplicate of xr1-20261109-P0-02. The claim regarding zone_coverage erasing G1 failures when matched[zone] is 0 (gedai.py:245-253) addresses the exact same defect and code lines as codex-P0-02.",
+      "finding_id": "xr1-20261109-P0-09",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept rejected. Re-checked national_relocation.py:25-35 and tests/test_national_migration.py:74-85. In national_relocation.py, _CACHE is keyed by (path, expected_sha) and verified against mount identity. In test_national_migration.py, reset_cache() is registered via addCleanup to close connections and set _CACHE = None, and os.environ.pop unsets the relocation keys. Test suite failures observed under isolated runs stemmed from cross-mount st_dev mismatches on systems where TMPDIR is on a different filesystem than /, rather than global cache leakage.",
+      "finding_id": "xr1-20261109-P0-10",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept known-gap. As stated in docs/en/implementation-index.md (lines 257-272) and completion-plan.md, C1-C6 and the beta-binomial swing model are scheduled for Phase 23 (which commences after the xr1 review campaign). The analysis plan is a pre-freeze draft protocol rather than an implemented pipeline. The protocol definition gaps are tracked under xr1-20261109-P7-05.",
+      "finding_id": "xr1-20261109-P0-11",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept partly-confirmed with low severity. Re-checked section_table.py:458-472 and integrity_checks.py:2389. distinct_sessions increments conflicts when alternate session copies record more completed cycles, but run_logs unpacks found, _ = distinct_sessions(raw), dropping conflicts without logging an issue. In the national 2026 dataset, copy_conflicts was 0 in both rounds, confirming zero national impact.",
+      "finding_id": "xr1-20261109-P0-12",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept rejected. Re-checked implementation-index.md:20-26 and section_table.py:171-193. The status 'Recebido' in the acquisition manifest described raw log package availability at download cutoff, not electoral result totalization. Results are populated nationally from official BWEB archives and verified against signed BUs via check I2 across all 499,205 sections without exclusion.",
+      "finding_id": "xr1-20261109-P0-13",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept rejected. pyproject.toml explicitly specifies requires-python = '>=3.14'. Unparenthesized multiple exception syntax in except clauses is standard Python syntax under PEP 758 (introduced in Python 3.14). Running on older Python versions is rejected by pyproject dependencies; portability concerns are addressed in Packet P8.",
+      "finding_id": "xr1-20261109-P0-14",
+      "stance": "accept-disposition"
+    }
+  ],
+  "reviewer": "gemini",
+  "round": "R3",
+  "summary": "Round 3 review for Packet P0 (open review). Evaluated all 14 ledger rows from Round 1: agreed with Codex's 4 confirmed findings (P0-01, P0-02, P0-03, P0-04) after independent code verification of manifest hashing, GEDAI zone-coverage filtering, composition fallback handling, and session clock ordering; accepted Claude's dispositions for all 10 Gemini rows (P0-05 partly-confirmed, P0-06 duplicate of P4-10, P0-07 partly-confirmed, P0-08 duplicate of P3-04, P0-09 duplicate of P0-02, P0-10 rejected, P0-11 known-gap, P0-12 partly-confirmed, P0-13 rejected, P0-14 rejected) after verifying code paths and reproduction rationale. No new high or critical findings outside the ledger."
+}

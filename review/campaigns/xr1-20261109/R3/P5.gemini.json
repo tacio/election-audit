@@ -1,0 +1,60 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [],
+  "packet": "P5",
+  "responses": [
+    {
+      "argument": "Checked election_audit/section_table.py:244-253 (results_sql) and election_audit/section_table.py:1041-1044 (_finish). In results_sql, nominal, blank, null_votes, and candidate tallies are computed using unqualified sum(TRY_CAST(QT_VOTOS AS BIGINT)) GROUP BY ALL, blindly summing repeated choice rows without deduplication or internal accounting reconciliation against attendance (attendance == nominal + blank + null_votes). In _finish, results_state is set to \"ready\" solely based on result is not None and result[\"eligible\"] is not None and not result[\"unparsed_votes\"]. This allows duplicate BWEB retransmissions, conflicting attendance (which collapses to attendance=null), and negative missing-value tokens (eligible=-1) to be published with results_state=\"ready\". Agree with the partly-confirmed disposition, noting zero national impact in the 2026 dataset where check I2 verified exact counts against signed BUs for all sections.",
+      "finding_id": "xr1-20261109-P5-01",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/section_table.py:112-116 (_manifest_files) and 186-197 (load_bweb). The finding identifies the omission of SHA-256 verification of staged BWEB archives against manifest.sqlite (checking only st_size) and the recording of the manifest digest as provenance. This is verbatim identical in claim, location, and mechanism to xr1-20261109-P0-01 (codex-P0-01). Agree with the duplicate disposition.",
+      "finding_id": "xr1-20261109-P5-02",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/electoral_results.py:223-230 and election_audit/electoral_results.py:687-751 (_round_comparison). The population disjointness key (policy[\"harmonization_policy\"], member[\"snapshot_id\"], member[\"principal_section_id\"]) includes snapshot_id, which allows multiple snapshots representing the same principal section to pass validation under the same policy. Subsequently, in _round_comparison(), memberships are grouped by election (groups[election].append(member)) and aggregated via sum(r[\"totals\"][field] for r in present), causing electors and votes from multiple snapshots of the same principal to be summed multiple times in one round. Agree with the confirmed disposition for Phase 6 derivatives.",
+      "finding_id": "xr1-20261109-P5-03",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/section_table.py:264-271, 952, and 975-982. The finding identifies that non-None unparseable or unpublished composition tokens (such as \"#NE#\") cause verified_member_sections() to return an empty list or raise ValueError, falling back to members = [section]. Because raw is None evaluates to False, composition_unknown is recorded as False, marking the principal as a confirmed singleton with composition=\"bweb\" and qualifying for profile readiness and cross-round comparability. This is identical in claim, location, and mechanism to xr1-20261109-P0-03 (and xr1-20261109-P5-07). Agree with the duplicate disposition.",
+      "finding_id": "xr1-20261109-P5-04",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/section_table.py:1157-1166 (harmonize). The comparability condition sets unit[\"comparable\"] = kind != \"one_round_only\" and all(sections[(r, *k)][\"results_state\"] == \"ready\" for r in (1, 2) for k in principals[r]). It tests only whether both rounds contain ready principal sections, without comparing the sets of underlying registered member sections across rounds. Consequently, when a principal's composition drops or adds an aggregated member section between round 1 and round 2, the unit is still classified as same_principal and marked comparable=True, concealing population divergence as turnout or vote-share variation. Agree with the confirmed disposition.",
+      "finding_id": "xr1-20261109-P5-05",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/results_hierarchy.py:179 and election_audit/results_hierarchy.py:246-248. In results_hierarchy.py:179, totalization_final stores value.get(\"tf\"), which is None (NULL in SQLite) when the key is omitted. In lines 246-248, SELECT count(*) FROM files WHERE kind='unified' AND totalization_final!='s' evaluates to UNKNOWN for NULL rows under standard SQL three-valued logic, excluding them from not_final. This allows unified results with missing totalization status to report unified_not_final=0. Agree with the confirmed disposition.",
+      "finding_id": "xr1-20261109-P5-06",
+      "stance": "agree"
+    },
+    {
+      "argument": "Accept duplicate of xr1-20261109-P0-03. Re-checked election_audit/section_table.py:264-278 and election_audit/features.py:136. The finding demonstrates that unparseable or unpublished composition tokens (such as \"#NE#\") cause compositions() to set members = [section] and record raw is None as False, improperly treating unknown compositions as valid singletons with composition=\"bweb\". This addresses the exact same defect and mechanism as xr1-20261109-P0-03 (codex-P0-03).",
+      "finding_id": "xr1-20261109-P5-07",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept confirmed disposition with medium severity. Re-checked election_audit/electoral_results.py:275-295 (_canonical()). Filtering eligible strictly to result_status == \"totalized\" prevents collecting supersessions from non-totalized result versions (e.g. administrative annulments or rejections), allowing an obsolete totalized version to be selected as canonical. In addition, the unresolved predicate v in unknown and v[\"result_status\"] in {\"totalized\", \"unknown\", \"conflict\"} checks membership in unknown (unassigned versions) rather than checking whether v[\"result_status\"] == \"unknown\", allowing an un-superseded observed version of unknown status to be ignored rather than flagging a conflict. The triage rationale correctly confirms this defect within Phase 6 derivatives.",
+      "finding_id": "xr1-20261109-P5-08",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept partly-confirmed disposition with low severity. Re-checked election_audit/electoral_results.py:492-498 and election_audit/electoral_references.py:24-35. In _hierarchy(), metrics are restricted to TOTAL_FIELDS, which causes passing official EA20 metrics from reference_metrics() to raise PublicationError(\"Invalid hierarchy metric\") on candidate tallies and auxiliary metrics, while candidate-level vote swaps are not checked at the hierarchy stage. The triage rationale correctly notes that candidate totals are reconciled nationally via integrity check I4 (BU against EA20 per municipality and candidate), so candidate vote swaps cannot pass undetected in the national audit. Clarifying the documentation regarding the scope of I4 versus hierarchy reconciliation and improving the metric validation error message resolves the issue.",
+      "finding_id": "xr1-20261109-P5-09",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept confirmed disposition with low severity. Re-checked election_audit/electoral_verification.py:261-264 and election_audit/electoral_verification.py:398-401. Filtering DS_SECOES_AGREGADAS only against {\"#NULO#\", \"#NULO\", \"-1\"} causes empty strings \"\" to produce [''].zfill(4) == ['0000'], injecting phantom section '0000' into member_sections, while missing tokens '#NE#' and '-3' are misparsed as ['#NE#'] and ['-003']. Updating electoral_verification.py to use features.verified_member_sections() directly fixes the composition parsing and prevents phantom member injection.",
+      "finding_id": "xr1-20261109-P5-10",
+      "stance": "accept-disposition"
+    }
+  ],
+  "reviewer": "gemini",
+  "round": "R3",
+  "summary": "Round 3 review for Packet P5 (electoral results and joins). Evaluated all 10 ledger rows: agreed with Codex's 6 findings (P5-01 partly-confirmed, P5-02 duplicate of P0-01, P5-03 confirmed, P5-04 duplicate of P0-03, P5-05 confirmed, P5-06 confirmed) after independent code verification of section table SQL aggregation, manifest hash omission, multi-snapshot principal collisions in round comparisons, composition fallback singleton propagation, member coverage gaps in cross-round comparability, and SQL NULL exclusion in unified_not_final; accepted Claude's dispositions for all 4 Gemini rows (P5-07 duplicate of P0-03, P5-08 confirmed, P5-09 partly-confirmed, P5-10 confirmed) after verifying canonical supersession logic in derivatives, I4 candidate reconciliation versus hierarchy TOTAL_FIELDS metrics, and DS_SECOES_AGREGADAS parsing. No new high or critical findings outside the ledger."
+}

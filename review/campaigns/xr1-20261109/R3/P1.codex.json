@@ -1,0 +1,40 @@
+{
+  "reviewer": "codex",
+  "packet": "P1",
+  "round": "R3",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Checked all six other-reviewer rows using code tracing and synthetic probes. Agree with five findings at their narrowed dispositions; disagree with the rejected path-traversal finding. No new high or critical findings. All 36 targeted existing tests passed.",
+  "findings": [],
+  "responses": [
+    {
+      "finding_id": "xr1-20261109-P1-05",
+      "stance": "agree",
+      "argument": "Verified the auxiliary-error fallback and acquired-state branch in coverage.py:287-324. Running .venv/bin/python review-scratch/r3-p1/probe.py with a missing auxiliary and one available historical log produced accounting={'acquired': 1}, auxiliary_state='metadata_not_verified', and package_assets=0. This is the same failure as P1-02, so the duplicate disposition is correct."
+    },
+    {
+      "finding_id": "xr1-20261109-P1-06",
+      "stance": "agree",
+      "argument": "Verified sevenzip._decode and _unpack, plus the archive_parsing and semantic_pass callers. The synthetic probe decoded two compressed 60-byte folders with limit=99 and returned 120 bytes without error. _unpack retains all decoded pieces, while callers enforce cumulative limits only after sevenzip.read returns. This confirms the aggregate memory-bound bypass; medium severity for resource exhaustion is reasonable."
+    },
+    {
+      "finding_id": "xr1-20261109-P1-07",
+      "stance": "agree",
+      "argument": "Agree with the partly-confirmed disposition. A synthetic committed WAL insert was visible through the writer connection but absent from both manifest_objects and url_order: live_rows=1, immutable_rows=0, url_order_rows=0. Calling stage with a certificate expecting that object raised 'Manifest rows do not reconcile with the certificate' before creating the destination. The WAL omission is real, but this reproduction confirms refusal rather than successful incomplete staging. These APIs explicitly consume a frozen certified manifest."
+    },
+    {
+      "finding_id": "xr1-20261109-P1-08",
+      "stance": "disagree",
+      "argument": "Verified that sevenzip.read preserves '../../escape/logd.dat', then traced all three production callers: archive_parsing.py:311, operational_review.py:173, and semantic_pass.py:270. They process member bytes in memory or temporary streams and retain names as locators; none constructs an extraction filesystem path from a member name. Returning an original archive name does not establish a traversal vulnerability in these consumers. The rejected disposition is supported."
+    },
+    {
+      "finding_id": "xr1-20261109-P1-09",
+      "stance": "agree",
+      "argument": "Agree with the narrowed diagnostic finding. Checked run_collection's report predicate and section-index processing. A mocked HTTP run using one valid principal section per UF finished with national_coverage=true and only 28 advertised/saved logs; the flag has no external expected-section count. The predicate also omits advertised==saved, although normal section fetch failures raise and prevent successful completion, so that omission alone does not demonstrate a normal finished run with unsaved advertisements. Checked that snapshot coverage computes its own index-based population and does not consume this flag."
+    },
+    {
+      "finding_id": "xr1-20261109-P1-10",
+      "stance": "agree",
+      "argument": "Exercised source_inventory.read_manifest itself against the synthetic acquisition fixture. Selecting 500 valid section keys succeeded; selecting 1000 raised sqlite3.OperationalError: 'Expression tree is too large (maximum depth 1000)'. This directly confirms the OR-expression selection limit and the low-severity robustness disposition."
+    }
+  ]
+}

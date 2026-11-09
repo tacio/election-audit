@@ -1,0 +1,40 @@
+{
+  "reviewer": "codex",
+  "packet": "P2",
+  "round": "R3",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Reproduced all five peer probes, verified the template-hash gap, and checked national copy deduplication. P2-10's rejection does not defeat its conditional failure scenario. No new findings.",
+  "findings": [],
+  "responses": [
+    {
+      "finding_id": "xr1-20261109-P2-05",
+      "stance": "agree",
+      "argument": "The orphan-completion probe passed: one orphan completion is followed by a biometric voter counted as manual. Checked semantic_pass.py:733-740 and operational_review.py:560-563: neither orphan branch clears pending, so manual_request and operator survive into the subsequent authorization. National incidence was not independently verified."
+    },
+    {
+      "finding_id": "xr1-20261109-P2-06",
+      "stance": "agree",
+      "argument": "Agree with partial confirmation. The midnight probe passed: one cycle completed, the crossing cycle became unresolved, the subsequent cycle disappeared, and closing_reading remained null. Both implementations gate transitions on election-day readings. The claimed negative active duration is not demonstrated by this scenario: section_operations uses first/last accepted completion readings, and the post-midnight completions are excluded."
+    },
+    {
+      "finding_id": "xr1-20261109-P2-07",
+      "stance": "agree",
+      "argument": "Agree that this duplicates P2-03. The patched-version probe passed, producing an official_vota session with software_supported false and zero completed biometric cycles. Checked classify's exact software comparison and semantic_pass's separate official-session classification and software activation gate."
+    },
+    {
+      "finding_id": "xr1-20261109-P2-08",
+      "stance": "agree",
+      "argument": "Confirmed independently with an in-memory template mutation and cleared classifier cache. Changing TEMPLATES_2026.supported_software changed classification from supported_software to unknown while _rules_sha(2026) remained identical. Checked operational_review._markers and semantic_pass._rules_sha: the effective fallback templates are absent from the hashed rules object."
+    },
+    {
+      "finding_id": "xr1-20261109-P2-09",
+      "stance": "agree",
+      "argument": "Agree with the module-specific limitation. The unequal-ending memory-copy probe passed with zero operational_review copy candidates. Separately checked section_table._copy_key and distinct_sessions: they group by device, block-start hash, and session rank, without requiring equal endings. All ten test_section_table tests passed, including unequal-length copies counted once. This national mitigation requires matching block lineage."
+    },
+    {
+      "finding_id": "xr1-20261109-P2-10",
+      "stance": "agree",
+      "argument": "Agree with the conditional finding and disagree with its rejection. The non-round VOTA-start probe passed: one official cycle followed by an unknown training-start message and another recognized cycle produces two official biometric completions in one session. classify returns unknown for the start, and semantic_pass increments active_unknown_events without ending the session; subsequent recognized authorizations and completions still count. Absence from the reported vocabulary may bound observed incidence, but does not rebut this state-machine behavior. Real-log occurrence remains unverified."
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "reviewer": "codex",
+  "packet": "P5",
+  "round": "R3",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Rechecked all seven rows requiring R3 responses. Contest P5-01's national-impact justification; accept both duplicate dispositions and agree with the other reviewer's findings. Offline probes reproduced the defects; 30 relevant existing tests passed. No new findings.",
+  "findings": [],
+  "responses": [
+    {
+      "finding_id": "xr1-20261109-P5-01",
+      "stance": "contest",
+      "argument": "The cited i2-by-results_state query cannot establish that every ready section's electorate and attendance match its signed BU. integrity_checks.py:1465 assigns i2 solely from vote digests; counts_i2 is separate. Running UV_OFFLINE=1 .venv/bin/python review-scratch/r3_p5_challenge.py reproduced unchanged vote digests with conflicting attendance, output_attendance=null and results_state=ready. Negative eligible=-1 also preserved the vote digest and readiness. Additionally, eligible=100, attendance=80 and abstentions=21 passed readiness with an unchanged digest; I2's count comparison omits abstentions. Equal I2 digests mitigate duplicated positive votes, but do not justify the broader national-impact conclusion. That conclusion needs separate population queries for count discrepancies, missing attendance, negative values and accounting failures. I did not access national data."
+    },
+    {
+      "finding_id": "xr1-20261109-P5-02",
+      "stance": "accept-disposition",
+      "argument": "Accept consolidation under P0-01. Rechecked _manifest_files() and load_bweb(), and reran review-scratch/codex_p5_probe.py. An equal-sized replacement ZIP loaded nominal=90 while provenance_claims_original_hash=True and actual_hash_matches_pin=False. The duplicate disposition consolidates the unresolved input-integrity defect; it does not demonstrate a fix."
+    },
+    {
+      "finding_id": "xr1-20261109-P5-04",
+      "stance": "accept-disposition",
+      "argument": "Accept consolidation under P0-03. Rerunning review-scratch/codex_p5_probe.py confirmed that '#NE#' produces composition_unknown=False, composition=bweb and profile_state=ready, with composition_errors=0. Malformed 'bad/composition' produces the same false availability, although its error count is incremented. The cited fallback and raw-is-None predicate remain unchanged."
+    },
+    {
+      "finding_id": "xr1-20261109-P5-07",
+      "stance": "agree",
+      "argument": "Checked compositions(), verified_member_sections() and _section_row(), and reproduced both unknown-token and malformed-token cases with review-scratch/codex_p5_probe.py. Both fall back to the principal while being labelled bweb, allowing the principal-only profile to be ready. This is the same defect as P5-04, so consolidation under P0-03 is appropriate."
+    },
+    {
+      "finding_id": "xr1-20261109-P5-08",
+      "stance": "agree",
+      "argument": "Checked _canonical() and its supersession validation, then ran review-scratch/probe_canonical.py. Both an evidenced rejected successor superseding v and an evidenced competing unknown-status observation returned selection_state=selected, result_version_id=v. Supersessions are collected only from eligible totalized versions, and observed unknown-status versions do not enter unresolved. Agree with the defect and its scope in the normalized derivatives pipeline."
+    },
+    {
+      "finding_id": "xr1-20261109-P5-09",
+      "stance": "agree",
+      "argument": "Checked _hierarchy(), reference_metrics() and the separate I4 implementation. review-scratch/r3_p5_challenge.py reproduced PublicationError('Invalid hierarchy metric') for reference_metrics() output. Swapping two candidate counts from 3/7 to 7/3 preserved internal reconciliation and hierarchy state=matched when referencing valid_candidate_votes=10. The limitation remains in normalized derivatives. The national mitigation is supported by code: PRESIDENT_SQL and ea20_measures() retain candidate-specific metrics, and run_hierarchy() compares them individually."
+    },
+    {
+      "finding_id": "xr1-20261109-P5-10",
+      "stance": "agree",
+      "argument": "Checked both composition-parsing branches in electoral_verification.py. Exercised actual verify_section() using a checked-in binary BU fixture and matching BWEB rows, changing only composition tokens. review-scratch/r3_p5_challenge.py returned member_sections=['0000','0001'] for '', ['#NE#','0001'] for '#NE#', and ['-003','0001'] for '-3'; every case retained binary_link=exact_identity_and_counts_match. The phantom and invalid memberships therefore reach verified result payloads."
+    }
+  ]
+}

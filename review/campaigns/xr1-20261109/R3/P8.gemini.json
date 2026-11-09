@@ -1,0 +1,60 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [],
+  "packet": "P8",
+  "responses": [
+    {
+      "argument": "Checked docs/en/reproduction.md:24, election_audit/reproduction.py:260-268 (file_pins), 279-283 (verify_bundle), and 390 (reproduce). The reproduction guide instructs recipients to 'install the bundled project from its lock with a populated offline cache' from BUNDLE/source. Running 'uv sync --locked' inside BUNDLE/source creates .venv within the verified source tree. file_pins() recursively traverses the bundle directory and raises PublicationError('Review bundle must not contain symlinks') upon encountering standard interpreter symlinks, and even without symlinks the extra unmanifested files fail actual == manifest['files']. Because reproduce() calls verify_bundle() before rebuilding, reproduction fails immediately. The documentation must instruct setting UV_PROJECT_ENVIRONMENT outside the bundle.",
+      "finding_id": "xr1-20261109-P8-01",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked tests/test_national_migration.py:26-28, 72, 312, and election_audit/national_relocation.py:42-48. MigrationTests.setUp creates temporary directories using tempfile.TemporaryDirectory() but hardcodes 'mount': '/' in self.item and 'anchor': '/' in config. In national_relocation.py, root.stat().st_dev != anchor.stat().st_dev asserts that the temporary root directory shares the exact filesystem device with the anchor mount. On standard Linux installations where /tmp or TMPDIR resides on tmpfs or a separate partition, root.stat().st_dev differs from '/' device, raising ValueError('Verified relocated source mount/root changed') and failing migration tests before reaching the intended assertions.",
+      "finding_id": "xr1-20261109-P8-02",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked README.md:33-40, election_audit/cli.py:13-28 (doctor), election_audit/publication.py:5, election_audit/archive_parsing.py:10, and election_audit/national_parallel.py:295. Unconditional module-level imports of fcntl and resource fail on native Windows with ModuleNotFoundError, while national_parallel.py unconditionally reads /proc/self/stat, failing on macOS with FileNotFoundError. Meanwhile, election-audit doctor verifies only package metadata and paths for uv and just, omitting platform and OS standard library checks and vacuously reporting success (exit 0) on unsupported operating systems. The README also omits any explicit Linux platform requirement.",
+      "finding_id": "xr1-20261109-P8-03",
+      "stance": "agree"
+    },
+    {
+      "argument": "Accept confirmed disposition with high severity. Re-checked justfile:11-15, README.md:38-51, and election_audit/cli.py:24-27. Every recipe in justfile and all quickstart commands in README.md wrap invocations in 'rtk proxy'. On a clean system where rtk (an external CLI tool for AI token condensation) is not installed, executing 'just doctor' or documented commands fails immediately with exit code 127 ('command not found'). election-audit doctor checks only uv and just, omitting rtk, and the documentation provides neither an explanation of rtk nor unproxied fallback instructions.",
+      "finding_id": "xr1-20261109-P8-04",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept duplicate of xr1-20261109-P8-01. Re-checked docs/en/reproduction.md:24-25 and election_audit/reproduction.py:260-283. Both findings identify the exact same failure mode where executing uv sync inside BUNDLE/source creates a .venv directory containing symlinks and unmanifested files inside the verified tree, causing verify_bundle and reproduce to raise PublicationError.",
+      "finding_id": "xr1-20261109-P8-05",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept duplicate of xr1-20261109-P8-03. Re-checked election_audit/cli.py:13-28, election_audit/publication.py:5, election_audit/archive_parsing.py:10, and election_audit/national_parallel.py:295. Both findings identify the identical defect: module-level imports of Unix-only fcntl/resource and Linux /proc/self/stat dependencies cause crashes on native Windows and macOS, while election-audit doctor checks only package and tool presence, vacuously reporting readiness with exit code 0.",
+      "finding_id": "xr1-20261109-P8-06",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept confirmed disposition with medium severity. Re-checked election_audit/publication.py:84-100 and election_audit/reproduction.py:210. demo() instantiates ResourceConfig with hardcoded defaults reserve_bytes = 10 GiB and spill_bytes = 8 GiB. _guard() enforces that free space must exceed reserve_bytes + spill_bytes (18 GiB), raising PublicationError('SSD free space cannot preserve reserve plus spill cap'). Neither demo() nor cli.py provides CLI arguments to lower these thresholds, causing quickstart evaluation on environments with less than 18 GiB free disk space to fail despite the synthetic demo writing only ~12.3 MiB.",
+      "finding_id": "xr1-20261109-P8-07",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept confirmed disposition with medium severity. Re-checked docs/en/reproduction.md:40, docs/en/backfill.md:10, and docs/en/acquisition-reference.md:154-155. Documented example commands contain machine-specific paths referencing local username 'tacio' and external drive UUIDs (/media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/...) as well as private staging paths. An external user executing these commands encounters immediate FileNotFoundError. Documentation meant for third parties must use placeholder variables and explain required directory contents.",
+      "finding_id": "xr1-20261109-P8-08",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept duplicate of xr1-20261109-P8-02. Re-checked tests/test_national_migration.py:72 and election_audit/national_relocation.py:44-48. Both findings target the identical issue where MigrationTests hardcodes 'mount': '/' for temporary fixture directories, causing root.stat().st_dev != anchor.stat().st_dev assertions to fail whenever /tmp or TMPDIR resides on another filesystem from root.",
+      "finding_id": "xr1-20261109-P8-09",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Accept partly-confirmed disposition with medium severity. Re-checked election_audit/resources/pki/pki.json:39, election_audit/resources/tse-format-2026-official.json:5, and docs/en/observations.md:26-38 (observations T1-T13). The hand-downloaded inputs (CRLs, format specifications, JWS manual/keys, urn hash lists) are public documents published by TSE, and the frozen staging directories preserve provenance via SOURCES.txt and SHA256SUMS. However, because TSE web servers return HTTP 403 to non-browser requests (blocking automated acquisition) and documentation references private staging directories without a unified standalone guide specifying exact browser URLs and expected checksums, third parties cannot independently acquire and verify these inputs from scratch.",
+      "finding_id": "xr1-20261109-P8-10",
+      "stance": "accept-disposition"
+    }
+  ],
+  "reviewer": "gemini",
+  "round": "R3",
+  "summary": "Round 3 review for Packet P8 (reproducibility on another machine). Evaluated all 10 ledger rows: agreed with Codex on 3 confirmed rows (P8-01 documented bundle installation invalidating bundle inventory, P8-02 migration test fixtures hardcoding root mount, P8-03 doctor reporting ready on unsupported Windows/macOS runtimes); accepted Claude's dispositions on all 7 Gemini rows (P8-04 confirmed high rtk proxy breakages, P8-05 duplicate of P8-01, P8-06 duplicate of P8-03, P8-07 confirmed medium 18 GiB demo free space guard, P8-08 confirmed medium author paths and drive UUIDs, P8-09 duplicate of P8-02, P8-10 partly-confirmed medium unautomated browser downloads and private staging paths) after verifying code paths, triage rationales, and execution constraints. No new high or critical findings outside the ledger."
+}

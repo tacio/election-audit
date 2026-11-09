@@ -1,0 +1,50 @@
+{
+  "reviewer": "codex",
+  "packet": "P4",
+  "round": "R3",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Rechecked all eight rows requiring responses using code, documentation, synthetic probes and public fixtures. The dispositions are supported with the qualifications below. All 22 targeted tests passed. National reproduction counts were not independently checked because those datasets are outside the checkout. No new findings.",
+  "findings": [],
+  "responses": [
+    {
+      "finding_id": "xr1-20261109-P4-04",
+      "stance": "accept-disposition",
+      "argument": "Accept consolidation under P0-02. Re-ran the GEDAI probe: despite two parsed section keys, a conflicting BU load changes from absent/[G1] to zone_unpublished/[]. Separately, a published medium covering another section changes from other_sections/[G3] to zone_unpublished/[]. The underlying circular exclusion remains; duplication does not resolve it."
+    },
+    {
+      "finding_id": "xr1-20261109-P4-05",
+      "stance": "agree",
+      "argument": "Checked signature_errors.error_counts and section_rules and re-ran the synthetic log through semantic_pass.summarize_object. A startup verification error followed by one vote, with no restart lines, produces failed_json=[], votes_same_session_after_verification=null and votes_after_restart=1. This supports the finding and its consolidation with P4-03. A segment alone does not establish a power cycle under the current semantics."
+    },
+    {
+      "finding_id": "xr1-20261109-P4-06",
+      "stance": "agree",
+      "argument": "Checked zone_coverage and its invocation before discrepancy generation in run_gedai. Reproduced removal of G1 despite published conflicting correspondences, and removal of G3 despite a published medium listing other sections. Availability depends on successful comparisons rather than independently observed publication. Consolidation under P0-02 is appropriate."
+    },
+    {
+      "finding_id": "xr1-20261109-P4-07",
+      "stance": "agree",
+      "argument": "Agree with the partly-confirmed disposition. Fixture probes for missing, unparseable and contest-omitting RDVs all produced i3_differ=0 and no issues. However, running integrity_checks.summarize preserved no_rdv:2 for missing/unparseable inputs and equal:1 plus missing_in_rdv:1 for the omitted contest. Thus discrepancy omission is real, but the full summary distinguishes unavailable comparisons from equality."
+    },
+    {
+      "finding_id": "xr1-20261109-P4-08",
+      "stance": "agree",
+      "argument": "Checked section_rules and reproduced the complete run_gedai output with one valid BU, one missing load_code and one missing urn_serial. The summary reported failed={\"[]\":3} and discrepancies.jsonl was empty. Its separate correspondence counter retained section:1 and no_bu_load:2, so availability remains distinguishable there even though the failed counter combines them."
+    },
+    {
+      "finding_id": "xr1-20261109-P4-09",
+      "stance": "agree",
+      "argument": "Agree with the narrowed scope. The same signed four-part content passed the CMInd raw-code path with chain=ok and signature=verified, while read_arvor produced slices_not_recovered and not_authentic. Explicitly allowing four parts recovered the slices. The cap affects every Arvor record requiring four or more reconstructed slices; raw QR records bypass that search. I did not independently verify the national four/five-code counts."
+    },
+    {
+      "finding_id": "xr1-20261109-P4-10",
+      "stance": "agree",
+      "argument": "Checked zeresima.section_rules and the documented replacement exception. A synthetic section with a zerésima from an unused device and 300 completed votes from another device returned failed_json=[] and devices_with_votes_without_zeresima=1. The code records the exception but does not establish replacement chronology or initialization of the voting device, supporting the confirmed methodological gap."
+    },
+    {
+      "finding_id": "xr1-20261109-P4-11",
+      "stance": "agree",
+      "argument": "Agree with the known-gap disposition. Checked absent_detail, the GEDAI guide, T13 and the handoff. Moving the GEDAI timestamp from 09:59 to 10:02 against a 10:00 urn load changed the explanation from medium_not_read_back_after_load to medium_read_back_later_without_it; both outputs retained [G1]. The documentation explicitly identifies different clocks and says the explanation does not demonstrate the cause, so this sensitivity does not clear a failure."
+    }
+  ]
+}

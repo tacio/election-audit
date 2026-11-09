@@ -1,0 +1,55 @@
+{
+  "reviewer": "codex",
+  "packet": "P7",
+  "round": "R3",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Accepted the disposition of my non-confirmed finding, agreed with seven other-reviewer rows with qualifications, and disagreed with P7-12's claimed inability to handle the other winner. Synthetic checks reproduced the relevant code behavior. No new high or critical findings.",
+  "findings": [],
+  "responses": [
+    {
+      "finding_id": "xr1-20261109-P7-03",
+      "stance": "accept-disposition",
+      "argument": "Rechecked analysis-plan.md:106, 279–293 and 344–352 against _baseline and _score. Running .venv/bin/python review-scratch/codex_p7_r3_checks.py shifted training and evaluation shares together by 0.2 and printed UNIFORM_SHIFT_UNCHANGED True. This establishes absorption in the implemented baseline, not power of the unimplemented C1–C6 family. An 80%-power threshold under specified alternatives cannot bound an observationally indistinguishable switch after a null result. The needs-user disposition correctly preserves the required pre-freeze design decision."
+    },
+    {
+      "finding_id": "xr1-20261109-P7-05",
+      "stance": "agree",
+      "argument": "Checked features.py:424–449 and research_models._rows. The synthetic probe with a complete reconciled result containing only candidate 13 returned candidate_a_share=(None, None, None, 'fixed_candidate_pair_required') and no candidate_b_share. Explicitly adding candidate 22 with count zero instead produced shares 1.0 and 0.0. Thus the exclusion concerns omitted zero-count choices, rather than every unanimous section. A section with zero valid votes appropriately has an undefined candidate share. I did not verify the national count of 110 sections."
+    },
+    {
+      "finding_id": "xr1-20261109-P7-06",
+      "stance": "agree",
+      "argument": "Checked perturb_mechanism, the experiment loop in run_mechanism_validation, and validate_mechanisms. The loop has no candidate-direction dimension, and validation hardcodes value('13') and value('22'). On synthetic counts A=40, B=35, other=5, the probe produced additions=(44,35), switching=(44,31), and turnout_reduction=(40,31). Both count perturbations and the validation mapping favor the same candidate direction; choosing candidate_b_share as the scoring target does not reverse the injected mechanism."
+    },
+    {
+      "finding_id": "xr1-20261109-P7-07",
+      "stance": "agree",
+      "argument": "Agree with the partly-confirmed disposition. Checked _score and the calibration-rank calculation. The probe returned scores [0.0, 10000.00000000001] for observations 0.50 and 0.51 against collapsed quantiles of 0.50. The scale-floor behavior is reproducible. Ties inside the prediction interval alone do not invalidate an interval-exceedance triage score, and a large raw score alone does not establish an inflated calibrated significance level. completion-plan.md:43 already assigns score redesign to Phase 23."
+    },
+    {
+      "finding_id": "xr1-20261109-P7-08",
+      "stance": "agree",
+      "argument": "Agree with the partly-confirmed disposition. Checked fit_models:214–246 and reproduced DictVectorizer behavior: training on municipality=ac:one and scoring ac:two yielded a zero municipality indicator while retaining the shared UF indicator. Fold-local fitting correctly represents an unseen municipality and prevents vocabulary leakage. The remaining concern is whether municipality-held-out hyperparameter selection matches final location-level prediction, where municipalities can already be represented. This supports a limited design concern rather than a general vectorizer bug."
+    },
+    {
+      "finding_id": "xr1-20261109-P7-09",
+      "stance": "agree",
+      "argument": "Checked analysis-plan.md:305–327, DEFAULT_DESIGN in research_protocol.py, analysis.BLOCKERS, and searched the implementation for C1–C6 definitions. The protocol lists test concepts and BY at alpha 0.05, but does not specify executable statistics, scan parameters, directional family membership, or the resulting number of hypotheses. completion-plan.md:43 explicitly schedules their implementation and freeze for Phase 23. Agree that these choices must be settled before confirmatory use; no current confirmatory result is established by the prototype."
+    },
+    {
+      "finding_id": "xr1-20261109-P7-10",
+      "stance": "agree",
+      "argument": "Checked the full context construction in research_models._rows against analysis-plan.md:279–282 and C5 at line 318. The prototype includes geography, optional electorate, an optional first-round target mean, and optional device/software terms; it does not include age, sex, schooling, or biometric enrolment. This confirms the implementation mismatch and leaves the stated benign demographic explanations uncontrolled by explicit covariates. The code alone does not establish the magnitude of confounding, so the needs-user, medium-severity disposition is appropriate."
+    },
+    {
+      "finding_id": "xr1-20261109-P7-11",
+      "stance": "agree",
+      "argument": "Checked the exposure disclosures in analysis-plan.md:60–95, completion-plan.md:72–78, and publish_protocol:179–225. Development exclusion depends solely on stable-location entries supplied through the inspection registry; prose disclosures are not imported. The synthetic probe assigned an unregistered location to test, then assigned the same location to development_inspected after registration with the same seed. This verifies the leakage path and required registration. The actual Phase 20b registry omissions and five previously parsed protected logs cannot be independently verified from the absent artifacts in this checkout."
+    },
+    {
+      "finding_id": "xr1-20261109-P7-12",
+      "stance": "disagree",
+      "argument": "The negative-margin restriction is real, but the claim that the module cannot handle the other candidate winning is too broad. analysis-plan.md section 8 explicitly defines A as the leading role with M=A−B>0, and read_national_margin accepts candidate identifiers as arguments without enforcing the model's candidate mapping. Using synthetic final BR totals 13=40 and 22=60, the probe called read_national_margin(path, '22', '13') and obtained 20. Passing candidate_a='22', candidate_b='13', counts a=60/b=40, cap=3 and expected_a=55 through conditional_scenario produced corrected margin bounds [14,20] and baseline-relative excess 10. The API supports either winner by assigning the winner to role A and swapping the associated counts and expectation. It lacks a general signed, bidirectional scenario interface, but that does not establish the claimed candidate-specific inability."
+    }
+  ]
+}

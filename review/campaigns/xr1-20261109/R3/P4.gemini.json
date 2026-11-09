@@ -1,0 +1,65 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [],
+  "packet": "P4",
+  "responses": [
+    {
+      "argument": "Checked election_audit/printed_bu.py:605 and lines 623–635, 715. Line 605 defines authentic without checking pki['pki_issuer_signature'] or pki['pki_revoked']. When a published VSC is absent, bu_cert is None (line 624), so row['certificate_matches_bu'] is None; because line 632 checks elif row['certificate_matches_bu'] is False, the None value falls into else: row['status'] = 'equal', allowing an unverified certificate to enter the summary equality count at line 715. Agree with confirmed disposition and triaged severity high.",
+      "finding_id": "xr1-20261109-P4-01",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/integrity_checks.py:2317–2332, 2340, 2364–2365. While manifest['files'] hashes are verified for release (lines 2317–2319) and semantic (lines 2321–2323), first (semantic_round1) only has its round verified at line 2331. Its manifest SHA-256 is recorded in the binding (line 2340), but its parquet tables are read without verifying table hashes against first / 'manifest.json'. Agree with confirmed disposition and triaged severity medium.",
+      "finding_id": "xr1-20261109-P4-02",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/signature_errors.py:127–146, 173–177. When a signature verification error occurs before VOTA starts (at startup), m['session_ordinal'] is None, so same remains None (line 127). Line 145 sums all subsequent votes in the block into votes_after_restart without verifying any reboot or re-execution of startup checks. E1 checks only most('verification', 'votes_same_session') (lines 173–177), which ignores None, so E1 never flags startup errors. Agree with confirmed disposition and triaged severity high.",
+      "finding_id": "xr1-20261109-P4-03",
+      "stance": "agree"
+    },
+    {
+      "argument": "Checked election_audit/gedai.py:238–254. The claim that zone_coverage circularly infers zone publication status from whether any section matched, thereby converting 100% failing zones to zone_unpublished and stripping G1/G3 failures from failed_json, is identical in scope, location, and mechanism to xr1-20261109-P0-02 (codex-P0-02). Agree that this is a duplicate of xr1-20261109-P0-02.",
+      "finding_id": "xr1-20261109-P4-04",
+      "stance": "agree"
+    },
+    {
+      "argument": "Re-checked election_audit/signature_errors.py:128–147, 173–177 and xr1-20261109-P4-03. The finding describes the identical mechanism where startup verification errors bypass E1 due to session_ordinal being None and miscredit subsequent votes to votes_after_restart. Accepting duplicate disposition of xr1-20261109-P4-03.",
+      "finding_id": "xr1-20261109-P4-05",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Re-checked election_audit/gedai.py:238–254 and xr1-20261109-P0-02. The finding identifies the identical circular exclusion mechanism in zone_coverage that erases G1 and G3 failures in zones where no section matches. Accepting duplicate disposition of xr1-20261109-P0-02.",
+      "finding_id": "xr1-20261109-P4-06",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Re-checked election_audit/integrity_checks.py:706–724, 776, 1112. no_rdv and missing_in_rdv do not increment i3_differ and emit no discrepancy rows to discrepancies.jsonl. However, summary['i3'] tallies each distinct i3 status, so missing RDVs/contests are not tallied as equal in the summary. Accepting partly-confirmed disposition with triaged severity low.",
+      "finding_id": "xr1-20261109-P4-07",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Re-checked election_audit/gedai.py:194–195, 343. A BU missing load_code or urn_serial returns failed_json='[]', which is tallied under '[]' (passes) in summary['failed'] without generating a discrepancy. Accepting confirmed disposition with triaged severity low given nil national impact on decoded BUs.",
+      "finding_id": "xr1-20261109-P4-08",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Re-checked election_audit/printed_bu.py:48, 125–129, 425, 450. split_search with MAX_SPLIT = 3 is only executed in read_arvor as a fallback when slice boundaries are omitted; records providing raw QR text (e.g. CMInd) parse codes directly via parse_codes without invoking split_search. Accepting partly-confirmed disposition with triaged severity low.",
+      "finding_id": "xr1-20261109-P4-09",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Re-checked election_audit/zeresima.py:138–175. Lines 138–141 skip devices without a zerésima from stream checks (Z2, Z4, Z5), and lines 155–156 check only whether the section as a whole has any zerésima. A voting replacement urn without its own zerésima is never tested for precedence or verified against the initial urn. Accepting confirmed disposition with triaged severity medium.",
+      "finding_id": "xr1-20261109-P4-10",
+      "stance": "accept-disposition"
+    },
+    {
+      "argument": "Re-checked docs/en/integrity-checks.md:622–624, docs/en/handoffs/task-20b.md:87–88, and docs/en/observations.md:38 (T13). The limitation that absent_detail compares unsynchronized clocks at 1-minute grain and merely describes the publication without proving causality or clearing G1 failures was already documented as a known gap and design decision prior to review. Accepting known-gap disposition.",
+      "finding_id": "xr1-20261109-P4-11",
+      "stance": "accept-disposition"
+    }
+  ],
+  "reviewer": "gemini",
+  "round": "R3",
+  "summary": "Evaluated all 11 Packet P4 ledger rows across election_audit/integrity_checks.py, printed_bu.py, zeresima.py, gedai.py, signature_errors.py, and documentation. For Codex findings P4-01 through P4-04, verified the code paths and agreed with all dispositions (P4-01 through P4-03 confirmed, P4-04 duplicate of P0-02). For Gemini findings P4-05 through P4-11, re-verified the cited evidence and code behaviors, accepting all triaged dispositions (P4-05 and P4-06 duplicates, P4-07 and P4-09 partly-confirmed, P4-08 and P4-10 confirmed, P4-11 known-gap). No new high or critical findings were identified outside the existing ledger."
+}
