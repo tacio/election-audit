@@ -57,7 +57,8 @@ from election_audit import integrity_checks as ic
 from election_audit.national_migration import atomic, sha
 from election_audit.types import JSON, Row
 
-VERSION = "integrity-gedai-v4"  # v4: zone coverage from the logs' own records
+VERSION = "integrity-gedai-v5"  # v5: BUs without load fields counted as n/a
+# v4: zone coverage from the logs' own records
 ARCHIVE = re.compile(r"files/log_gedai_([12])t_([A-Z]{2})_(\d{12})\.zip")
 CORRESPONDENCE = re.compile(
     r"(?:Recebida|Transmitida a|Definida como atual a) correspondência de (seção|contingência): "
@@ -353,7 +354,13 @@ def run_gedai(
         "rounds": dict(Counter(r.get("rounds_json") or "n/a" for r in rows)),
         "medium": dict(Counter(str(r.get("medium")) for r in rows)),
         "load_medium": dict(Counter(str(r.get("load_medium")) for r in rows)),
-        "failed": dict(Counter(r["failed_json"] for r in rows)),
+        # a BU without load code or urn number is not checked: never counted with passes
+        # (xr1-20261109-P4-08)
+        "failed": dict(
+            Counter(
+                "n/a" if r["correspondence"] == "no_bu_load" else r["failed_json"] for r in rows
+            )
+        ),
         "absent_detail": dict(
             Counter(
                 f"{'sp/0176' if (r['uf'], r['zone']) == ('sp', '0176') else 'other'}:"

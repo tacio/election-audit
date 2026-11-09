@@ -14,7 +14,11 @@ each section's log and applies:
 - Z4: no zerésima after a vote cycle was completed earlier in its stream (file order). An urn
   restarted before voting prints a new zerésima, and a replacement urn prints its own: several
   zerésimas per section are counted (by urn), not failed;
-- Z5: no ``Urna pronta para receber votos`` before the first zerésima of its stream.
+- Z5: no ``Urna pronta para receber votos`` before the first zerésima of its stream;
+- Z6 (v3, xr1-20261109-P4-10): an urn with completed votes but no zerésima of its own starts
+  its first voting session after another urn of the section printed one (urn clocks). This
+  tests the premise under which such urns are not failed: that they replaced an urn that
+  printed the zerésima. A session or zerésima without a reading is counted as unknown.
 
 Counts per stream (votes before, readiness lines before) take the largest stream of the
 section, so a block kept in both memories is not counted twice.
@@ -41,7 +45,7 @@ from election_audit.national_migration import atomic, sha
 from election_audit.section_table import distinct_sessions
 from election_audit.types import JSON, Row
 
-VERSION = "integrity-zeresima-v2"
+VERSION = "integrity-zeresima-v3"  # v3: Z6, the replacement premise
 SEMANTIC_VERSION = "session-aggregates-v5"
 RULES = {
     "Z1": "a section with completed votes in its official blocks has a zerésima",
@@ -49,6 +53,8 @@ RULES = {
     "Z3": "every zerésima is dated on the election day",
     "Z4": "no zerésima after a vote cycle completed earlier in its stream (file order)",
     "Z5": "no 'Urna pronta para receber votos' before the first zerésima of its stream",
+    "Z6": "an urn voting without its own zerésima starts voting after another urn printed one "
+    "(urn clocks)",
 }
 MARKER_SQL = """
 SELECT m.object_sha256, m.stream_ordinal, m.segment_ordinal, m.device_id, m.kind, m.line,
@@ -74,6 +80,8 @@ SECTION_SCHEMA = pa.schema(
         ("devices_with_votes_without_zeresima", pa.int32()),
         ("zeresima_devices", pa.int32()),
         ("zeresimas_after_votes", pa.int32()),
+        ("devices_voting_before_any_zeresima", pa.int32()),  # Z6
+        ("devices_replacement_order_unknown", pa.int32()),  # Z6 without a reading
         ("failed_json", pa.string()),
     ]
 )
@@ -151,6 +159,17 @@ def section_rules(
         voting[s["device_id"]] += _completed(s)
     devices = {d for d, n in voting.items() if n}
     with_zeresima = {m["device_id"] for m in zeresimas}
+    first_zeresima = min((m["reading"] for m in zeresimas if m["reading"]), default=None)
+    early_replacements = unknown_order = 0
+    for device in devices - with_zeresima:
+        starts = [
+            s.get("start_reading") for s in sessions if s["device_id"] == device and _completed(s)
+        ]
+        known = [x for x in starts if x]
+        if first_zeresima is None or not starts or len(known) != len(starts):
+            unknown_order += 1
+        elif min(known) < first_zeresima:
+            early_replacements += 1
     failed = []
     if devices and not zeresimas:
         failed.append("Z1")
@@ -162,6 +181,8 @@ def section_rules(
         failed.append("Z4")
     if ready_before:
         failed.append("Z5")
+    if early_replacements:
+        failed.append("Z6")
     return {
         "zeresimas": len(zeresimas),
         "votes_before_first": votes_before if zeresimas else None,
@@ -171,6 +192,8 @@ def section_rules(
         "devices_with_votes_without_zeresima": len(devices - with_zeresima),
         "zeresima_devices": len(with_zeresima),
         "zeresimas_after_votes": after_votes,
+        "devices_voting_before_any_zeresima": early_replacements,
+        "devices_replacement_order_unknown": unknown_order,
         "failed_json": json.dumps(failed, separators=(",", ":")),
     }
 
@@ -271,8 +294,15 @@ def run_zeresima(
         "no_official_votes": sum(
             1 for r in rows if r["log"] == "semantic" and not r["devices_with_votes"]
         ),
-        "sections_with_devices_without_zeresima": sum(
-            1 for r in rows if r.get("devices_with_votes_without_zeresima")
+        "sections_with_devices_without_zeresima": dict(
+            Counter(
+                str(r["devices_with_votes_without_zeresima"])
+                for r in rows
+                if r.get("devices_with_votes_without_zeresima")
+            )
+        ),
+        "devices_replacement_order_unknown": sum(
+            r.get("devices_replacement_order_unknown") or 0 for r in rows
         ),
         "other_zeresima_templates": dict(Counter(r["template"] for r in other)),
     }

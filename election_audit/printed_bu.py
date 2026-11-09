@@ -41,11 +41,12 @@ from election_audit.types import JSON, Row
 if TYPE_CHECKING:
     from cryptography import x509
 
-VERSION = "printed-bu-v2"  # v2: trusted certificate required for equal
+VERSION = "printed-bu-v3"  # v3: unrecovered slices are unknown, not inauthentic (xr1 P4-09)
+# v2: trusted certificate required for equal
 PLEITO_ROUND = {3220: 1, 3221: 2}
 ELECTION_DATE = {1: "2026-10-04", 2: "2026-10-25"}
 QR_LIMIT = 1100  # characters per printed code, header and security fields included
-MAX_SPLIT = 3  # codes searched when only the reassembled content is known
+MAX_SPLIT = 3  # codes searched when only the reassembled content is known (cost grows fast)
 ORIGIN = {
     "votacaoUE": "VOTA",
     "votacaoRED": "RED",
@@ -105,7 +106,12 @@ def chain(chunks: Iterable[str]) -> list[str]:
 
 
 def split_search(content: str, final: str, max_parts: int = MAX_SPLIT) -> list[str] | None:
-    """Content slices (cut at spaces) whose chain ends in ``final``, or None."""
+    """Content slices (cut at spaces) whose chain ends in ``final``, or None.
+
+    The search is exhaustive over cut points and grows by about a hundred times per extra
+    code, so it stops at ``max_parts``; content that needs more codes returns None and its
+    chain stays unverified, never inauthentic (xr1-20261109-P4-09).
+    """
     if chain([content])[-1] == final:
         return [content]
     spaces = [m.start() for m in re.finditer(" ", content)]
@@ -617,7 +623,13 @@ def check_record(record: Row, published: Published) -> Row:
         found = published.section(round_number, uf, municipality, zone, section)
         if found is None:
             row["published_bu"] = "absent"
-            row["status"] = "no_published_bu" if authentic else "not_authentic"
+            row["status"] = (
+                "chain_unverified"
+                if chain_status == "slices_not_recovered"
+                else "no_published_bu"
+                if authentic
+                else "not_authentic"
+            )
         else:
             raw, vsc, package = found
             row["published_bu"] = package
@@ -630,7 +642,9 @@ def check_record(record: Row, published: Published) -> Row:
             row["header_differences"], row["contest_differences"] = len(header), len(contests)
             if header or contests:
                 detail["header"], detail["contests"] = header, contests
-            if not authentic:
+            if chain_status == "slices_not_recovered":  # unknown, not a failed chain
+                row["status"] = "chain_unverified"
+            elif not authentic:
                 row["status"] = "not_authentic"
             elif header or contests:
                 row["status"] = "differs"

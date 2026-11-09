@@ -105,6 +105,22 @@ class SectionCheckTests(unittest.TestCase):
         row, _, _, _ = self.check(blobs=blobs, published=published)
         self.assertEqual(row["i1_hash_mismatches"], 1)
 
+    def test_an_rdv_from_another_urn_or_missing_a_contest_is_reported(self) -> None:
+        # xr1-20261109-P3-10 and P4-07
+        parser = self.ic.rdv_codec()
+        envelope = parser.decode("EntidadeResultadoRDV", self.blobs["rdv"])
+        other = copy.deepcopy(envelope)
+        other["urna"]["correspondenciaResultado"]["carga"]["numeroInternoUrna"] += 1
+        blobs = dict(self.blobs, rdv=parser.encode("EntidadeResultadoRDV", other))
+        _, _, _, issues = self.check(blobs=blobs)
+        self.assertIn("rdv_urn", [i["kind"] for i in issues])
+        fewer = copy.deepcopy(envelope)
+        fewer["rdv"]["eleicoes"] = (fewer["rdv"]["eleicoes"][0], fewer["rdv"]["eleicoes"][1][:1])
+        blobs = dict(self.blobs, rdv=parser.encode("EntidadeResultadoRDV", fewer))
+        _, contests, _, issues = self.check(blobs=blobs)
+        self.assertIn("missing_in_rdv", [c["i3"] for c in contests])
+        self.assertIn(("I3", "missing_in_rdv"), [(i["check"], i["kind"]) for i in issues])
+
     def test_corrupt_files_are_recorded_not_raised(self) -> None:
         row, contests, _, _ = self.check(blobs={"bu": b"\x30\x03xyz", "rdv": b"", "vsc": b"junk"})
         self.assertEqual((row["bu_status"], row["rdv_status"], row["vsc_status"]), ("error",) * 3)

@@ -31,6 +31,7 @@ def session(device: str = "d1", completed: int = 10, **extra: Any) -> dict[str, 
         "stream_ordinal": 0,
         "segment_ordinal": 1,
         "device_id": device,
+        "start_reading": f"{DAY}T08:00:00",
         "cycles_completed_biometric": completed,
         "cycles_completed_manual": 0,
         "cycles_completed_unknown": 0,
@@ -78,6 +79,19 @@ class ZeresimaRuleTests(unittest.TestCase):
     def test_a_section_without_official_votes_is_not_failed(self) -> None:
         row = section_rules([], [session(completed=0)], DAY)
         self.assertEqual((self.failed(row), row["devices_with_votes"]), ([], 0))
+
+    def test_z6_a_replacement_votes_only_after_another_urn_printed_the_zeresima(self) -> None:
+        # xr1-20261109-P4-10: the premise under which an urn without a zerésima passes.
+        zeresima = [marker("zeresima_start", 5)]
+        later = session("d2", start_reading=f"{DAY}T11:00:00")
+        row = section_rules(zeresima, [session(), later], DAY)
+        self.assertEqual((self.failed(row), row["devices_voting_before_any_zeresima"]), ([], 0))
+        early = session("d2", start_reading=f"{DAY}T06:30:00")
+        row = section_rules(zeresima, [session(), early], DAY)
+        self.assertEqual((self.failed(row), row["devices_voting_before_any_zeresima"]), (["Z6"], 1))
+        unknown = session("d2", start_reading=None)
+        row = section_rules(zeresima, [session(), unknown], DAY)
+        self.assertEqual((self.failed(row), row["devices_replacement_order_unknown"]), ([], 1))
 
     def test_restarts_and_replacements_before_voting_print_new_zeresimas(self) -> None:
         restart = [

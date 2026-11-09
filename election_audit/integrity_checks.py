@@ -55,7 +55,8 @@ if TYPE_CHECKING:
 type Verifier = Callable[[bytes, bytes], bool]
 type Entries = Mapping[tuple[str, int], int]
 
-VERSION = "integrity-sections-v5"  # v5: urn key order checked; I1 and PKI failures are issues
+VERSION = "integrity-sections-v6"  # v6: RDV urn against the BU; unrecounted contests are issues
+# v5: urn key order checked; I1 and PKI failures are issues
 SHARD_SECTIONS = 250
 MAX_SMALL = 8 * 1024**2  # BU, RDV and signature files are far smaller
 # TSE's official 2026 specifications (resources/tse-format-2026-official.json).
@@ -671,8 +672,16 @@ def check_section(
         row["bu_status"] = "missing"
     if "rdv" in blobs:
         try:
-            rdv = rdv_codec().decode("EntidadeResultadoRDV", blobs["rdv"])["rdv"]
+            rdv_envelope = rdv_codec().decode("EntidadeResultadoRDV", blobs["rdv"])
+            rdv = rdv_envelope["rdv"]
             identity = _key_of(rdv["identificacao"]) == (municipality, zone, section)
+            rdv_load = rdv_envelope["urna"]["correspondenciaResultado"]["carga"]
+            rdv_urn = (str(rdv_load["codigoCarga"]), str(rdv_load["numeroInternoUrna"]))
+            if row.get("bu_status") == "decoded" and rdv_urn != (
+                row["load_code"],
+                row["urn_serial"],
+            ):  # xr1-20261109-P3-10: the RDV must come from the BU's urn and load
+                issues.append({"check": "I9", "kind": "rdv_urn", **base})
             row.update(
                 rdv_status="decoded",
                 rdv_error=None,
@@ -743,6 +752,8 @@ def check_section(
         accounting = "equal" if votes == contest["attendance"] * choices else "differs"
         if recount is None:
             i3 = "no_rdv" if rdv is None else "missing_in_rdv"
+            # a contest the RDV cannot recount is reported, not passed (xr1-20261109-P4-07)
+            issues.append({"check": "I3", "kind": i3, **base, "election": key[0], "cargo": key[1]})
         elif recount["entries"] == +contest["entries"]:
             i3, equal = "equal", equal + 1
         else:
@@ -2149,7 +2160,8 @@ def run_correspondence(
 # --------------------------------------------------------------------------- I5–I7: logs
 
 
-LOGS_VERSION = "integrity-logs-v3"  # v3: I7 last session by clock; round-1 files hashed
+LOGS_VERSION = "integrity-logs-v4"  # v4: copy conflicts and malformed lines reported (xr1)
+# v3: I7 last session by clock; round-1 files hashed
 CLOCK_RULES = {
     "R1": "at least one official voting session of the round",
     "R2": "the last official session has a closing reading",
@@ -2171,8 +2183,15 @@ LOG_SECTION_SCHEMA = pa.schema(
         ("i6", pa.string()),
         ("i7_failed_json", pa.string()),
         ("unresolved_cycles", pa.int32()),
+        ("copy_conflicts", pa.int32()),  # copy groups whose copies disagree on completed cycles
+        ("malformed_lines", pa.int32()),  # lines no session or I6 comparison reads, all objects
     ]
 )
+
+
+def _malformed(release: Path) -> dict[str, int]:
+    table = pq.read_table(release / "objects.parquet", columns=["object_sha256", "malformed_lines"])
+    return {r["object_sha256"]: r["malformed_lines"] or 0 for r in table.to_pylist()}
 
 
 def _witness_map(release: Path) -> dict[tuple[str, ...], list[Row]]:
@@ -2410,12 +2429,21 @@ def run_logs(
     official = _official(semantic, digests, round_number)
     i6 = round1_statuses(semantic, first) if first is not None else None
     first_witnesses = _witness_map(first) if first is not None else None
+    malformed = _malformed(semantic)
+    first_malformed = _malformed(first) if first is not None else {}
     rows, issues = [], []
     for s in sections:
         key = (s["uf"], s["municipality"], s["zone"], s["section"])
         base = dict(zip(("uf", "municipality", "zone", "section"), key, strict=True))
         objects = [o for o in witnesses.get(key, []) if o["status"] == "complete"]
-        row = {**base, "i6": None, "i7_failed_json": None, "unresolved_cycles": None}
+        row = {
+            **base,
+            "i6": None,
+            "i7_failed_json": None,
+            "unresolved_cycles": None,
+            "copy_conflicts": None,
+            "malformed_lines": None,
+        }
         if not objects:
             state = "error" if witnesses.get(key) else "protected_or_unavailable"
             rows.append(
@@ -2433,7 +2461,10 @@ def run_logs(
                 {"check": "I9", "kind": "several_log_objects", **base, "objects": len(objects)}
             )
         raw = [x for o in objects for x in official.get(o["object_sha256"], [])]
-        found, _ = distinct_sessions(raw)  # memory copies of one session count once
+        found, conflicts = distinct_sessions(raw)  # memory copies of one session count once
+        if conflicts:  # xr1-20261109-P0-12: the kept copy is the longest; others disagree
+            issues.append({"check": "I5", "kind": "copy_conflict", **base, "groups": conflicts})
+        bad_lines = sum(malformed.get(o["object_sha256"], 0) for o in objects)
         completed = sum(
             x["cycles_completed_biometric"]
             + x["cycles_completed_manual"]
@@ -2488,6 +2519,22 @@ def run_logs(
                 status6 = i6.get(key, "no_round1_block_in_either_log")
             if status6 not in ("equal", "equal_closed_open_prefix_unverified"):
                 issues.append({"check": "I6", "kind": status6, **base})
+            first_bad = sum(
+                first_malformed.get(o["object_sha256"], 0)
+                for o in (first_witnesses or {}).get(key, [])
+                if o["status"] == "complete"
+            )
+            if (bad_lines or first_bad) and status6.startswith("equal"):
+                # xr1-20261109-P2-02: I6 compares well-formed records, not bytes
+                issues.append(
+                    {
+                        "check": "I6",
+                        "kind": "equal_except_malformed_lines",
+                        **base,
+                        "runoff_malformed_lines": bad_lines,
+                        "round1_malformed_lines": first_bad,
+                    }
+                )
         rows.append(
             {
                 **row,
@@ -2498,6 +2545,8 @@ def run_logs(
                 "i6": status6,
                 "i7_failed_json": json.dumps(failed, separators=(",", ":")),
                 "unresolved_cycles": unresolved,
+                "copy_conflicts": conflicts,
+                "malformed_lines": bad_lines,
             }
         )
     final = output / ".release.tmp"
@@ -2517,6 +2566,8 @@ def run_logs(
             Counter(f for r in rows for f in json.loads(r["i7_failed_json"] or "[]"))
         ),
         "kinds": dict(Counter(f"{i['check']}:{i['kind']}" for i in issues)),
+        "copy_conflicts": sum(r["copy_conflicts"] or 0 for r in rows),
+        "sections_with_malformed_lines": sum(1 for r in rows if r["malformed_lines"]),
     }
     result = {
         **binding,

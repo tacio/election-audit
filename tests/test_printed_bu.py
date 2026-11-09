@@ -34,6 +34,8 @@ class ChainTests(unittest.TestCase):
         final = pb.chain(chunks)[-1]
         self.assertEqual(pb.split_search(content, final), chunks)
         self.assertIsNone(pb.split_search(content, "0" * 128))
+        # xr1-20261109-P4-09: content needing more codes than the search tries is unknown
+        self.assertIsNone(pb.split_search("x " * (2 * pb.QR_LIMIT), final))
 
     def test_codes_are_reassembled_in_order_and_gaps_named(self) -> None:
         chunks = ["ORIG:VOTA PLEI:3221", "IDEL:6258 CARG:1 13:1"]
