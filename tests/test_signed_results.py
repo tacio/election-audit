@@ -135,6 +135,23 @@ class SignedResultsTests(unittest.TestCase):
         republished = self.sr.check_file(self.jws(newer), self.public(), self.kid, newer, BODY)
         self.assertEqual(json.loads(republished["failed_json"]), [])  # reported, not failed
         self.assertFalse(republished["payload_equals_ea20"])
+        # xr1-20261109-P3-01: an older generation or another election is a replay, not a
+        # republication.
+        older = BODY.replace(b'"hg" : "23:27:02"', b'"hg" : "20:00:00"')
+        other = newer.replace(b'"ele" : "6258"', b'"ele" : "6257"')
+        for replay in (older, other):
+            row = self.sr.check_file(self.jws(replay), self.public(), self.kid, replay, BODY)
+            self.assertEqual(json.loads(row["failed_json"]), ["J4"])
+
+    def test_a_row_missing_from_the_signed_fetch_stops_the_run(self) -> None:
+        # xr1-20261109-P3-02: the verified population must equal the EA20 snapshot's.
+        import sqlite3
+
+        root = self.fetch(self.jws(BODY), BODY)
+        with sqlite3.connect(root / "manifest.sqlite") as db:
+            db.execute("DELETE FROM files")
+        with self.assertRaisesRegex(ValueError, "1 missing"):
+            self.sr.run_verify(root, self.key_file, self.base / "out")
 
     def test_a_key_that_does_not_match_its_certificate_is_refused(self) -> None:
         from cryptography.hazmat.primitives.asymmetric import ed25519

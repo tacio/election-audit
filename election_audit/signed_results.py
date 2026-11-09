@@ -22,6 +22,7 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 import sqlite3
 import time
 from collections import Counter
@@ -37,7 +38,7 @@ from election_audit.sa_logs import _get
 from election_audit.types import JSON, Row
 
 FETCH_VERSION = "signed-results-fetch-v1"
-VERSION = "integrity-jws-v2"
+VERSION = "integrity-jws-v3"  # v3: J4 checks identity and order; URL sets must match
 # Revocation lists named in the certificates: the end entity's issuer and the intermediate's.
 CRLS = {"acdivulgacao.crl": ("end_entity", "intermediate"), "actot.crl": ("intermediate", "root")}
 SCHEMA = """
@@ -288,6 +289,38 @@ def _generation(value: bytes) -> str | None:
     return " ".join(str(data.get(k)) for k in ("dg", "hg", "idg"))
 
 
+IDENTITY = ("ele", "t", "f", "tpabr", "cdabr")  # election, round, phase, scope type and code
+
+
+def republication(payload: bytes, snapshot: bytes) -> bool:
+    """True when ``payload`` is a later generation of the same result file as ``snapshot``.
+
+    Only then may differing bytes be a legitimate republication; a payload naming another
+    election, round or place, or an older or equal generation, is a replay (xr1-20261109-P3-01).
+    """
+    try:
+        ours, theirs = json.loads(payload), json.loads(snapshot)
+    except ValueError:
+        return False
+
+    def when(data: JSON) -> tuple[str, str, int] | None:
+        day = re.fullmatch(r"(\d\d)/(\d\d)/(\d{4})", str(data.get("dg", "")))
+        if not day or not re.fullmatch(r"\d\d:\d\d:\d\d", str(data.get("hg", ""))):
+            return None
+        try:
+            return f"{day[3]}{day[2]}{day[1]}", str(data["hg"]), int(data.get("idg"))
+        except TypeError, ValueError:
+            return None
+
+    later, earlier = when(ours), when(theirs)
+    return (
+        all(ours.get(k) == theirs.get(k) for k in IDENTITY)
+        and later is not None
+        and earlier is not None
+        and later > earlier
+    )
+
+
 def check_file(body: bytes, key: Any, kid: str, plain: bytes, snapshot: bytes) -> Row:
     """J1-J4 for one compact JWS."""
     from cryptography.exceptions import InvalidSignature
@@ -337,8 +370,8 @@ def check_file(body: bytes, key: Any, kid: str, plain: bytes, snapshot: bytes) -
         failed.append("J2")
     if not row["payload_equals_json"]:
         failed.append("J3")
-    if not row["payload_equals_ea20"] and row["payload_generation"] == row["ea20_generation"]:
-        failed.append("J4")  # same publication, different bytes
+    if not row["payload_equals_ea20"] and not republication(payload, snapshot):
+        failed.append("J4")  # different bytes, not a later generation of the same file
     row["failed_json"] = json.dumps(failed, separators=(",", ":"))
     return row
 
@@ -394,6 +427,12 @@ def run_verify(
     with contextlib.closing(sqlite3.connect(uri, uri=True)) as db:
         db.row_factory = sqlite3.Row
         files = [dict(r) for r in db.execute("SELECT * FROM files ORDER BY url")]
+    fetched = {f["url"] for f in files}
+    if fetched != set(ea20):  # xr1-20261109-P3-02: no row may vanish from the population
+        raise ValueError(
+            f"Signed fetch and EA20 snapshot differ: {len(set(ea20) - fetched)} missing, "
+            f"{len(fetched - set(ea20))} extra"
+        )
     rows = []
     for f in files:
         body = (signed_root / f["jws_path"]).read_bytes()
