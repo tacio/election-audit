@@ -1,6 +1,6 @@
 # Revisão cruzada entre modelos
 
-Document-ID: EA-CROSS-REVIEW · Revision: 1 · Language: pt-BR
+Document-ID: EA-CROSS-REVIEW · Revision: 2 · Language: pt-BR
 
 [English](../en/cross-model-review.md) · [Índice de implementação](implementation-index.md)
 
@@ -72,9 +72,13 @@ revisores podem seguir o código além deles.
 | P5 | Resultados eleitorais e junções |
 | P6 | Processamento nacional, releases e reprodução |
 | P7 | Desenho da pesquisa e estatística |
+| P8 | Reprodutibilidade em outra máquina: um recém-chegado instala e roda o projeto a partir do README |
 
 O P7 é o que mais importa para vieses e premissas não declaradas. Ele revisa o protocolo
-do estudo antes do seu congelamento, enquanto os achados ainda podem mudar o desenho.
+do estudo antes do seu congelamento, enquanto os achados ainda podem mudar o desenho. O
+P8 testa um dos objetivos do projeto: que outros possam rodá-lo. O revisor monta o
+próprio ambiente a partir do lock e segue o README ao pé da letra com dados sintéticos.
+Ele relata cada passo que falha, exige um palpite ou pressupõe esta máquina.
 
 ## Rodadas
 

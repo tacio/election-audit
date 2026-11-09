@@ -1,6 +1,6 @@
 # Cross-model review
 
-Document-ID: EA-CROSS-REVIEW · Revision: 1 · Language: en
+Document-ID: EA-CROSS-REVIEW · Revision: 2 · Language: en
 
 [Português](../pt-BR/cross-model-review.md) · [Implementation index](implementation-index.md)
 
@@ -71,9 +71,13 @@ may follow the code beyond them.
 | P5 | Electoral results and joins |
 | P6 | National processing, releases and reproduction |
 | P7 | Research design and statistics |
+| P8 | Reproducibility on another machine: a newcomer installs and runs the project from the README |
 
 P7 matters most for bias and unstated assumptions. It reviews the study protocol before
-its freeze, while findings can still change the design.
+its freeze, while findings can still change the design. P8 tests one of the project's
+objectives: that others can run it. The reviewer builds its own environment from the
+lock and follows the README literally on synthetic data. It reports every step that
+fails, needs a guess or assumes this machine.
 
 ## Rounds
 

@@ -33,7 +33,7 @@ class CrossReviewTests(unittest.TestCase):
 
     def test_every_packet_and_round_prompt_exists(self) -> None:
         self.assertEqual(
-            list(cross_review.packets()), ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7"]
+            list(cross_review.packets()), ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"]
         )
         for name in cross_review.ROUNDS:
             self.assertTrue((cross_review.REVIEW / "prompts" / f"{name}.md").exists())

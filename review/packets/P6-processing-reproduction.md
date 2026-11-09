@@ -19,8 +19,8 @@ Press on:
   all, and still give a summary that looks complete?
 - Content addressing and version pins: can two different inputs or code versions produce
   the same release ID, or one input produce two IDs?
-- Can an independent person reproduce a release from the documented commands alone?
-  Which inputs, environment details or manual steps are undocumented?
+- Does a release record everything needed to recompute it: inputs, parents, code and
+  library versions, parameters? (Running it on another machine is packet P8.)
 - Do resource limits (memory, workers) change results, for example through spilling,
   ordering or float summation?
 - Is `query` really bounded and read-only?
