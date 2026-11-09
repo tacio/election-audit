@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 40 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 41 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -241,7 +241,9 @@ nationally:
 - Phase 15: frozen AC protocol (training 1259, calibration 399, protected test
   340, municipal stress 256, development-inspected 16).
 - Phase 16: one AC turnout fit (`no_first_round` variant) evaluated on
-  calibration data only. The protected test set has not been opened.
+  calibration data only. No final evaluation has run; four protected test sections
+  (and one municipal-stress section) were structurally parsed, without values, in the
+  Phase 11 stratified sample before the exclusions existed (`impact.json`).
 - Phase 17: 126 AC development case packets (20 + 20 ranked, 86 unflagged controls).
 - Phase 18: four marimo notebooks over the AC export; browser QA not done.
 
@@ -249,22 +251,24 @@ No national electoral result, national margin, fitted national model or fraud
 label exists.
 
 **Checks.** The full offline gate `just check` passes (lock, format, lint,
-type check, contracts, docs, documented commands and all 442 tests). Every
+type check, contracts, docs, documented commands and all 445 tests). Every
 function in `election_audit/`, `scripts/` and `tests/` is annotated (ruff `ANN`)
 and `ty check` (pinned 0.0.94) reports no diagnostics; the conventions are in
 `CLAUDE.md`.
 
 ## Next step
 
-Run the first [cross-model review](cross-model-review.md) campaign (`xr1`), in which
-Codex and Gemini challenge the code, the docs and the study protocol at a pinned commit,
-before Phase 23 starts. Then start Phase 23 (development modelling, power study,
+Finish the first [cross-model review](cross-model-review.md) campaign
+(`xr1-20261109`, `review/campaigns/xr1-20261109/`): rounds 1–3 are done (98 findings,
+65 confirmed or partly confirmed, none changing a recorded national result) and the
+fixes of round 4 are under way, Phase 23 blockers first; round 5 verifies them. Then
+start Phase 23 (development modelling, power study,
 protocol freeze) on development data only. Phase 20b is complete and its checks and gaps are registered in the
 protocol ([handoff](handoffs/task-20b.md)); before the freeze, add TSE's reply on the
 root certificates and the TCU report to the protocol. TSE's reply to the root-certificate request (protocol
 83529705172533) is due by 25 November 2026. File the TCU consolidated integrity test
 report when it is published (due within 30 days of the second round). The
-[study protocol](../../research/analysis-plan.md) (Revision 9) defines the claims,
+[study protocol](../../research/analysis-plan.md) (Revision 10) defines the claims,
 the threat-to-observable map, the integrity checks I1–I9, the confirmatory tests
 C1–C6, the power study and the data policy; the
 [completion plan](../../research/completion-plan.md) (Revision 14) defines

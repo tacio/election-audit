@@ -1,6 +1,6 @@
 # Auditoria estatística da eleição presidencial de 2026: protocolo do estudo
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 9 · Language: pt-BR
+Document-ID: EA-ANALYSIS-PLAN · Revision: 10 · Language: pt-BR
 
 [English](analysis-plan.md) · [Plano de conclusão](completion-plan.pt-BR.md) · [Trabalhos relacionados](related-work.pt-BR.md)
 
@@ -61,8 +61,10 @@ escrevê-lo. Nesta revisão:
   segundo turno, então essas contagens misturam turnos e não são medidas do segundo
   turno.
 - **Registros de inspeção:** todo local listado em
-  `data/phase15/inspection.sqlite`, `data/national/phase11-protection-2026-10-31/`
-  e nos registros de lotes da Fase 11 é dado de desenvolvimento.
+  `data/phase15/inspection.sqlite`, `data/national/phase11-protection-2026-10-31/`,
+  `~/data/election-audit-stage/inspection/phase20b-national-20261109.sqlite` (os 7824 locais de votação das 12016 seções cujas linhas de integridade
+  foram vistas nas Fases 20 e 20b, registrados em 9 de novembro de 2026) e nos
+  registros de lotes da Fase 11 é dado de desenvolvimento.
 - **Passada semântica nacional (Fase 21):** agregados por sessão de todo log elegível
   dos dois turnos de 2026 e dos dois turnos de 2022, calculados por código. Visto:
   contagens de objetos, sessões e segmentos, os registros da população, as amostras
@@ -76,7 +78,10 @@ escrevê-lo. Nesta revisão:
   comparecimento do BU. Os valores das linhas que concordam ficam nas saídas das
   verificações (`restricted/` e resumos por disputa) e não são relatados nem
   consultados antes do congelamento. Os logs das 596 seções protegidas/de estresse
-  passam por SHA-512 para o I1 e nunca são interpretados.
+  passam por SHA-512 para o I1. Cinco deles (quatro de teste, um de estresse
+  municipal) foram interpretados estruturalmente, sem leitura de nenhum valor, na
+  amostra estratificada da Fase 11, antes de as exclusões existirem
+  (`data/national/phase11-protection-2026-10-31/impact.json`).
 - **Conciliação da integridade (Fase 20b):** a releitura por prefixo do I6 (conteúdo
   linha a linha dos 113 pares divergentes de blocos do 1º turno, como modelos com
   dígitos mascarados); para as 121 seções que falharam no I5, seu comparecimento no
@@ -111,7 +116,7 @@ família confirmatória.
 | Mecanismo | Onde deixaria rastros | Verificações e testes | O que a auditoria não vê |
 | --- | --- | --- | --- |
 | Resultados alterados ou substituídos depois da urna (transmissão, totalização, publicação) | Assinatura do BU; BU binário vs BWEB vs totais hierárquicos; cópias impressas do BU | I1, I2, I4, I8 | Nada dentro da cadeia eletrônica se as próprias chaves de assinatura forem comprometidas; cópias impressas são a verificação fora da cadeia |
-| Software que altera votos dentro da urna, com BU, RDV e log todos consistentes | Nenhum rastro no log; só padrões agregados de resultado | Testes de integridade do TSE no dia da eleição (evidência externa, seção 4); C1, C2, C4, C6 | Uma troca pequena e espacialmente uniforme que imita a variação comum; seu tamanho é limitado pela manipulação mínima detectável |
+| Software que altera votos dentro da urna, com BU, RDV e log todos consistentes | Nenhum rastro no log; só padrões agregados de resultado | Testes de integridade do TSE no dia da eleição (evidência externa, seção 4); C1, C2, C4, C6 | Uma troca espalhada por igual entre as seções parece variação comum em qualquer tamanho, e o modelo de variação a absorve, então estes dados não a identificam (seção 7.5); essa ameaça depende da evidência externa da seção 4 e dos BUs impressos (I8) |
 | Enchimento de urna ou personificação por mesários | Habilitações não biométricas, ciclos fora do horário normal, rajadas de ciclos rápidos; picos de comparecimento e de proporção | I5; C2, C3, C5 | Enchimento diluído em muitas seções, em horários normais e com habilitação biométrica |
 | Supressão ou obstrução de eleitores | Queda de comparecimento do primeiro para o segundo turno em relação aos pares; longas pausas, suspensões, abertura tardia, troca de urna | C1 (comparecimento), C4, C5 | Causas fora do local de votação; causas legítimas (transporte, clima) produzem o mesmo sinal |
 | Logs adulterados, copiados ou fabricados | Hashes de blocos; o trecho do primeiro turno dentro de cada log do segundo turno vs o log do primeiro turno; descontinuidades de relógio | I6, I7 | Uma cadeia de artefatos completa e reassinada de forma consistente |
@@ -328,7 +333,10 @@ transversais.
 Testes confirmatórios atuam só em nível global ou de agrupamento, onde 500.000 seções
 dão poder em vez de uma carga impossível de testes múltiplos. Cada teste é bilateral
 ou roda nas duas direções de candidato, e cada um tem nulo por simulação a partir do
-modelo ajustado, com reamostragem de locais inteiros.
+modelo ajustado, com reamostragem de locais inteiros. Um teste rodado nas duas
+direções conta como dois membros da família. Antes do congelamento, uma tabela fixa
+para cada teste sua estatística, unidade, direção ou direções, nulo e limiar, e
+portanto o tamanho da família.
 
 | ID | Teste | Detecta | Alternativa benigna |
 | --- | --- | --- | --- |
@@ -336,8 +344,11 @@ modelo ajustado, com reamostragem de locais inteiros.
 | C2 | Distribuição conjunta comparecimento × proporção comparada ao nulo implicado pelo modelo, no espírito de [Klimek et al. 2012](https://doi.org/10.1073/pnas.1210722109) | Enchimento que eleva comparecimento e um candidato juntos | Comunidades homogêneas fortemente mobilizadas |
 | C3 | Excesso de porcentagens inteiras em relação a um nulo dependente do tamanho ([Kobak et al. 2016](https://doi.org/10.1214/16-AOAS904); [Rozenas 2017](https://doi.org/10.1017/pan.2016.9)) | Resultados fabricados ou arredondados | Seções pequenas; testado contra o nulo discreto exato |
 | C4 | Estatística de varredura sobre locais de votação e municípios nos resíduos ([Kulldorff 1997](https://doi.org/10.1080/03610929708831995)) | Manipulação geograficamente concentrada | Eventos políticos locais; revistos com evidência de origem |
-| C5 | Associação entre excesso operacional (proporção não biométrica, ciclos tardios, cadência) e resíduo de proporção, nas duas direções | Enchimento ou personificação ligados a um candidato | Baixo cadastro biométrico, acessibilidade, filas |
+| C5 | Associação entre excesso operacional (proporção não biométrica, ciclos tardios, cadência) e resíduo de proporção, ajustada pelo perfil do eleitorado (faixas de idade, escolaridade, cadastro biométrico, tamanho) e comparada dentro do local de votação, nas duas direções | Enchimento ou personificação ligados a um candidato | Baixo cadastro biométrico, acessibilidade, filas |
 | C6 | Resíduo de variação por modelo de urna e versão de software, dentro do local | Manipulação de software específica de dispositivo | Composição dos locais que usam urnas mais antigas (o erro do Instituto Voto Legal em 2022; seção 7.6) |
+
+Idade e ruralidade movem tanto as medidas operacionais quanto as proporções de voto,
+então a associação do C5 sem ajuste é divulgada só como descritiva.
 
 A multiplicidade é controlada nessa família por Benjamini–Yekutieli a 5% de FDR
 ([Benjamini e Yekutieli 2001](https://doi.org/10.1214/aos/1013699998)). A família, as
@@ -370,7 +381,11 @@ Para cada mecanismo e concentração o protocolo divulga curvas de poder e a
 **manipulação mínima detectável**: a menor mudança na margem nacional detectada com
 80% de poder pela família. Perturbações benignas injetadas (erros de relógio, logs
 copiados) medem falsos alarmes. Esses números fazem parte do pré-registro e dos
-resultados principais.
+resultados principais. A manipulação mínima detectável é uma afirmação de poder para
+os padrões de injeção nomeados, não um limite: depois de um resultado nulo ela não
+limita manipulações de outros padrões, e uma troca espalhada por igual entre as
+seções não é identificável em nenhum tamanho, porque o modelo do primeiro para o
+segundo turno a absorve como variação.
 
 ### 7.6 Controles negativos
 
@@ -455,6 +470,9 @@ taxa de falsos alarmes da triagem fique visível.
   inclusive especificações nulas e malsucedidas.
 - Escolher subgrupos depois de ver resultados já é seleção; corrigir só a lista
   exibida não considera a busca ([xkcd 882](https://xkcd.com/882/)).
+- A avaliação protegida é usada uma vez por protocolo e partição: uma avaliação
+  final exige o registro de acesso compartilhado do protocolo, que recusa um segundo
+  modelo e qualquer repetição, venha o pedido de qualquer diretório de modelo.
 - Uma vez inspecionado, um dado vira dado de desenvolvimento. Novas afirmações
   confirmatórias precisam de nova evidência reservada.
 - Acompanhar resultados à medida que chegam é descritivo; não há regra sequencial de

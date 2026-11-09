@@ -1,6 +1,6 @@
 # Statistical audit of the 2026 presidential election: study protocol
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 9 · Language: en
+Document-ID: EA-ANALYSIS-PLAN · Revision: 10 · Language: en
 
 [Português](analysis-plan.pt-BR.md) · [Completion plan](completion-plan.md) · [Related work](related-work.md)
 
@@ -57,7 +57,9 @@ writing it. As of this revision:
   runoff log spans setup (September), the first round and the runoff, so these
   counts mix rounds and are not runoff measures.
 - **Inspection registries:** every location listed in
-  `data/phase15/inspection.sqlite`, `data/national/phase11-protection-2026-10-31/`
+  `data/phase15/inspection.sqlite`, `data/national/phase11-protection-2026-10-31/`,
+  `~/data/election-audit-stage/inspection/phase20b-national-20261109.sqlite` (the 7824 polling places of the 12016 sections whose integrity rows were
+  seen in Phases 20 and 20b, registered on 9 November 2026)
   and the Phase 11 tranche registries is development data.
 - **National semantic pass (Phase 21):** per-session aggregates of every eligible log
   of both 2026 rounds and of both 2022 rounds, computed by code. Seen: object,
@@ -70,7 +72,9 @@ writing it. As of this revision:
   cycles with BU attendance. Values of agreeing rows stay in the check outputs
   (`restricted/` and per-contest digests) and are neither reported nor queried before
   the freeze. The logs of the 596 protected/stress sections are hashed with SHA-512
-  for I1 and never parsed.
+  for I1. Five of them (four test, one municipal stress) were structurally parsed,
+  without any values being read, in the Phase 11 stratified sample before the
+  exclusions existed (`data/national/phase11-protection-2026-10-31/impact.json`).
 - **Integrity reconciliation (Phase 20b):** the I6 prefix re-read (line-by-line
   content of the 113 differing round-1 block pairs, as digit-masked templates); for
   the 121 sections that failed I5, their BU attendance, their log sessions and the
@@ -103,7 +107,7 @@ confirmatory family.
 | Mechanism | Where it would leave traces | Checks and tests | What the audit cannot see |
 | --- | --- | --- | --- |
 | Altered or substituted results after the urn (transmission, totalization, publication) | BU signature; binary BU vs BWEB vs hierarchical totals; printed BU copies | I1, I2, I4, I8 | Nothing within the electronic chain if the signing keys themselves were compromised; printed copies are the out-of-band check |
-| Software that alters votes inside the urn, with BU, RDV and log all consistent | No log trace; aggregate result patterns only | TSE election-day integrity tests (external evidence, section 4); C1, C2, C4, C6 | A small, spatially uniform switch that mimics ordinary swing; its size is bounded by the minimum detectable manipulation |
+| Software that alters votes inside the urn, with BU, RDV and log all consistent | No log trace; aggregate result patterns only | TSE election-day integrity tests (external evidence, section 4); C1, C2, C4, C6 | A switch spread evenly across sections looks like ordinary swing at any size, and the swing model absorbs it, so these data cannot identify it (section 7.5); this threat rests on the external evidence of section 4 and on printed BUs (I8) |
 | Ballot stuffing or impersonation by poll workers | Non-biometric authorizations, cycles outside normal hours, bursts of fast cycles; turnout and share spikes | I5; C2, C3, C5 | Stuffing spread thinly over many sections at normal times and with biometric authorizations |
 | Suppression or obstruction of voters | Turnout drop from round 1 to round 2 relative to peers; long gaps, suspensions, late opening, urn replacement | C1 (turnout), C4, C5 | Causes outside the polling place; legitimate causes (transport, weather) produce the same signal |
 | Tampered, copied or fabricated logs | Block hashes; the round-1 segment inside each runoff log vs the round-1 log; clock discontinuities | I6, I7 | A complete, consistently re-signed artifact chain |
@@ -307,7 +311,10 @@ the main source of false alarms in cross-sectional models.
 Confirmatory tests act only at global or cluster level, where 500,000 sections
 give power rather than an impossible multiple-testing burden. Each test is
 two-sided or run in both candidate directions, and each has a simulation-based
-null drawn from the fitted model with whole-location resampling.
+null drawn from the fitted model with whole-location resampling. A test run in both
+directions counts as two members of the family. Before the freeze, a table fixes for
+each test its statistic, unit, direction or directions, null and threshold, and so
+the family size.
 
 | ID | Test | Detects | Benign alternative |
 | --- | --- | --- | --- |
@@ -315,8 +322,11 @@ null drawn from the fitted model with whole-location resampling.
 | C2 | Turnout × share joint distribution compared with the model-implied null, in the spirit of [Klimek et al. 2012](https://doi.org/10.1073/pnas.1210722109) | Stuffing that raises turnout and one candidate together | Strongly mobilized homogeneous communities |
 | C3 | Excess of integer percentages relative to a size-aware null ([Kobak et al. 2016](https://doi.org/10.1214/16-AOAS904); [Rozenas 2017](https://doi.org/10.1017/pan.2016.9)) | Fabricated or rounded results | Small sections; tested against the exact discrete null |
 | C4 | Scan statistic over polling places and municipalities on residuals ([Kulldorff 1997](https://doi.org/10.1080/03610929708831995)) | Geographically concentrated manipulation | Local political events; reviewed with source evidence |
-| C5 | Association between operational excess (non-biometric share, late cycles, cadence) and share residual, both directions | Stuffing or impersonation linked to one candidate | Low biometric enrolment, accessibility, queues |
+| C5 | Association between operational excess (non-biometric share, late cycles, cadence) and share residual, adjusted for the voter profile (age bands, schooling, biometric enrolment, size) and compared within polling place, both directions | Stuffing or impersonation linked to one candidate | Low biometric enrolment, accessibility, queues |
 | C6 | Swing residual by device model and software version, within location | Device-specific software manipulation | Composition of places using older devices (the 2022 Instituto Voto Legal error; section 7.6) |
+
+Age and rurality drive both operational measures and vote shares, so the unadjusted
+C5 association is reported as descriptive only.
 
 Multiplicity is controlled across this family with Benjamini–Yekutieli at 5% FDR
 ([Benjamini and Yekutieli 2001](https://doi.org/10.1214/aos/1013699998)). The
@@ -349,7 +359,10 @@ For each mechanism and concentration the protocol reports power curves and the
 **minimum detectable manipulation**: the smallest national margin shift detected
 with 80% power by the family. Benign injected disturbances (clock errors, copied
 logs) measure false alarms. These numbers are part of the pre-registration and of
-the headline results.
+the headline results. The minimum detectable manipulation is a power statement for
+the named injection patterns, not a bound: after a null result it does not limit
+manipulation of other patterns, and a switch spread evenly across sections is not
+identifiable at any size, because the round-1 to round-2 model absorbs it as swing.
 
 ### 7.6 Negative controls
 
@@ -431,6 +444,9 @@ visible.
 - Selecting subgroups after seeing results is itself selection; correcting only
   the displayed list does not account for the search
   ([xkcd 882](https://xkcd.com/882/)).
+- The protected evaluation is used once per protocol and partition: a final
+  evaluation needs the protocol's shared access registry, which refuses a second
+  model and any repeat, whichever model directory asks.
 - Once inspected, data becomes development data. Renewed confirmatory claims need
   new held-out evidence.
 - Monitoring results as they arrive is descriptive; there is no sequential

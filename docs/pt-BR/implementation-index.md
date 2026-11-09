@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 40 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 41 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -255,7 +255,10 @@ reutilizadas, mas nada foi executado em escala nacional:
 - Fase 15: protocolo do AC congelado (treino 1259, calibração 399, teste protegido
   340, estresse municipal 256, inspecionadas em desenvolvimento 16).
 - Fase 16: um ajuste de comparecimento no AC (variante `no_first_round`) avaliado só
-  com dados de calibração. O conjunto de teste protegido não foi aberto.
+  com dados de calibração. Nenhuma avaliação final foi feita; quatro seções do teste
+  protegido (e uma de estresse municipal) foram interpretadas estruturalmente, sem
+  valores, na amostra estratificada da Fase 11, antes de as exclusões existirem
+  (`impact.json`).
 - Fase 17: 126 pacotes de casos de desenvolvimento do AC (20 + 20 ranqueados, 86
   controles não sinalizados).
 - Fase 18: quatro notebooks marimo sobre a exportação do AC; QA no navegador não feito.
@@ -265,15 +268,17 @@ nem rótulo de fraude.
 
 **Verificações.** A verificação offline completa `just check` passa (lock, formato,
 lint, verificação de tipos, contratos, documentos, comandos documentados e todos os
-442 testes). Toda função em `election_audit/`, `scripts/` e `tests/` tem anotações
+445 testes). Toda função em `election_audit/`, `scripts/` e `tests/` tem anotações
 de tipo (ruff `ANN`) e `ty check` (fixado em 0.0.94) não relata diagnósticos; as
 convenções estão em `CLAUDE.md`.
 
 ## Próximo passo
 
-Rodar a primeira campanha de [revisão cruzada entre modelos](cross-model-review.md)
-(`xr1`), na qual o Codex e o Gemini contestam o código, a documentação e o protocolo do
-estudo num commit fixado, antes de começar a Fase 23. Depois, começar a Fase 23 (modelagem de desenvolvimento, estudo de poder, congelamento do
+Concluir a primeira campanha de [revisão cruzada entre modelos](cross-model-review.md)
+(`xr1-20261109`, `review/campaigns/xr1-20261109/`): as rodadas 1–3 estão feitas (98
+achados, 65 confirmados ou confirmados em parte, nenhum mudando um resultado nacional
+registrado) e as correções da rodada 4 estão em andamento, primeiro as que bloqueiam a
+Fase 23; a rodada 5 as verifica. Depois, começar a Fase 23 (modelagem de desenvolvimento, estudo de poder, congelamento do
 protocolo) só com dados de desenvolvimento. A Fase 20b está concluída e suas
 verificações e lacunas estão registradas no protocolo
 ([handoff](handoffs/task-20b.md)); antes do congelamento, acrescentar ao protocolo a
@@ -282,7 +287,7 @@ certificados raiz (protocolo 83529705172533) é devida até 25 de novembro de 20
 Arquivar o relatório
 consolidado do TCU sobre o teste de integridade quando for publicado (previsto até
 30 dias após o segundo turno). O
-[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 9) define as
+[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 10) define as
 afirmações, o mapa de ameaças e observáveis, as verificações de integridade I1–I9, os
 testes confirmatórios C1–C6, o estudo de poder e a política de dados; o
 [plano de conclusão](../../research/completion-plan.pt-BR.md) (Revisão 14) define as
