@@ -61,6 +61,7 @@ def bu(
         "urn_serial": urn,
         "load_code": load,
         "flash_serial": serial,
+        "loaded_at": "20260918T100000",
     }
     return row | extra
 
@@ -111,6 +112,24 @@ class GedaiTests(unittest.TestCase):
         self.assertEqual(
             (uncovered["load_medium"], json.loads(uncovered["failed_json"])), ("absent", ["G3"])
         )
+
+    def test_an_absent_load_records_when_its_medium_was_read_back(self) -> None:
+        parsed = gedai.parse_archives(self.root, gedai.gedai_archives(self.root))
+        self.assertEqual(parsed["received"], {"ECCE29DD": "20260918T150000"})  # Recebida only
+
+        def detail(serial: str, loaded_at: str | None) -> str:
+            row = gedai.section_rules(
+                bu("0088", "4" * 24, "2263093", serial, loaded_at=loaded_at), parsed
+            )
+            self.assertEqual(json.loads(row["failed_json"]), ["G1"])
+            return row["absent_detail"]
+
+        self.assertEqual(detail("CB28DF40", "20260917T100000"), "medium_never_read_back")
+        self.assertEqual(detail("ECCE29DD", "20261003T120000"), "medium_not_read_back_after_load")
+        self.assertEqual(detail("ECCE29DD", "20260917T100000"), "medium_read_back_later_without_it")
+        self.assertEqual(detail("ECCE29DD", None), "no_load_time")
+        ok = gedai.section_rules(bu("0088", "1" * 24, "2263093", "CB28DF40"), parsed)
+        self.assertIsNone(ok["absent_detail"])
 
     def test_zones_whose_logs_hold_nothing_to_match_are_unavailable(self) -> None:
         parsed = gedai.parse_archives(self.root, gedai.gedai_archives(self.root))

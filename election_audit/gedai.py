@@ -27,6 +27,14 @@ a zone where the logs hold nothing it could match: G1 where no section of the zo
 correspondence (``zone_unpublished``), G3 where no section of the zone matched a load medium.
 Such sections are unavailable, not failed; a zone with some matches keeps its failures.
 
+A G1 failure records what the logs hold about its load medium (``absent_detail``), because a
+correspondence reaches GEDAI only when the medium that loaded the urn is read back
+(``Recebida``): ``medium_never_read_back`` (no correspondence received from that medium),
+``medium_not_read_back_after_load`` (correspondences received from it, all dated before the
+BU's load time) or ``medium_read_back_later_without_it`` (received after the load, holding
+other loads). The two times come from different clocks (the GEDAI computer and the urn), at
+minute grain; the detail describes the publication, it does not clear the failure.
+
 Logs of both rounds are read, and a match records which round's logs hold it. The signature
 files of the GEDAI logs are not verified (format not reviewed).
 """
@@ -49,7 +57,7 @@ from election_audit import integrity_checks as ic
 from election_audit.national_migration import atomic, sha
 from election_audit.types import JSON, Row
 
-VERSION = "integrity-gedai-v2"
+VERSION = "integrity-gedai-v3"
 ARCHIVE = re.compile(r"files/log_gedai_([12])t_([A-Z]{2})_(\d{12})\.zip")
 CORRESPONDENCE = re.compile(
     r"(?:Recebida|Transmitida a|Definida como atual a) correspondência de (seção|contingência): "
@@ -71,6 +79,9 @@ SECTION_SCHEMA = pa.schema(
         ("medium", pa.string()),  # match | differs | null
         # covers_section | other_sections | absent | zone_unpublished | null
         ("load_medium", pa.string()),
+        # medium_never_read_back | medium_not_read_back_after_load |
+        # medium_read_back_later_without_it | no_load_time | null (not absent)
+        ("absent_detail", pa.string()),
         ("failed_json", pa.string()),
     ]
 )
@@ -103,8 +114,8 @@ def _read(z: zipfile.ZipFile, info: zipfile.ZipInfo) -> bytes:
     return z.read(info)
 
 
-def log_lines(path: Path) -> Iterator[tuple[str, str]]:
-    """(computer package, message) for every line of every computer log in one archive."""
+def log_lines(path: Path) -> Iterator[tuple[str, str, str]]:
+    """(computer package, time, message) for every line of every computer log in one archive."""
     with zipfile.ZipFile(path) as outer:
         for info in outer.infolist():
             if not info.filename.endswith("-log.jez"):
@@ -118,7 +129,7 @@ def log_lines(path: Path) -> Iterator[tuple[str, str]]:
                             for line in _read(log, entry).decode("latin-1").splitlines():
                                 fields = line.split("\t")
                                 if len(fields) == 4:
-                                    yield info.filename, fields[2]
+                                    yield info.filename, fields[0], fields[2]
 
 
 def parse_archives(root: Path, archives: Sequence[Row]) -> JSON:
@@ -127,14 +138,17 @@ def parse_archives(root: Path, archives: Sequence[Row]) -> JSON:
     # Contingency urns by (load code, urn): the place they were registered to, medium, round.
     contingency: dict[tuple[str, str], set[tuple[str, str, str, int]]] = defaultdict(set)
     media: dict[str, set[tuple[str, str, str]]] = defaultdict(set)
+    received: dict[str, str] = {}  # medium -> latest time a correspondence from it was received
     lines = Counter()
     for archive in archives:
         number = archive["round"]
-        for _, message in log_lines(root / archive["path"]):
+        for _, time, message in log_lines(root / archive["path"]):
             lines[number] += 1
             if "correspondência de" in message and (found := CORRESPONDENCE.fullmatch(message)):
                 kind, municipality, zone, section, load, urn, medium = found.groups()
                 municipality, zone, urn = municipality.zfill(5), zone.zfill(4), urn.lstrip("0")
+                if message.startswith("Recebida") and (stamp := _stamp(time)):
+                    received[medium] = max(received.get(medium, stamp), stamp)
                 if kind == "seção":
                     sections[(municipality, zone, section.zfill(4))].add(
                         (load, urn, medium, number)
@@ -148,7 +162,31 @@ def parse_archives(root: Path, archives: Sequence[Row]) -> JSON:
                 for municipality, listed in MUNICIPALITY_SECTIONS.findall(found[3]):
                     for section in listed.split():
                         media[serial].add((municipality.zfill(5), zone, section.zfill(4)))
-    return {"sections": sections, "contingency": contingency, "media": media, "lines": lines}
+    return {
+        "sections": sections,
+        "contingency": contingency,
+        "media": media,
+        "received": received,
+        "lines": lines,
+    }
+
+
+def _stamp(time: str) -> str | None:
+    """``dd/mm/yyyy HH:MM:SS`` as ``yyyymmddTHHMMSS``, the BU's ``loaded_at`` form."""
+    found = re.fullmatch(r"(\d\d)/(\d\d)/(\d{4}) (\d\d):(\d\d):(\d\d)", time.strip())
+    return f"{found[3]}{found[2]}{found[1]}T{found[4]}{found[5]}{found[6]}" if found else None
+
+
+def absent_detail(bu: Row, parsed: JSON) -> str:
+    """What the logs hold about the load medium of a load with no correspondence."""
+    last = parsed["received"].get((bu.get("flash_serial") or "").upper())
+    if last is None:
+        return "medium_never_read_back"
+    if not bu.get("loaded_at"):
+        return "no_load_time"
+    if last <= bu["loaded_at"]:
+        return "medium_not_read_back_after_load"
+    return "medium_read_back_later_without_it"
 
 
 def section_rules(bu: Row, parsed: JSON) -> Row:
@@ -164,9 +202,10 @@ def section_rules(bu: Row, parsed: JSON) -> Row:
         found = [(load, urn, medium, number) for _, _, medium, number in places]
         here = any((m, z) == key[:2] for m, z, _, _ in places)
         kind = "absent" if not found else "contingency" if here else "contingency_other_zone"
-    failed, medium, load_medium = [], None, None
+    failed, medium, load_medium, detail = [], None, None, None
     if kind == "absent":
         failed.append("G1")
+        detail = absent_detail(bu, parsed)
     else:
         serial = (bu.get("flash_serial") or "").upper()
         medium = "match" if any(v[2] == serial for v in found) else "differs"
@@ -188,6 +227,7 @@ def section_rules(bu: Row, parsed: JSON) -> Row:
         "rounds_json": json.dumps(sorted({v[3] for v in found}), separators=(",", ":")),
         "medium": medium,
         "load_medium": load_medium,
+        "absent_detail": detail,
         "failed_json": json.dumps(failed, separators=(",", ":")),
     }
 
@@ -240,6 +280,8 @@ def run_gedai(
         "kept": "correspondence and load-medium lines only; operator identifiers are not read "
         "into any output",
         "not_verified": "the GEDAI log signature files (format not reviewed)",
+        "absent_detail": "for a G1 failure, whether its load medium was read back into GEDAI "
+        "after the BU's load time (GEDAI computer clock against urn clock, minute grain)",
         "zones": "G1 (G3) is not applied in a zone where no section matched a correspondence "
         "(a load medium): the zone's preparation logs are not in the publication",
         "ufs": sorted(ufs) if ufs else None,
@@ -247,15 +289,17 @@ def run_gedai(
     output.mkdir(parents=True)
     atomic(output / "binding.json", binding)
     parsed: JSON = {"sections": defaultdict(set), "contingency": defaultdict(set)}
-    parsed["media"], lines = defaultdict(set), Counter()
+    parsed["media"], parsed["received"], lines = defaultdict(set), {}, Counter()
     for root, archives in per_root:
         part = parse_archives(root, archives)
         for name in ("sections", "contingency", "media"):
             for key, values in part[name].items():
                 parsed[name][key] |= values
+        for medium, stamp in part["received"].items():
+            parsed["received"][medium] = max(parsed["received"].get(medium, stamp), stamp)
         lines.update(part["lines"])
     columns = ["uf", "municipality", "zone", "section", "package", "bu_status"]
-    columns += ["urn_serial", "load_code", "flash_serial"]
+    columns += ["urn_serial", "load_code", "flash_serial", "loaded_at"]
     rows, loads, issues = [], [], []
     table = pq.read_table(release / "sections.parquet", columns=columns)
     for bu in table.to_pylist():
@@ -263,7 +307,7 @@ def run_gedai(
             continue
         base = {k: bu[k] for k in ("uf", "municipality", "zone", "section", "package")}
         rows.append({**base, **section_rules(bu, parsed)})
-        loads.append({k: bu[k] for k in ("urn_serial", "load_code", "flash_serial")})
+        loads.append({k: bu[k] for k in ("urn_serial", "load_code", "flash_serial", "loaded_at")})
     zone_coverage(rows)
     for row, bu in zip(rows, loads, strict=True):
         failed = json.loads(row["failed_json"])
@@ -274,7 +318,10 @@ def run_gedai(
                     "failed": failed,
                     **{k: row[k] for k in ("uf", "municipality", "zone", "section", "package")},
                     "bu": bu,
-                    **{k: row.get(k) for k in ("correspondence", "medium", "load_medium")},
+                    **{
+                        k: row.get(k)
+                        for k in ("correspondence", "medium", "load_medium", "absent_detail")
+                    },
                 }
             )
     final = output / ".release.tmp"
@@ -294,6 +341,14 @@ def run_gedai(
         "medium": dict(Counter(str(r.get("medium")) for r in rows)),
         "load_medium": dict(Counter(str(r.get("load_medium")) for r in rows)),
         "failed": dict(Counter(r["failed_json"] for r in rows)),
+        "absent_detail": dict(
+            Counter(
+                f"{'sp/0176' if (r['uf'], r['zone']) == ('sp', '0176') else 'other'}:"
+                f"{r['absent_detail']}"
+                for r in rows
+                if r["correspondence"] == "absent"
+            )
+        ),
         "zones_unpublished": {
             "correspondence": sorted(
                 {
