@@ -11,6 +11,7 @@ import unittest
 import zipfile
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 import pyarrow.parquet as pq
 
@@ -143,6 +144,29 @@ class PrintedPassTests(unittest.TestCase):
         table = pq.read_table(Path(self.temp.name) / name / "release" / "printed.parquet")
         return result, {r["source_id"]: r for r in table.to_pylist()}
 
+    def trusted(self) -> Any:
+        """The test key is self-signed; treat it as CA-issued to reach the comparison paths."""
+        from election_audit import urn_pki
+
+        real = urn_pki.check_certificate
+
+        def check(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            return real(*args, **kwargs) | {
+                "pki_issuer_signature": "verified",
+                "pki_revoked": False,
+            }
+
+        return mock.patch.object(urn_pki, "check_certificate", side_effect=check)
+
+    def test_a_copy_signed_by_an_untrusted_key_is_not_authentic(self) -> None:
+        # xr1-20261109-P4-01: a self-signed key can sign copied content.
+        self.write(1, self.qr(self.content))
+        _, rows = self.run_pass()
+        self.assertEqual(rows["1"]["pki_issuer_signature"], "unknown_issuer")
+        self.assertEqual(
+            (rows["1"]["signature"], rows["1"]["status"]), ("verified", "not_authentic")
+        )
+
     def test_copies_are_verified_and_compared(self) -> None:
         changed = self.content.replace(" 13:", " 13:1", 1)
         self.assertNotEqual(changed, self.content)
@@ -150,12 +174,13 @@ class PrintedPassTests(unittest.TestCase):
         self.write(2, self.qr(changed))  # re-signed by the same key: authentic, different
         self.write(3, self.qr(self.content, sign=False))
         self.write(4, self.qr(self.content.replace("FASE:O", "FASE:S")))
-        result, rows = self.run_pass()
+        with self.trusted():
+            result, rows = self.run_pass()
         equal = rows["1"]
         self.assertEqual(
             (equal["chain"], equal["signature"], equal["qr_codes"]), ("ok", "verified", 2)
         )
-        self.assertEqual(equal["pki_issuer_signature"], "unknown_issuer")
+        self.assertEqual(equal["pki_issuer_signature"], "verified")
         self.assertFalse(equal["certificate_matches_bu"])  # not the urn's key
         self.assertEqual(equal["status"], "equal_content_other_certificate")
         self.assertEqual((equal["header_differences"], equal["contest_differences"]), (0, 0))
@@ -173,7 +198,7 @@ class PrintedPassTests(unittest.TestCase):
         self.assertEqual(result["summary"]["sections_with_several_copies"], 1)
         self.assertEqual(result["summary"]["sections_whose_copies_share_one_final_hash"], 0)
         self.assertIn("2:ac", result["bulk_archives"])
-        with self.assertRaises(FileExistsError):
+        with self.assertRaises(FileExistsError), self.trusted():
             self.run_pass()
 
     def test_arvor_input_must_match_its_manifest(self) -> None:

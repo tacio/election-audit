@@ -41,7 +41,7 @@ from election_audit.types import JSON, Row
 if TYPE_CHECKING:
     from cryptography import x509
 
-VERSION = "printed-bu-v1"
+VERSION = "printed-bu-v2"  # v2: trusted certificate required for equal
 PLEITO_ROUND = {3220: 1, 3221: 2}
 ELECTION_DATE = {1: "2026-10-04", 2: "2026-10-25"}
 QR_LIMIT = 1100  # characters per printed code, header and security fields included
@@ -602,7 +602,12 @@ def check_record(record: Row, published: Published) -> Row:
         "internal_inconsistencies": len(issues),
         "final_hash": record["final_hash"],
     }
-    authentic = chain_status == "ok" and signature == "verified" and not detail["errors"]
+    # The QR signature proves nothing unless its certificate chains to a pinned CA and is
+    # not revoked (xr1-20261109-P4-01): a self-signed key can sign copied content.
+    trusted = pki["pki_issuer_signature"] == "verified" and pki["pki_revoked"] is False
+    authentic = (
+        chain_status == "ok" and signature == "verified" and trusted and not detail["errors"]
+    )
     if record["simulated"] or h.get("FASE") != "O" or round_number is None:
         row["status"] = "out_of_scope"
     elif not all(key.values()):
@@ -631,6 +636,8 @@ def check_record(record: Row, published: Published) -> Row:
                 row["status"] = "differs"
             elif row["certificate_matches_bu"] is False:
                 row["status"] = "equal_content_other_certificate"
+            elif row["certificate_matches_bu"] is None:  # unknown is not a match
+                row["status"] = "equal_content_certificate_unknown"
             else:
                 row["status"] = "equal"
     row["detail_json"] = json.dumps(detail, separators=(",", ":"), sort_keys=True)
