@@ -1,6 +1,6 @@
 # Tier 1 integrity checks (Phase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 6 · Language: en
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 7 · Language: en
 
 [Português](../pt-BR/integrity-checks.md) · [Implementation index](implementation-index.md)
 
@@ -520,6 +520,223 @@ copy.
 One process; reading the bulk archives' central directories dominates (one archive
 open at a time). The release (`printed.parquet` and its manifest) is 140 kB.
 
+## Phase 20b: checks added from DataUrnas-BR
+
+Five checks that [DataUrnas-BR](../../research/related-work.md) runs and this
+project lacked ran nationally on 8–9 November 2026. Each writes a new root with
+`binding.json` and a checksummed `release/`. Operator and voter identifiers never
+reach an output.
+
+### Ed521 cross-check
+
+`integrity-check ed521-crosscheck` (`ed521-crosscheck-v1`, module
+`ed521_crosscheck`) reruns the section checks (`integrity-sections-v4`) and hands
+every Ed521 verdict, on urn signatures and on the CA signature of each urn
+certificate, to DataUrnas-BR's own verifier, loaded unmodified from a pinned file.
+It also runs the 53 vectors of `ed521rs` (33 edge cases, 2 from ECPy, 18 from 2026
+urns) through both verifiers. Inputs, frozen in
+`~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/`: DataUrnas-BR's
+`ed521.py` at commit `f5e8005` (SHA-256 `bff76f54…`) and the vectors of `ed521rs` at
+commit `e711763`.
+
+```sh
+just integrity-check ed521-crosscheck \
+  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot \
+  --round 1 --workers 6 \
+  --reference ~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/dataurnas-ed521.py \
+  --reference-label alissonlinneker/DataUrnas-BR@f5e80059526e511bea7d52aef6a1570de42c3789 \
+  --vectors ~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/vectors \
+  --output ~/data/election-audit-stage/phase20b-ed521/national-r1-20261108
+```
+
+| Round | Sections | Urn signatures | CA signatures | Disagreements |
+| --- | --- | --- | --- | --- |
+| 1 | 399222 | 2794564 | 399222 | 0 |
+| 2 | 399250 | 2428563 | 399250 | 0 |
+
+Every signature was valid in both verifiers. On the vectors, DataUrnas-BR's verifier
+agrees with this project's strict mode in all 53; it differs from ECPy's decoding in
+18, as the strict mode does (RFC 8032 decoding rules). No real signature falls in
+those cases.
+
+### Zerésima
+
+The semantic pass (`session-aggregates-v5`, [semantic pass](semantic-pass.md#version-5-phase-20b))
+keeps a marker for every zerésima and readiness line. `integrity-check zeresima`
+(`integrity-zeresima-v2`, module `zeresima`) reads the markers of each section's
+official blocks of the round. Copies of a block in both memories count once. Urns
+that recorded votes without a zerésima of their own are counted, not failed: a
+contingency urn takes over a section whose zerésima the replaced urn printed.
+
+- Z1: a section with completed votes in its official blocks has a zerésima;
+- Z2: no vote cycle completed before the first zerésima of its stream (file order);
+- Z3: every zerésima is dated on the election day (urn clock);
+- Z4: no zerésima after a vote cycle completed earlier in its stream;
+- Z5: no `Urna pronta para receber votos` before the first zerésima of its stream.
+
+```sh
+just integrity-check zeresima \
+  --sections ~/data/election-audit-stage/phase20/national-r1-sections-v4-20261107 \
+  --semantic ~/data/election-audit-stage/phase20b-zeresima/v5-national-r1-20261108 \
+  --output ~/data/election-audit-stage/phase20b-zeresima/national-r1-zeresima-v2-20261109
+```
+
+| Round | Sections read | Passed | Failed | Without official votes | Two or more urns with a zerésima | Protected or unavailable |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 498580 | 498579 | 1 (Z1) | 12 | 379 | 627 |
+| 2 | 498581 | 498580 | 1 (Z1) | 4 | 296 | 626 |
+
+- No zerésima follows a vote in either round, every zerésima is dated on election
+  day and none comes after the urn declared itself ready.
+- The two Z1 sections, sp/71072/0002/0035 and ma/08893/0047/0609, are the two O17
+  sections whose only voting session starts near 11:00: the urn that printed the
+  zerésima is not in the package ([O17](observations.md#operations)).
+- Version 1 (`integrity-zeresima-v1`, `national-r{1,2}-zeresima-v1-20261108`)
+  required one zerésima per section and one in every log. It failed 382 and 298
+  sections under Z4 and 13 and 5 under Z1. A second zerésima comes from a replacement
+  urn or from an urn restarted before voting, which prints a new one
+  ([O18](observations.md#operations)); 12 and 4 logs hold no official vote at all.
+  Version 2 tests the property that matters, no zerésima after votes.
+
+### GEDAI preparation logs
+
+`integrity-check gedai` (`integrity-gedai-v2`, module `gedai`) reads TSE's GEDAI-UE
+logs of both rounds (one package per preparation computer, per UF) and keeps only
+the correspondence and load-media lines. Per section, against the BU's load code,
+urn number and load-media serial:
+
+- G1: the (section, load code, urn) correspondence is in a log, or the (load code,
+  urn) of a contingency urn is, registered to the section's zone or another;
+- G2: the BU's load-media serial equals that correspondence's;
+- G3: a section correspondence's load medium was generated for the section.
+
+A rule is not applied in a zone whose published logs hold nothing it could match:
+G1 where no section of the zone matched a correspondence, G3 where none matched a
+load medium. Those sections are `zone_unpublished`.
+
+```sh
+just integrity-check gedai \
+  --sections ~/data/election-audit-stage/phase20/national-r1-sections-v4-20261107 \
+  --gedai-root ~/data/election-audit-stage/inputs/resultados-2026-logs-do-sistema-de-preparacao-das-urnas-eletronicas-gedai-1-turno \
+  --gedai-root ~/data/election-audit-stage/inputs/resultados-2026-logs-do-sistema-de-preparacao-das-urnas-eletronicas-gedai-2-turno \
+  --output ~/data/election-audit-stage/phase20b-gedai/national-r1-gedai-v2-20261109
+```
+
+| Round | Section match | Contingency match | Zone unpublished (G1) | Zone unpublished (G3) | G1 failed | G3 failed | G2 failed |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 495387 | 3057 | 482 | 284 | 281 | 0 | 0 |
+| 2 | 492667 | 5721 | 482 | 284 | 337 | 1 | 0 |
+
+- Zones without correspondences: am/0050, mg/0339 and pa/0106. Their logs hold
+  only media generation (pa/0106 in round 1: two packages, 1199 lines), so the computers that
+  loaded the urns are not published. Zones without load media: am/0042, pr/0018
+  and sp/0176 ([T11](observations.md#transparency)).
+- sp/0176 also matches only 169 of its 437 sections' correspondences; its 268 and
+  267 G1 failures are most of the failures. The rest are 13 sections in 12 zones in
+  round 1 and 70 in 56 zones in round 2, each in a zone where every other section
+  matches. They are listed in `discrepancies.jsonl` and not yet explained.
+- Every matched BU load-media serial equals the GEDAI one (G2).
+- Version 1 (`national-r{1,2}-gedai-v1-20261108`) failed the unpublished zones
+  (763 and 819 G1, 284 and 285 G3).
+
+### Hash lists
+
+`integrity-check hash-lists` (`integrity-hash-lists-v1`, module `hash_lists`)
+compares the package signature checks recorded in the logs (the `packages` table of
+`session-aggregates-v5`) with TSE's published hash lists for the four urn models
+(`path1u13`, `path1u15`, `path1u20`, `path1u22`). The logs carry no program hash, so
+the check compares names and results, not file contents:
+
+- H1: every program package verified in a log is named in a list, and how:
+  `exact` (its model's list), `other_model`, `model_suffix` (named without the
+  model year, e.g. `avmodue2020.vst` against `avmodue.vst`) or `not_listed`;
+- H2: every program package verification ended in `SUCESSO`.
+
+The lists were downloaded in a browser on 8 November 2026 (TSE refuses scripted
+requests, [T5](observations.md#transparency)) and frozen in
+`~/data/election-audit-stage/inputs/tse-www-20261108/` with their URLs; all four
+are byte-identical to DataUrnas-BR's copies of 27 October.
+
+```sh
+just integrity-check hash-lists \
+  --semantic ~/data/election-audit-stage/phase20b-zeresima/v5-national-r1-20261108 \
+  --semantic ~/data/election-audit-stage/phase20b-zeresima/v5-national-r2-20261108 \
+  --lists ~/data/election-audit-stage/inputs/tse-www-20261108 \
+  --output ~/data/election-audit-stage/phase20b-hash-lists/national-v1-20261109
+```
+
+- Of the 1456 (round, model, application, stage, path) rows, 1040 are data files
+  (`.vsc` and digit-masked paths), 296 are named exactly in their model's list, 64
+  only without the model year and 56 are not listed.
+- The seven unlisted program paths are files of the load media or of the load
+  itself: `/dsk/fe/estatico/chave/avusrchave.vst` (the list has the
+  internal-memory copy, `/dsk/fi/…`), `/dsk/fe/estatico/jez/vota_apl.vst`,
+  `vota_ofi.vst`, `avpart_ofi.vst`, `/boot/boot/avbootcfg.vst` and `.vsu`, and
+  `/dsk/fi/estatico/dadoscarga.vsu`. The lists cover the installed software only
+  ([T12](observations.md#transparency)).
+- H2: 86 program verification lines ended in `ERRO`, all at start-up, in a few urns
+  of each model (for example `/boot/boot/avboot.vst` 14, `/lib/avlib.vst` 14;
+  round-2 logs repeat the round-1 history, so the rounds overlap). After such an
+  error the urn reports an integrity failure and asks to be switched off
+  (`Desligue a urna`). Whether any of these urns recorded votes
+  after the error is not yet checked: the semantic markers place each error in its
+  block, and a per-session rule is the open item.
+
+### JWS signatures on the published results
+
+TSE publishes a `-u.jws` beside each EA20 `-u.json` result file: a JSON Web
+Signature (Ed25519) over the same bytes. `results-hierarchy fetch-signed`
+(`signed-results-fetch-v1`) downloads both files for every node of a finished EA20
+snapshot, one request at a time with a pause. `integrity-check jws`
+(`integrity-jws-v1`, module `signed_results`) checks the pinned key, then every
+file:
+
+- the key file: the end-entity certificate holds the JWK's key, the `kid` is the
+  certificate's subject key identifier, the chain end entity → `AC DIVULGACAO` →
+  `AC TOTALIZACAO` verifies (Ed448), and the certificate was valid on election day;
+- J1: the header names that `kid` and `EdDSA`;
+- J2: the signature verifies;
+- J3: the signed payload equals the plain `-u.json` fetched with it;
+- J4: it equals the EA20 snapshot used by I4, or the file was republished since
+  (reported, not failed);
+- a negative control: one byte changed in each file must be refused.
+
+The key and the three certificates come from appendix B (official keys) of TSE's
+JWS verification manual of 16 September 2026, downloaded in a browser and frozen in
+`tse-www-20261108/`; `tse-jws-key-20261108/` holds the key file and the script that
+extracted it. DataUrnas-BR quotes the same key.
+
+```sh
+just results-hierarchy fetch-signed \
+  --ea20-root ~/data/election-audit-stage/results-hierarchy/ea20-r1-20261104 \
+  --output ~/data/election-audit-stage/phase20b-jws/signed-r1-20261108
+just integrity-check jws \
+  --signed-root ~/data/election-audit-stage/phase20b-jws/signed-r1-20261108 \
+  --key ~/data/election-audit-stage/inputs/tse-jws-key-20261108/key.json \
+  --output ~/data/election-audit-stage/phase20b-jws/national-r1-jws-v1-20261109
+```
+
+In both rounds all 5786 files (Brazil, 28 UF files and 5757 municipalities) have
+the expected header and a valid signature; each payload equals its plain file and
+the 4 November EA20 snapshot (none was republished), and every altered copy was
+refused. The revocation list named in the certificates was not consulted.
+
+### Runs
+
+| Run | Wall time | CPU time | Peak memory | Output |
+| --- | --- | --- | --- | --- |
+| Ed521 cross-check, round 1 (6 workers) | 3:00:11 | 67769 s | 1.15 GB | 24 MB |
+| Ed521 cross-check, round 2 (6 workers) | 2:31:06 | 56222 s | 1.15 GB | 24 MB |
+| Zerésima v2, round 1 / 2 | 0:29 / 0:32 | — | 2.9 GB | 0.8 / 0.6 MB |
+| GEDAI v2, round 1 / 2 | 0:49 / 0:45 | — | 2.2 GB | 0.8 / 0.7 MB |
+| Hash lists | 0:01 | — | 0.10 GB | 60 kB |
+| JWS fetch, round 1 / 2 | 3:11:27 / 2:30:26 | — | 0.08 GB | 256 / 166 MB |
+| JWS check, round 1 / 2 | 0:17 / 0:10 | — | 0.11 GB | 0.2 MB |
+
+Peak memory is the largest single process; the aggregate of the six cross-check
+workers was not measured. The semantic pass v5 that feeds the zerésima and
+hash-list checks is in the [semantic pass guide](semantic-pass.md#version-5-phase-20b).
+
 ## Limits
 
 - Certificate chains are verified only up to the intermediate CAs; the root and
@@ -535,5 +752,10 @@ open at a time). The release (`printed.parquet` and its manifest) is 140 kB.
   cycles, another section's urn, a broken stream, a log covering part of the day);
   rs/89060/0017/0191 is one cycle short beyond its unresolved cycle. Four logs cover
   only part of election day (O17), so their measures are partial.
+- The JWS check does not consult TSE's revocation list for `AC DIVULGACAO`; the
+  hash-list check compares names and results only, since the logs carry no program
+  hash; the GEDAI logs' own signature files are not verified.
+- GEDAI: 13 and 70 isolated G1 sections and sp/0176 are unexplained; the urns that
+  logged a program signature error are not yet followed to their votes.
 - Agreement among artifacts of the same software chain shows consistency, not voter
   intent.

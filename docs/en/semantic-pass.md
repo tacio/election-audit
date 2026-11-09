@@ -1,6 +1,6 @@
 # Streaming semantic pass (Phase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 6 · Language: en
+Document-ID: EA-SEMANTIC-PASS · Revision: 7 · Language: en
 
 [Português](../pt-BR/semantic-pass.md) · [Implementation index](implementation-index.md)
 
@@ -159,6 +159,38 @@ All four ran on 7–8 November 2026 with 6 workers and no object errors, into
 sample equivalence took 3:10 to 5:41, almost all of it in the adapter. Sections with
 no official session of the round fall from 1636 and 1449 to 12 and 4 in 2026, and
 from 1013 and 1007 to 15 and 12 in 2022 ([section table](section-table.md#national-results)).
+
+## Version 5 (Phase 20b)
+
+`session-aggregates-v5` adds two tables for the integrity checks of Phase 20b and
+leaves sessions, segments, objects and vocabulary unchanged:
+
+- `markers.parquet`: one row per zerésima and readiness line (`await_datetime`,
+  `await_confirmation`, `asked_to_print`, `zeresima_start`, `zeresima_end`,
+  `zeresima_print`, `summary_start`, `summary_end`, `summary_print`, `ready`,
+  `sa_zeresima`), per other line naming the zerésima (`other`) and per signature or
+  integrity failure line (`signature_error`). Each row has its object, stream,
+  block, session and device, the line number, the urn clock reading, the masked
+  template and the vote cycles completed earlier in the same block.
+- `packages.parquet`: national counts of package signature verifications
+  (`Verificação de assinatura … - [ERRO|SUCESSO]`) by urn model, application, stage
+  (`aplicação`, `dado` or `startup`), path, file and result, with events and logs.
+  Digits are masked only in data-file paths. SCUE logs its checks before the model
+  line, so rows take the model of their stream.
+
+The [zerésima](integrity-checks.md#zerésima) and
+[hash-list](integrity-checks.md#hash-lists) checks read them.
+
+| Round | Objects | Markers | Package rows | Wall time | CPU time | Peak memory | Release |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 498580 | 5197232 | 846 | 2:18:03 | 45819 s | 0.98 GB | 594 MB |
+| 2 | 498581 | 10312157 | 850 | 3:34:03 | 75786 s | 1.06 GB | 922 MB |
+
+Both ran on 9 November 2026 with 6 workers and no object errors, into
+`~/data/election-audit-stage/phase20b-zeresima/v5-national-r{1,2}-20261108/`. Their
+sessions, segments, objects and vocabulary tables equal version 4 row for row
+(`EXCEPT ALL` both ways, zero rows). Runoff logs carry the round-1 history, so the
+round-2 release holds both rounds' markers; checks select blocks by context.
 
 ## Contingency counting (SA) logs
 

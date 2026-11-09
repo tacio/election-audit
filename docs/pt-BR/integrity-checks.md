@@ -1,6 +1,6 @@
 # Verificações de integridade de nível 1 (Fase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 6 · Language: pt-BR
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 7 · Language: pt-BR
 
 [English](../en/integrity-checks.md) · [Índice de implementação](implementation-index.md)
 
@@ -541,6 +541,230 @@ coleções, com o mesmo hash final. Nenhuma das seções restantes do I5 tem có
 Um processo; a leitura dos diretórios centrais dos arquivos em lote domina (um
 arquivo aberto por vez). O release (`printed.parquet` e seu manifesto) tem 140 kB.
 
+## Fase 20b: verificações trazidas do DataUrnas-BR
+
+Cinco verificações que o [DataUrnas-BR](../../research/related-work.pt-BR.md) faz e
+que faltavam a este projeto rodaram em escala nacional em 8–9 de novembro de 2026.
+Cada uma grava uma nova raiz com `binding.json` e um `release/` com checksums.
+Identificadores de operadores e de eleitores nunca chegam a uma saída.
+
+### Verificação cruzada do Ed521
+
+`integrity-check ed521-crosscheck` (`ed521-crosscheck-v1`, módulo
+`ed521_crosscheck`) refaz as verificações de seção (`integrity-sections-v4`) e passa
+cada veredito Ed521, nas assinaturas das urnas e na assinatura da AC em cada
+certificado de urna, ao próprio verificador do DataUrnas-BR, carregado sem
+alterações de um arquivo fixado. Também roda os 53 vetores do `ed521rs` (33 casos de
+borda, 2 do ECPy, 18 de urnas de 2026) nos dois verificadores. Entradas, congeladas
+em `~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/`: o `ed521.py`
+do DataUrnas-BR no commit `f5e8005` (SHA-256 `bff76f54…`) e os vetores do `ed521rs`
+no commit `e711763`.
+
+```sh
+just integrity-check ed521-crosscheck \
+  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot \
+  --round 1 --workers 6 \
+  --reference ~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/dataurnas-ed521.py \
+  --reference-label alissonlinneker/DataUrnas-BR@f5e80059526e511bea7d52aef6a1570de42c3789 \
+  --vectors ~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/vectors \
+  --output ~/data/election-audit-stage/phase20b-ed521/national-r1-20261108
+```
+
+| Turno | Seções | Assinaturas de urna | Assinaturas de AC | Divergências |
+| --- | --- | --- | --- | --- |
+| 1 | 399222 | 2794564 | 399222 | 0 |
+| 2 | 399250 | 2428563 | 399250 | 0 |
+
+Toda assinatura foi válida nos dois verificadores. Nos vetores, o verificador do
+DataUrnas-BR concorda com o modo estrito deste projeto nos 53; difere da decodificação
+do ECPy em 18, como o modo estrito (regras de decodificação da RFC 8032). Nenhuma
+assinatura real cai nesses casos.
+
+### Zerésima
+
+O passe semântico (`session-aggregates-v5`, [passe semântico](semantic-pass.md#versão-5-fase-20b))
+guarda um marcador para cada linha de zerésima e de prontidão. `integrity-check
+zeresima` (`integrity-zeresima-v2`, módulo `zeresima`) lê os marcadores dos blocos
+oficiais do turno de cada seção. Cópias de um bloco nas duas memórias contam uma vez.
+Urnas que registraram votos sem zerésima própria são contadas, não reprovadas: uma
+urna de contingência assume uma seção cuja zerésima a urna substituída imprimiu.
+
+- Z1: uma seção com votos concluídos nos seus blocos oficiais tem zerésima;
+- Z2: nenhum ciclo de voto concluído antes da primeira zerésima do seu fluxo (ordem
+  do arquivo);
+- Z3: toda zerésima tem a data do dia da eleição (relógio da urna);
+- Z4: nenhuma zerésima depois de um ciclo de voto concluído antes no seu fluxo;
+- Z5: nenhum `Urna pronta para receber votos` antes da primeira zerésima do seu
+  fluxo.
+
+```sh
+just integrity-check zeresima \
+  --sections ~/data/election-audit-stage/phase20/national-r1-sections-v4-20261107 \
+  --semantic ~/data/election-audit-stage/phase20b-zeresima/v5-national-r1-20261108 \
+  --output ~/data/election-audit-stage/phase20b-zeresima/national-r1-zeresima-v2-20261109
+```
+
+| Turno | Seções lidas | Aprovadas | Reprovadas | Sem votos oficiais | Duas ou mais urnas com zerésima | Protegidas ou indisponíveis |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 498580 | 498579 | 1 (Z1) | 12 | 379 | 627 |
+| 2 | 498581 | 498580 | 1 (Z1) | 4 | 296 | 626 |
+
+- Nenhuma zerésima vem depois de um voto em nenhum dos turnos, toda zerésima tem a
+  data do dia da eleição e nenhuma vem depois de a urna se declarar pronta.
+- As duas seções reprovadas em Z1, sp/71072/0002/0035 e ma/08893/0047/0609, são as
+  duas seções da O17 cuja única sessão de votação começa perto das 11:00: a urna que
+  imprimiu a zerésima não está no pacote ([O17](observations.md#operação)).
+- A versão 1 (`integrity-zeresima-v1`, `national-r{1,2}-zeresima-v1-20261108`)
+  exigia uma zerésima por seção e uma em todo log. Reprovou 382 e 298 seções em Z4 e
+  13 e 5 em Z1. Uma segunda zerésima vem de uma urna substituta ou de uma urna
+  reiniciada antes da votação, que imprime outra ([O18](observations.md#operação));
+  12 e 4 logs não têm nenhum voto oficial. A versão 2 testa a propriedade que importa:
+  nenhuma zerésima depois de votos.
+
+### Logs de preparação do GEDAI
+
+`integrity-check gedai` (`integrity-gedai-v2`, módulo `gedai`) lê os logs do
+GEDAI-UE publicados pelo TSE para os dois turnos (um pacote por computador de
+preparação, por UF) e guarda só as linhas de correspondência e de mídia de carga. Por
+seção, contra o código de carga, o número da urna e o número de série da mídia de
+carga do BU:
+
+- G1: a correspondência (seção, código de carga, urna) está em um log, ou a
+  (código de carga, urna) de uma urna de contingência está, registrada na zona da
+  seção ou em outra;
+- G2: o número de série da mídia de carga do BU é igual ao dessa correspondência;
+- G3: a mídia de carga de uma correspondência de seção foi gerada para a seção.
+
+Uma regra não é aplicada numa zona cujos logs publicados não têm nada que ela possa
+casar: G1 quando nenhuma seção da zona casou com uma correspondência, G3 quando
+nenhuma casou com uma mídia de carga. Essas seções ficam `zone_unpublished`.
+
+```sh
+just integrity-check gedai \
+  --sections ~/data/election-audit-stage/phase20/national-r1-sections-v4-20261107 \
+  --gedai-root ~/data/election-audit-stage/inputs/resultados-2026-logs-do-sistema-de-preparacao-das-urnas-eletronicas-gedai-1-turno \
+  --gedai-root ~/data/election-audit-stage/inputs/resultados-2026-logs-do-sistema-de-preparacao-das-urnas-eletronicas-gedai-2-turno \
+  --output ~/data/election-audit-stage/phase20b-gedai/national-r1-gedai-v2-20261109
+```
+
+| Turno | Casamento de seção | Casamento de contingência | Zona não publicada (G1) | Zona não publicada (G3) | G1 reprovado | G3 reprovado | G2 reprovado |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 495387 | 3057 | 482 | 284 | 281 | 0 | 0 |
+| 2 | 492667 | 5721 | 482 | 284 | 337 | 1 | 0 |
+
+- Zonas sem correspondências: am/0050, mg/0339 e pa/0106. Seus logs têm só a geração
+  de mídias (pa/0106 no 1º turno: dois pacotes, 1199 linhas), então os computadores
+  que carregaram as urnas não foram publicados. Zonas sem mídias de carga: am/0042,
+  pr/0018 e sp/0176 ([T11](observations.md#transparência)).
+- sp/0176 também casa as correspondências de só 169 das suas 437 seções; suas 268 e
+  267 reprovações em G1 são a maior parte das reprovações. O resto são 13 seções em
+  12 zonas no 1º turno e 70 em 56 zonas no 2º, cada uma numa zona em que todas as
+  outras seções casam. Estão listadas em `discrepancies.jsonl` e ainda não têm
+  explicação.
+- Todo número de série de mídia de carga casado no BU é igual ao do GEDAI (G2).
+- A versão 1 (`national-r{1,2}-gedai-v1-20261108`) reprovava as zonas não publicadas
+  (763 e 819 em G1, 284 e 285 em G3).
+
+### Listas de hash
+
+`integrity-check hash-lists` (`integrity-hash-lists-v1`, módulo `hash_lists`)
+compara as verificações de assinatura de pacotes registradas nos logs (a tabela
+`packages` de `session-aggregates-v5`) com as listas de hash publicadas pelo TSE
+para os quatro modelos de urna (`path1u13`, `path1u15`, `path1u20`, `path1u22`). Os
+logs não trazem hash de programa, então a verificação compara nomes e resultados, não
+o conteúdo dos arquivos:
+
+- H1: todo pacote de programa verificado num log aparece numa lista, e como:
+  `exact` (a lista do seu modelo), `other_model`, `model_suffix` (nomeado sem o ano
+  do modelo, por exemplo `avmodue2020.vst` contra `avmodue.vst`) ou `not_listed`;
+- H2: toda verificação de pacote de programa terminou em `SUCESSO`.
+
+As listas foram baixadas num navegador em 8 de novembro de 2026 (o TSE recusa
+requisições automatizadas, [T5](observations.md#transparência)) e congeladas em
+`~/data/election-audit-stage/inputs/tse-www-20261108/` com suas URLs; as quatro são
+idênticas byte a byte às cópias do DataUrnas-BR de 27 de outubro.
+
+```sh
+just integrity-check hash-lists \
+  --semantic ~/data/election-audit-stage/phase20b-zeresima/v5-national-r1-20261108 \
+  --semantic ~/data/election-audit-stage/phase20b-zeresima/v5-national-r2-20261108 \
+  --lists ~/data/election-audit-stage/inputs/tse-www-20261108 \
+  --output ~/data/election-audit-stage/phase20b-hash-lists/national-v1-20261109
+```
+
+- Das 1456 linhas (turno, modelo, aplicação, etapa, caminho), 1040 são arquivos de
+  dados (`.vsc` e caminhos com dígitos mascarados), 296 aparecem exatamente na lista do
+  seu modelo, 64 só sem o ano do modelo e 56 não estão listadas.
+- Os sete caminhos de programa não listados são arquivos da mídia de carga ou da
+  própria carga: `/dsk/fe/estatico/chave/avusrchave.vst` (a lista tem a cópia da
+  memória interna, `/dsk/fi/…`), `/dsk/fe/estatico/jez/vota_apl.vst`,
+  `vota_ofi.vst`, `avpart_ofi.vst`, `/boot/boot/avbootcfg.vst` e `.vsu`, e
+  `/dsk/fi/estatico/dadoscarga.vsu`. As listas cobrem só o software instalado
+  ([T12](observations.md#transparência)).
+- H2: 86 linhas de verificação de programa terminaram em `ERRO`, todas na
+  inicialização, em poucas urnas de cada modelo (por exemplo `/boot/boot/avboot.vst`
+  14, `/lib/avlib.vst` 14; os logs do 2º turno repetem o histórico do 1º, então os
+  turnos se sobrepõem). Depois de um erro assim a urna informa uma falha de
+  integridade e pede para ser desligada (`Desligue a urna`). Ainda não se verificou se
+  alguma dessas urnas registrou votos depois do erro: os marcadores semânticos situam
+  cada erro no seu bloco, e uma regra por sessão é o item em aberto.
+
+### Assinaturas JWS dos resultados publicados
+
+O TSE publica um `-u.jws` ao lado de cada arquivo de resultado `-u.json` do EA20: uma
+JSON Web Signature (Ed25519) sobre os mesmos bytes. `results-hierarchy fetch-signed`
+(`signed-results-fetch-v1`) baixa os dois arquivos para cada nó de um snapshot EA20
+concluído, uma requisição por vez com pausa. `integrity-check jws`
+(`integrity-jws-v1`, módulo `signed_results`) verifica a chave fixada e depois cada
+arquivo:
+
+- o arquivo de chave: o certificado da entidade final tem a chave do JWK, o `kid` é o
+  identificador de chave do titular do certificado, a cadeia entidade final →
+  `AC DIVULGACAO` → `AC TOTALIZACAO` verifica (Ed448) e o certificado era válido no
+  dia da eleição;
+- J1: o cabeçalho traz esse `kid` e `EdDSA`;
+- J2: a assinatura verifica;
+- J3: o conteúdo assinado é igual ao `-u.json` baixado junto;
+- J4: é igual ao snapshot EA20 usado pelo I4, ou o arquivo foi republicado depois
+  (relatado, não reprovado);
+- um controle negativo: um byte alterado em cada arquivo tem de ser recusado.
+
+A chave e os três certificados vêm do apêndice B (chaves oficiais) do manual de
+verificação JWS do TSE de 16 de setembro de 2026, baixado num navegador e congelado em
+`tse-www-20261108/`; `tse-jws-key-20261108/` guarda o arquivo de chave e o script que
+o extraiu. O DataUrnas-BR cita a mesma chave.
+
+```sh
+just results-hierarchy fetch-signed \
+  --ea20-root ~/data/election-audit-stage/results-hierarchy/ea20-r1-20261104 \
+  --output ~/data/election-audit-stage/phase20b-jws/signed-r1-20261108
+just integrity-check jws \
+  --signed-root ~/data/election-audit-stage/phase20b-jws/signed-r1-20261108 \
+  --key ~/data/election-audit-stage/inputs/tse-jws-key-20261108/key.json \
+  --output ~/data/election-audit-stage/phase20b-jws/national-r1-jws-v1-20261109
+```
+
+Nos dois turnos, os 5786 arquivos (Brasil, 28 arquivos de UF e 5757 municípios) têm o
+cabeçalho esperado e assinatura válida; cada conteúdo é igual ao seu arquivo simples e
+ao snapshot EA20 de 4 de novembro (nenhum foi republicado), e toda cópia alterada foi
+recusada. A lista de revogação indicada nos certificados não foi consultada.
+
+### Execuções
+
+| Execução | Tempo de relógio | Tempo de CPU | Memória de pico | Saída |
+| --- | --- | --- | --- | --- |
+| Verificação cruzada do Ed521, 1º turno (6 workers) | 3:00:11 | 67769 s | 1,15 GB | 24 MB |
+| Verificação cruzada do Ed521, 2º turno (6 workers) | 2:31:06 | 56222 s | 1,15 GB | 24 MB |
+| Zerésima v2, 1º / 2º turno | 0:29 / 0:32 | — | 2,9 GB | 0,8 / 0,6 MB |
+| GEDAI v2, 1º / 2º turno | 0:49 / 0:45 | — | 2,2 GB | 0,8 / 0,7 MB |
+| Listas de hash | 0:01 | — | 0,10 GB | 60 kB |
+| Download JWS, 1º / 2º turno | 3:11:27 / 2:30:26 | — | 0,08 GB | 256 / 166 MB |
+| Verificação JWS, 1º / 2º turno | 0:17 / 0:10 | — | 0,11 GB | 0,2 MB |
+
+A memória de pico é a do maior processo individual; o agregado dos seis workers da
+verificação cruzada não foi medido. O passe semântico v5 que alimenta as verificações
+de zerésima e de listas de hash está no [guia do passe semântico](semantic-pass.md#versão-5-fase-20b).
+
 ## Limites
 
 - As cadeias de certificados são verificadas só até as ACs intermediárias; os
@@ -557,5 +781,12 @@ arquivo aberto por vez). O release (`printed.parquet` e seu manifesto) tem 140 k
   dia); rs/89060/0017/0191 fica um ciclo abaixo além do seu ciclo não resolvido.
   Quatro logs cobrem só parte do dia de eleição (O17), então suas medidas são
   parciais.
+- A verificação JWS não consulta a lista de revogação do TSE para a `AC DIVULGACAO`;
+  a verificação das listas de hash compara só nomes e resultados, pois os logs não
+  trazem hash de programa; os arquivos de assinatura dos próprios logs do GEDAI não
+  são verificados.
+- GEDAI: as 13 e 70 seções isoladas reprovadas em G1 e a zona sp/0176 não têm
+  explicação; as urnas que registraram erro de assinatura de programa ainda não foram
+  seguidas até os seus votos.
 - A concordância entre artefatos da mesma cadeia de software mostra consistência, não
   a intenção do eleitor.

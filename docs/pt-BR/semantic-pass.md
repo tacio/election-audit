@@ -1,6 +1,6 @@
 # Passada semântica em fluxo (Fase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 6 · Language: pt-BR
+Document-ID: EA-SEMANTIC-PASS · Revision: 7 · Language: pt-BR
 
 [English](../en/semantic-pass.md) · [Índice de implementação](implementation-index.md)
 
@@ -163,6 +163,40 @@ As quatro rodaram em 7–8 de novembro de 2026 com 6 workers e sem erros de obje
 equivalência por amostra levou de 3:10 a 5:41, quase tudo no adaptador. As seções sem
 sessão oficial do turno caem de 1636 e 1449 para 12 e 4 em 2026, e de 1013 e 1007
 para 15 e 12 em 2022 ([tabela por seção](section-table.md#resultados-nacionais)).
+
+## Versão 5 (Fase 20b)
+
+`session-aggregates-v5` acrescenta duas tabelas para as verificações de integridade
+da Fase 20b e não altera sessões, segmentos, objetos e vocabulário:
+
+- `markers.parquet`: uma linha por linha de zerésima e de prontidão (`await_datetime`,
+  `await_confirmation`, `asked_to_print`, `zeresima_start`, `zeresima_end`,
+  `zeresima_print`, `summary_start`, `summary_end`, `summary_print`, `ready`,
+  `sa_zeresima`), por outra linha que menciona a zerésima (`other`) e por linha de
+  falha de assinatura ou de integridade (`signature_error`). Cada linha tem seu
+  objeto, fluxo, bloco, sessão e dispositivo, o número da linha, a leitura do relógio
+  da urna, o modelo mascarado e os ciclos de voto concluídos antes no mesmo bloco.
+- `packages.parquet`: contagens nacionais das verificações de assinatura de pacotes
+  (`Verificação de assinatura … - [ERRO|SUCESSO]`) por modelo de urna, aplicação,
+  etapa (`aplicação`, `dado` ou `startup`), caminho, arquivo e resultado, com eventos e
+  logs. Os dígitos são mascarados só em caminhos de arquivos de dados. O SCUE registra
+  suas verificações antes da linha do modelo, então as linhas recebem o modelo do seu
+  fluxo.
+
+As verificações de [zerésima](integrity-checks.md#zerésima) e de
+[listas de hash](integrity-checks.md#listas-de-hash) as leem.
+
+| Turno | Objetos | Marcadores | Linhas de pacotes | Tempo de relógio | Tempo de CPU | Memória de pico | Release |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 498580 | 5197232 | 846 | 2:18:03 | 45819 s | 0,98 GB | 594 MB |
+| 2 | 498581 | 10312157 | 850 | 3:34:03 | 75786 s | 1,06 GB | 922 MB |
+
+Os dois rodaram em 9 de novembro de 2026 com 6 workers e sem erros de objeto, em
+`~/data/election-audit-stage/phase20b-zeresima/v5-national-r{1,2}-20261108/`. Suas
+tabelas de sessões, segmentos, objetos e vocabulário são iguais às da versão 4 linha a
+linha (`EXCEPT ALL` nos dois sentidos, zero linhas). Os logs do segundo turno trazem o
+histórico do 1º turno, então o release do 2º turno tem os marcadores dos dois turnos;
+as verificações selecionam blocos pelo contexto.
 
 ## Logs de apuração de contingência (SA)
 
