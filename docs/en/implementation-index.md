@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 41 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 42 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -260,8 +260,13 @@ and `ty check` (pinned 0.0.94) reports no diagnostics; the conventions are in
 
 Finish the first [cross-model review](cross-model-review.md) campaign
 (`xr1-20261109`, `review/campaigns/xr1-20261109/`): rounds 1–3 are done (98 findings,
-65 confirmed or partly confirmed, none changing a recorded national result) and the
-fixes of round 4 are under way, Phase 23 blockers first; round 5 verifies them. Then
+65 confirmed or partly confirmed). In round 4 the Phase 23 blockers and the fixes to
+the integrity checks are done and reran nationally on 9 November 2026
+([cross-model review fixes](integrity-checks.md#phase-20b-cross-model-review-fixes)):
+sp/0176 now fails G3 in 168 sections per round, I7 R2 adds 20 sections that already
+failed R6, and E3's 31 start-up recoveries are recorded (T14); no other result
+changed. Still to do: the portability fixes and the low-severity rows, then round 5
+verifies them. Then
 start Phase 23 (development modelling, power study,
 protocol freeze) on development data only. Phase 20b is complete and its checks and gaps are registered in the
 protocol ([handoff](handoffs/task-20b.md)); before the freeze, add TSE's reply on the

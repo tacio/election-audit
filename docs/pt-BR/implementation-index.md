@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 41 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 42 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -276,9 +276,14 @@ convenções estão em `CLAUDE.md`.
 
 Concluir a primeira campanha de [revisão cruzada entre modelos](cross-model-review.md)
 (`xr1-20261109`, `review/campaigns/xr1-20261109/`): as rodadas 1–3 estão feitas (98
-achados, 65 confirmados ou confirmados em parte, nenhum mudando um resultado nacional
-registrado) e as correções da rodada 4 estão em andamento, primeiro as que bloqueiam a
-Fase 23; a rodada 5 as verifica. Depois, começar a Fase 23 (modelagem de desenvolvimento, estudo de poder, congelamento do
+achados, 65 confirmados ou confirmados em parte). Na rodada 4 as correções que
+bloqueiam a Fase 23 e as das verificações de integridade estão feitas e rodaram
+nacionalmente em 9 de novembro de 2026
+([correções da revisão entre modelos](integrity-checks.md#fase-20b-correções-da-revisão-entre-modelos)):
+sp/0176 passa a reprovar G3 em 168 seções por turno, R2 de I7 acrescenta 20 seções já
+reprovadas em R6, e as 31 recuperações na inicialização de E3 estão registradas (T14);
+nenhum outro resultado mudou. Falta: as correções de portabilidade e as linhas de baixa
+severidade; depois a rodada 5 as verifica. Depois, começar a Fase 23 (modelagem de desenvolvimento, estudo de poder, congelamento do
 protocolo) só com dados de desenvolvimento. A Fase 20b está concluída e suas
 verificações e lacunas estão registradas no protocolo
 ([handoff](handoffs/task-20b.md)); antes do congelamento, acrescentar ao protocolo a

@@ -1,6 +1,6 @@
 # Tier 1 integrity checks (Phase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 10 · Language: en
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 11 · Language: en
 
 [Português](../pt-BR/integrity-checks.md) · [Implementation index](implementation-index.md)
 
@@ -130,12 +130,12 @@ continues in the runoff log after the round-1 log was written, so it can only ma
 as a prefix; Phase 21 kept whole-segment fingerprints, so that block is reported as
 `open_prefix_unverified`.
 
-**I7, clock and session rules** (`integrity-logs-v1`, `integrity-logs-v2`): R1 at least one official
-session of the round; R2 the last one has a closing reading; R3 no backward clock
+**I7, clock and session rules** (`integrity-logs-v1` to `integrity-logs-v3`): R1 at least one official
+session of the round; R2 the last one (by urn clock since v3) has a closing reading; R3 no backward clock
 step inside official sessions; R4 no completion outside a cycle; R5 every official
 session starts on the election date; R6 official sessions do not overlap.
 
-**I8, printed BUs** (`printed-bu-v1`): BU copies read from the QR codes of the paper
+**I8, printed BUs** (`printed-bu-v1`, `printed-bu-v2`): BU copies read from the QR codes of the paper
 printed at the polling station, collected by third parties, against the published BU
 of the same section. See [Phase 20b: I8 printed BUs](#phase-20b-i8-printed-bus).
 
@@ -644,7 +644,9 @@ just integrity-check gedai \
 - Zones without correspondences: am/0050, mg/0339 and pa/0106. Their logs hold
   only media generation (pa/0106 in round 1: two packages, 1199 lines), so the computers that
   loaded the urns are not published. Zones without load media: am/0042, pr/0018
-  and sp/0176 ([T11](observations.md#transparency)).
+  and sp/0176 ([T11](observations.md#transparency)); version 4 finds one medium of
+  sp/0176 and fails G3 there (see
+  [cross-model review fixes](#phase-20b-cross-model-review-fixes)).
 - sp/0176 also matches only 169 of its 437 sections' correspondences; its 268 and
   267 G1 failures are most of the failures. Of those, 192 per round have a load
   medium from which GEDAI never received a correspondence: the computer that loaded
@@ -854,6 +856,84 @@ Peak memory is the largest single process; the aggregate of the six cross-check
 workers was not measured. The semantic pass v5 that feeds the zerésima and
 hash-list checks is in the [semantic pass guide](semantic-pass.md#version-5-phase-20b).
 
+## Phase 20b: cross-model review fixes
+
+The cross-model review of 9 November 2026 (campaign
+[`xr1-20261109`](cross-model-review.md), ledger in
+`review/campaigns/xr1-20261109/ledger.jsonl`) confirmed findings in several checks.
+The fixed versions reran nationally on 9 November 2026 into new roots; earlier
+releases stay as they were.
+
+| Check | Version | Change | Ledger (`xr1-20261109-`) |
+| --- | --- | --- | --- |
+| Sections (I1) | `integrity-sections-v5` | Every signature under an urn key of small order ([4]A = O, `hw_key_small_order`) is refused: cofactorless Ed521 verification accepts a universal forgery under such a key. Certificate, issuer, revocation, file-hash and unlisted-file failures become I1 issue rows | P3-04, P0-05, P3-05 |
+| Ed521 vectors | `ed521-crosscheck-v2` | New command `integrity-check ed521-vectors` runs the 53 vectors through the pure-Python verifier, `ed521rs` strict and ECPy, and marks small-order keys | P3-04 |
+| Logs (I6, I7) | `integrity-logs-v3` | I6 checks each round-1 file's hash before using it; I7 R2 takes the last session by urn clock, not by archive order | P4-02, P0-04 |
+| Signature errors | `integrity-signature-errors-v3` | E3, see [signature errors and votes](#signature-errors-and-votes) | P4-03 |
+| GEDAI | `integrity-gedai-v4` | A zone is unpublished only when its logs hold no record of that kind, read from the records themselves, not from matches | P0-02 |
+| I8 | `printed-bu-v2` | A copy is authentic only with a verified, unrevoked issuer signature; an unknown certificate match is its own status | P4-01, P3-05 |
+| JWS | `integrity-jws-v3` | J4 accepts a different payload only as a later publication of the same node (same identity, strictly later date, time and id); the signed population must equal the EA20 snapshot's | P3-01, P3-02 |
+| Section table, semantic pass | (code) | Hash the bytes they read against their manifest; a mismatch is refused or becomes an error row | P0-01, P2-01 |
+
+```sh
+just integrity-check sections \
+  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot \
+  --round 1 --output ~/data/election-audit-stage/phase20/national-r1-sections-v5-20261109 \
+  --workers 6
+just integrity-check ed521-vectors \
+  --reference ~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/dataurnas-ed521.py \
+  --reference-label alissonlinneker/DataUrnas-BR@f5e80059526e511bea7d52aef6a1570de42c3789 \
+  --vectors ~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/vectors \
+  --output ~/data/election-audit-stage/phase20b-ed521/vectors-v2-20261109
+just integrity-check logs \
+  --sections ~/data/election-audit-stage/phase20/national-r2-sections-v4-20261107 \
+  --semantic ~/data/election-audit-stage/phase20b-sessions/v4-national-r2-20261107 \
+  --semantic-round1 ~/data/election-audit-stage/phase20b-sessions/v4-national-r1-20261107 \
+  --output ~/data/election-audit-stage/phase20/national-r2-logs-v4-20261109
+```
+
+Results:
+
+- Sections v5: no urn key is of small order, and no new I1 issue: both rounds have
+  0 discrepancies, and their summaries equal v4's.
+- Vectors: 0 failures of this project's verifiers; 10 vectors use a small-order key.
+  DataUrnas-BR's verifier agrees with the strict mode in all 53 and with ECPy in 35.
+- I6 is unchanged. I7 R2 now also fails 15 sections in round 1 and 5 in round 2, all
+  of which already failed R6 (overlapping sessions). In each, a short session
+  without a closing reading has urn-clock readings inside the span of the day's
+  closed session, so it sorts last by start; the session that ends last has a
+  closing reading in all 20. Those open sessions hold 4 votes in round 1 and 88 in
+  round 2 (one section in Espírito Santo, whose two streams overlap all day). No
+  section lacks a closing at the end of the day.
+- Signature errors v3: 0 E3 failures (v2: 22 and 9).
+- GEDAI v4: G1 is unchanged. sp/0176 is no longer unpublished for G3: its logs hold
+  one load medium of the zone, generated for 41 sections, which none of its 437 BUs
+  used. Its 168 matched sections now fail G3 with `load_medium` `absent` in both
+  rounds ([T11](observations.md#transparency)). Round 2 also keeps its one G3 failure
+  in mg/0112. G3 stays unpublished in am/0042 (31 sections) and pr/0018 (85).
+- I8 v2: all 528 copies equal, every certificate verified and unrevoked.
+- JWS v3: all 5786 files in both rounds pass; the signed and snapshot populations are
+  equal and no file was republished.
+- Input rehash (`review/campaigns/xr1-20261109/repro/rehash_inputs.py`): the
+  498580 and 498581 staged log objects of the two semantic releases, and the 112
+  BWEB archives, all equal their recorded SHA-256.
+- Inspection: the sections of these reruns' rows, including the 31 E3 and 20 new R2
+  sections whose logs were read, are registered as development data in
+  `~/data/election-audit-stage/inspection/xr1-r4-reruns-20261109.sqlite` (6551
+  places, 31 s, 0.9 GB). Every one was already in the Phase 20b registry, so 7824 of
+  94751 polling places remain development data.
+
+| Run | Wall time | Workers | Peak memory | Output |
+| --- | --- | --- | --- | --- |
+| Sections v5, round 1 / 2 | 1:06:58 / 1:02:08 | 6 | 4.8 / 4.1 GB | 629 / 337 MB |
+| Ed521 vectors v2 | 0:01 | 1 | 0.07 GB | 18 kB |
+| Logs v4 (code v3), round 1 / 2 | 0:26 / 0:48 | 1 | 2.6 / 3.5 GB | 1.2 / 1.7 MB |
+| Signature errors v3, round 1 / 2 | 0:20 / 0:27 | 1 | 1.4 GB | 0.8 / 0.6 MB |
+| GEDAI v4, round 1 / 2 | 0:59 / 0:52 | 1 | 2.3 GB | 0.9 / 0.8 MB |
+| I8 v2 | 0:29 | 1 | 0.56 GB | 0.2 MB |
+| JWS v3, round 1 / 2 | 0:12 / 0:09 | 1 | 0.11 GB | 0.2 MB |
+| Input rehash | 9:18 | 4 | 0.87 GB | 1 kB |
+
 ## Limits
 
 - Certificate chains are verified only up to the intermediate CAs; the root and
@@ -875,6 +955,7 @@ hash-list checks is in the [semantic pass guide](semantic-pass.md#version-5-phas
   hash; the GEDAI logs' own signature files are not verified.
 - GEDAI: the 13 and 70 isolated G1 sections are late loads whose correspondence did
   not reach the published logs (T13), as far as the logs show; why it did not is
-  not established. sp/0176 lacks the preparation logs of most of its urns (T11).
+  not established. sp/0176 lacks the preparation logs of most of its urns and the
+  load media of all its BUs (T11).
 - Agreement among artifacts of the same software chain shows consistency, not voter
   intent.

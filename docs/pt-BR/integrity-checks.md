@@ -1,6 +1,6 @@
 # Verificações de integridade de nível 1 (Fase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 10 · Language: pt-BR
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 11 · Language: pt-BR
 
 [English](../en/integrity-checks.md) · [Índice de implementação](implementation-index.md)
 
@@ -139,12 +139,12 @@ depois de o log do primeiro turno ter sido gravado, então só pode coincidir co
 prefixo; a Fase 21 guardou impressões digitais de segmentos inteiros, então esse
 bloco aparece como `open_prefix_unverified`.
 
-**I7, regras de relógio e sessão** (`integrity-logs-v1`, `integrity-logs-v2`): R1 ao menos uma sessão
-oficial do turno; R2 a última tem leitura de encerramento; R3 nenhum recuo do relógio
+**I7, regras de relógio e sessão** (`integrity-logs-v1` a `integrity-logs-v3`): R1 ao menos uma sessão
+oficial do turno; R2 a última (pelo relógio da urna desde a v3) tem leitura de encerramento; R3 nenhum recuo do relógio
 dentro das sessões oficiais; R4 nenhuma conclusão fora de um ciclo; R5 toda sessão
 oficial começa na data da eleição; R6 as sessões oficiais não se sobrepõem.
 
-**I8, BUs impressos** (`printed-bu-v1`): cópias do BU lidas dos QR codes do papel
+**I8, BUs impressos** (`printed-bu-v1`, `printed-bu-v2`): cópias do BU lidas dos QR codes do papel
 impresso na seção, reunidas por terceiros, contra o BU publicado da mesma seção. Ver
 [Fase 20b: BUs impressos do I8](#fase-20b-bus-impressos-do-i8).
 
@@ -670,7 +670,9 @@ just integrity-check gedai \
 - Zonas sem correspondências: am/0050, mg/0339 e pa/0106. Seus logs têm só a geração
   de mídias (pa/0106 no 1º turno: dois pacotes, 1199 linhas), então os computadores
   que carregaram as urnas não foram publicados. Zonas sem mídias de carga: am/0042,
-  pr/0018 e sp/0176 ([T11](observations.md#transparência)).
+  pr/0018 e sp/0176 ([T11](observations.md#transparência)); a versão 4 acha uma mídia
+  de sp/0176 e reprova G3 ali (ver
+  [correções da revisão entre modelos](#fase-20b-correções-da-revisão-entre-modelos)).
 - sp/0176 também casa as correspondências de só 169 das suas 437 seções; suas 268 e
   267 reprovações em G1 são a maior parte das reprovações. Delas, 192 por turno têm
   uma mídia de carga da qual o GEDAI nunca recebeu correspondência: o computador que
@@ -887,6 +889,86 @@ A memória de pico é a do maior processo individual; o agregado dos seis worker
 verificação cruzada não foi medido. O passe semântico v5 que alimenta as verificações
 de zerésima e de listas de hash está no [guia do passe semântico](semantic-pass.md#versão-5-fase-20b).
 
+## Fase 20b: correções da revisão entre modelos
+
+A revisão entre modelos de 9 de novembro de 2026 (campanha
+[`xr1-20261109`](cross-model-review.md), registro em
+`review/campaigns/xr1-20261109/ledger.jsonl`) confirmou achados em várias
+verificações. As versões corrigidas rodaram nacionalmente em 9 de novembro de 2026 em
+raízes novas; as releases anteriores ficam como estavam.
+
+| Verificação | Versão | Mudança | Registro (`xr1-20261109-`) |
+| --- | --- | --- | --- |
+| Seções (I1) | `integrity-sections-v5` | Toda assinatura sob uma chave de urna de ordem pequena ([4]A = O, `hw_key_small_order`) é recusada: a verificação Ed521 sem cofator aceita uma falsificação universal sob essa chave. Falhas de certificado, emissor, revogação, hash de arquivo e arquivo não listado viram linhas de problema de I1 | P3-04, P0-05, P3-05 |
+| Vetores Ed521 | `ed521-crosscheck-v2` | O novo comando `integrity-check ed521-vectors` roda os 53 vetores no verificador em Python puro, no `ed521rs` estrito e no ECPy, e marca as chaves de ordem pequena | P3-04 |
+| Logs (I6, I7) | `integrity-logs-v3` | I6 confere o hash de cada arquivo do 1º turno antes de usá-lo; R2 de I7 toma a última sessão pelo relógio da urna, não pela ordem no arquivo | P4-02, P0-04 |
+| Erros de assinatura | `integrity-signature-errors-v3` | E3, ver [erros de assinatura e votos](#erros-de-assinatura-e-votos) | P4-03 |
+| GEDAI | `integrity-gedai-v4` | Uma zona só é não publicada quando seus logs não têm nenhum registro daquele tipo, lido dos próprios registros, não das correspondências achadas | P0-02 |
+| I8 | `printed-bu-v2` | Uma cópia só é autêntica com assinatura do emissor verificada e não revogada; uma correspondência de certificado desconhecida tem estado próprio | P4-01, P3-05 |
+| JWS | `integrity-jws-v3` | J4 só aceita um conteúdo diferente como publicação posterior do mesmo nó (mesma identidade, data, hora e id estritamente posteriores); a população assinada deve ser igual à do snapshot EA20 | P3-01, P3-02 |
+| Tabela de seções, passada semântica | (código) | Conferem os bytes que leem com o manifesto; uma divergência é recusada ou vira linha de erro | P0-01, P2-01 |
+
+```sh
+just integrity-check sections \
+  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot \
+  --round 1 --output ~/data/election-audit-stage/phase20/national-r1-sections-v5-20261109 \
+  --workers 6
+just integrity-check ed521-vectors \
+  --reference ~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/dataurnas-ed521.py \
+  --reference-label alissonlinneker/DataUrnas-BR@f5e80059526e511bea7d52aef6a1570de42c3789 \
+  --vectors ~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/vectors \
+  --output ~/data/election-audit-stage/phase20b-ed521/vectors-v2-20261109
+just integrity-check logs \
+  --sections ~/data/election-audit-stage/phase20/national-r2-sections-v4-20261107 \
+  --semantic ~/data/election-audit-stage/phase20b-sessions/v4-national-r2-20261107 \
+  --semantic-round1 ~/data/election-audit-stage/phase20b-sessions/v4-national-r1-20261107 \
+  --output ~/data/election-audit-stage/phase20/national-r2-logs-v4-20261109
+```
+
+Resultados:
+
+- Seções v5: nenhuma chave de urna tem ordem pequena, e não há problema novo de I1:
+  os dois turnos têm 0 divergências, e seus resumos são iguais aos da v4.
+- Vetores: 0 falhas dos verificadores deste projeto; 10 vetores usam uma chave de
+  ordem pequena. O verificador do DataUrnas-BR concorda com o modo estrito nos 53 e
+  com o ECPy em 35.
+- I6 não muda. R2 de I7 passa a reprovar também 15 seções no 1º turno e 5 no 2º,
+  todas já reprovadas em R6 (sessões sobrepostas). Em cada uma, uma sessão curta sem
+  leitura de encerramento tem leituras do relógio da urna dentro do intervalo da
+  sessão encerrada do dia, então fica por último na ordem de início; a sessão que
+  termina por último tem leitura de encerramento nas 20. Essas sessões abertas têm 4
+  votos no 1º turno e 88 no 2º (uma seção do Espírito Santo, cujos dois fluxos se
+  sobrepõem o dia todo). Nenhuma seção fica sem encerramento no fim do dia.
+- Erros de assinatura v3: 0 reprovações em E3 (v2: 22 e 9).
+- GEDAI v4: G1 não muda. sp/0176 deixa de ser não publicada para G3: seus logs têm
+  uma mídia de carga da zona, gerada para 41 seções, que nenhum dos seus 437 BUs
+  usou. Suas 168 seções com correspondência passam a reprovar G3 com `load_medium`
+  `absent` nos dois turnos ([T11](observations.md#transparência)). O 2º turno mantém
+  também sua única reprovação em G3, em mg/0112. G3 segue não publicada em am/0042
+  (31 seções) e pr/0018 (85).
+- I8 v2: as 528 cópias iguais, todo certificado verificado e não revogado.
+- JWS v3: os 5786 arquivos dos dois turnos passam; as populações assinada e do
+  snapshot são iguais e nenhum arquivo foi republicado.
+- Novo hash das entradas (`review/campaigns/xr1-20261109/repro/rehash_inputs.py`):
+  os 498580 e 498581 objetos de log preparados das duas releases semânticas e os
+  112 arquivos do BWEB são todos iguais ao SHA-256 registrado.
+- Inspeção: as seções das linhas destas reexecuções, incluindo as 31 de E3 e as 20
+  novas de R2 cujos logs foram lidos, estão registradas como dados de desenvolvimento
+  em `~/data/election-audit-stage/inspection/xr1-r4-reruns-20261109.sqlite` (6551
+  locais, 31 s, 0,9 GB). Todos já estavam no registro da Fase 20b, então 7824 de
+  94751 locais de votação seguem como dados de desenvolvimento.
+
+| Execução | Duração | Workers | Pico de memória | Saída |
+| --- | --- | --- | --- | --- |
+| Seções v5, 1º / 2º turno | 1:06:58 / 1:02:08 | 6 | 4,8 / 4,1 GB | 629 / 337 MB |
+| Vetores Ed521 v2 | 0:01 | 1 | 0,07 GB | 18 kB |
+| Logs v4 (código v3), 1º / 2º turno | 0:26 / 0:48 | 1 | 2,6 / 3,5 GB | 1,2 / 1,7 MB |
+| Erros de assinatura v3, 1º / 2º turno | 0:20 / 0:27 | 1 | 1,4 GB | 0,8 / 0,6 MB |
+| GEDAI v4, 1º / 2º turno | 0:59 / 0:52 | 1 | 2,3 GB | 0,9 / 0,8 MB |
+| I8 v2 | 0:29 | 1 | 0,56 GB | 0,2 MB |
+| JWS v3, 1º / 2º turno | 0:12 / 0:09 | 1 | 0,11 GB | 0,2 MB |
+| Novo hash das entradas | 9:18 | 4 | 0,87 GB | 1 kB |
+
 ## Limites
 
 - As cadeias de certificados são verificadas só até as ACs intermediárias; os
@@ -911,6 +993,6 @@ de zerésima e de listas de hash está no [guia do passe semântico](semantic-pa
 - GEDAI: as 13 e 70 seções isoladas reprovadas em G1 são cargas tardias cuja
   correspondência não chegou aos logs publicados (T13), até onde os logs mostram; por
   que não chegou não está estabelecido. sp/0176 não tem os logs de preparação da
-  maior parte das suas urnas (T11).
+  maior parte das suas urnas nem as mídias de carga de nenhum dos seus BUs (T11).
 - A concordância entre artefatos da mesma cadeia de software mostra consistência, não
   a intenção do eleitor.
