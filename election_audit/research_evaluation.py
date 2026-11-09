@@ -69,6 +69,53 @@ def open_journal(path: str | Path, protocol: str | Path) -> sqlite3.Connection:
     return db
 
 
+def claim_protected_access(registry: str | Path, document: JSON, model_run_id: str) -> JSON:
+    """Claim the protocol's one final evaluation, whichever model directory asks.
+
+    Each model directory keeps its own journal, so the one-use rule cannot live there: a
+    model fitted into a new directory would start with an empty history. The registry is
+    shared by every model of a frozen protocol and partition. It refuses another model run,
+    and refuses any run once an evaluation has completed; the same run may resume an
+    evaluation that stopped before completing.
+    """
+    path = Path(registry)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    key = (document["protocol_id"], document["partition_id"])
+    with closing(sqlite3.connect(path, isolation_level=None)) as db:
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS protected_access(protocol_id TEXT,partition_id TEXT,"
+            "model_run_id TEXT NOT NULL,claimed_at TEXT NOT NULL,completed_at TEXT,"
+            "PRIMARY KEY(protocol_id,partition_id))"
+        )
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute(
+            "SELECT model_run_id,claimed_at,completed_at FROM protected_access"
+            " WHERE protocol_id=? AND partition_id=?",
+            key,
+        ).fetchone()
+        if row and row[0] != model_run_id:
+            db.execute("ROLLBACK")
+            raise ValueError(f"Protected population already claimed by model run {row[0]}")
+        if row and row[2] is not None:
+            db.execute("ROLLBACK")
+            raise ValueError("Final evaluation of this protocol has already completed")
+        if row is None:
+            row = (model_run_id, utc_now(), None)
+            db.execute("INSERT INTO protected_access VALUES(?,?,?,?,NULL)", (*key, *row[:2]))
+        db.execute("COMMIT")
+    return {"registry": str(path.resolve()), "model_run_id": row[0], "claimed_at": row[1]}
+
+
+def complete_protected_access(registry: str | Path, document: JSON, model_run_id: str) -> None:
+    with closing(sqlite3.connect(Path(registry))) as db:
+        db.execute(
+            "UPDATE protected_access SET completed_at=? WHERE protocol_id=? AND partition_id=?"
+            " AND model_run_id=? AND completed_at IS NULL",
+            (utc_now(), document["protocol_id"], document["partition_id"], model_run_id),
+        )
+        db.commit()
+
+
 def append_record(
     db: sqlite3.Connection,
     record_id: str,

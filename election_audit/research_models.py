@@ -15,6 +15,8 @@ from typing import Any
 
 from election_audit.research_evaluation import (
     append_record,
+    claim_protected_access,
+    complete_protected_access,
     open_journal,
     record_evaluation_units,
     record_final_evaluation,
@@ -338,10 +340,13 @@ def evaluate_models(
     output: str | Path,
     *,
     final: bool = False,
+    access_registry: str | Path | None = None,
 ) -> JSON:
     import numpy as np
 
     document = load_protocol(protocol)
+    if final and access_registry is None:
+        raise ValueError("A final evaluation needs the protocol's shared access registry")
     manifest, model = _load_model(model_path)
     config = manifest["config"]
     if (
@@ -364,9 +369,12 @@ def evaluate_models(
     identity["state"] = "complete"
     access_id = digest([identity, "access"])
     evaluation_id = digest([identity, "evaluation"])
+    claim = None
     if final:
         if journal.execute("SELECT 1 FROM ledger WHERE record_kind='final_evaluation'").fetchone():
             raise ValueError("Final evaluation already complete")
+        assert access_registry is not None  # required above for a final evaluation
+        claim = claim_protected_access(access_registry, document, manifest["run_id"])
         append_record(journal, access_id, "test_access", identity, references=[manifest["run_id"]])
         record_evaluation_units(
             journal,
@@ -415,11 +423,13 @@ def evaluate_models(
             sumloss += _loss([row["y"]], p)
     payload = {
         **identity,
-        "state": "complete",
+        # An evaluation without a single prediction measured nothing; it is not complete.
+        "state": "complete" if n else "no_eligible_predictions",
         "eligible_predictions": n,
         "quantile_loss": sumloss / n if n else None,
         "predictions_sha256": hash_file(output / "predictions.jsonl"),
         "missing_outcomes": "protected units without eligible target retained in evaluation population; no outcome imputation",
+        **({"protected_access": claim} if claim else {}),
     }
     append_record(
         journal,
@@ -439,13 +449,16 @@ def evaluate_models(
                 )
             ),
         )
-        record_final_evaluation(
-            journal,
-            digest([identity, "final"]),
-            model_run_id=manifest["run_id"],
-            evaluation_id=evaluation_id,
-            access_id=access_id,
-        )
+        if n:
+            record_final_evaluation(
+                journal,
+                digest([identity, "final"]),
+                model_run_id=manifest["run_id"],
+                evaluation_id=evaluation_id,
+                access_id=access_id,
+            )
+        assert access_registry is not None
+        complete_protected_access(access_registry, document, manifest["run_id"])
     journal.commit()
     journal.close()
     (output / "evaluation.json").write_bytes(canonical(payload) + b"\n")
@@ -939,6 +952,11 @@ def research_models_main(argv: Argv = None) -> int:
     parser.add_argument("--target", choices=TARGETS, default="turnout")
     parser.add_argument("--variant", default="no_first_round")
     parser.add_argument("--final", action="store_true")
+    parser.add_argument(
+        "--access-registry",
+        type=Path,
+        help="shared one-use registry of the protocol's protected evaluation (with --final)",
+    )
     parser.add_argument("--max-experiments", type=int)
     parser.add_argument("--repetitions", type=int)
     parser.add_argument("--sanitized-histories", type=Path)
@@ -961,7 +979,12 @@ def research_models_main(argv: Argv = None) -> int:
         )
     elif args.action == "evaluate":
         result = evaluate_models(
-            args.features, args.protocol, args.model, args.output, final=args.final
+            args.features,
+            args.protocol,
+            args.model,
+            args.output,
+            final=args.final,
+            access_registry=args.access_registry,
         )
     else:
         result = simulate_models(args.features, args.protocol, args.model, args.output)

@@ -85,18 +85,79 @@ class ResearchModelTests(unittest.TestCase):
             self.assertFalse(training & test)
             dev = evaluate_models(source, protocol, root / "model-a", root / "development")
             self.assertEqual(dev["stage"], "development")
-            result = evaluate_models(source, protocol, root / "model-a", root / "final", final=True)
+            registry = root / "protected-access.sqlite"
+            with self.assertRaises(ValueError):  # no final evaluation without the registry
+                evaluate_models(source, protocol, root / "model-a", root / "nofinal", final=True)
+            result = evaluate_models(
+                source,
+                protocol,
+                root / "model-a",
+                root / "final",
+                final=True,
+                access_registry=registry,
+            )
             self.assertEqual(result["eligible_predictions"], len(test))
+            self.assertEqual(result["state"], "complete")
             with sqlite3.connect(root / "model-a" / "journal.sqlite") as db:
                 self.assertTrue(final_evaluation_complete(db))
             with self.assertRaises(ValueError):
                 evaluate_models(
-                    source, protocol, root / "model-a", root / "second-final", final=True
+                    source,
+                    protocol,
+                    root / "model-a",
+                    root / "second-final",
+                    final=True,
+                    access_registry=registry,
+                )
+            # xr1 P7-01: a model in a new directory has an empty journal, but the shared
+            # registry still refuses a second final evaluation of the protected population.
+            with self.assertRaises(ValueError):
+                evaluate_models(
+                    source,
+                    protocol,
+                    root / "model-b",
+                    root / "other-final",
+                    final=True,
+                    access_registry=registry,
                 )
             with (root / "model-b" / "model.pickle").open("ab") as stream:
                 stream.write(b"damage")
             with self.assertRaises(ValueError):
                 _load_model(root / "model-b")
+
+    def test_a_final_evaluation_without_predictions_is_not_complete(self) -> None:
+        # xr1 P7-02: no eligible prediction means nothing was evaluated.
+        from unittest import mock
+
+        import election_audit.research_models as models
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, protocol = fixture(root)
+            fit_models(source, protocol, root / "model")
+            with mock.patch.object(models, "_rows", return_value=[]):
+                result = evaluate_models(
+                    source,
+                    protocol,
+                    root / "model",
+                    root / "final",
+                    final=True,
+                    access_registry=root / "access.sqlite",
+                )
+            self.assertEqual(
+                (result["state"], result["eligible_predictions"]), ("no_eligible_predictions", 0)
+            )
+            with sqlite3.connect(root / "model" / "journal.sqlite") as db:
+                self.assertFalse(final_evaluation_complete(db))
+            with self.assertRaises(ValueError):  # the access was still used up
+                evaluate_models(
+                    source,
+                    protocol,
+                    root / "model",
+                    root / "again",
+                    final=True,
+                    access_registry=root / "access.sqlite",
+                )
 
     def test_changed_source_and_matrix_bound_fail(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
