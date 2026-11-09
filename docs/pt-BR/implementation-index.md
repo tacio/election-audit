@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 37 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 38 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -264,7 +264,7 @@ nem rótulo de fraude.
 
 **Verificações.** A verificação offline completa `just check` passa (lock, formato,
 lint, verificação de tipos, contratos, documentos, comandos documentados e todos os
-435 testes). Toda função em `election_audit/`, `scripts/` e `tests/` tem anotações
+437 testes). Toda função em `election_audit/`, `scripts/` e `tests/` tem anotações
 de tipo (ruff `ANN`) e `ty check` (fixado em 0.0.94) não relata diagnósticos; as
 convenções estão em `CLAUDE.md`.
 
@@ -279,7 +279,7 @@ certificados raiz (protocolo 83529705172533) é devida até 25 de novembro de 20
 Arquivar o relatório
 consolidado do TCU sobre o teste de integridade quando for publicado (previsto até
 30 dias após o segundo turno). O
-[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 7) define as
+[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 8) define as
 afirmações, o mapa de ameaças e observáveis, as verificações de integridade I1–I9, os
 testes confirmatórios C1–C6, o estudo de poder e a política de dados; o
 [plano de conclusão](../../research/completion-plan.pt-BR.md) (Revisão 14) define as

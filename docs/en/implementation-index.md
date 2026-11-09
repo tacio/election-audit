@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 37 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 38 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -248,7 +248,7 @@ No national electoral result, national margin, fitted national model or fraud
 label exists.
 
 **Checks.** The full offline gate `just check` passes (lock, format, lint,
-type check, contracts, docs, documented commands and all 435 tests). Every
+type check, contracts, docs, documented commands and all 437 tests). Every
 function in `election_audit/`, `scripts/` and `tests/` is annotated (ruff `ANN`)
 and `ty check` (pinned 0.0.94) reports no diagnostics; the conventions are in
 `CLAUDE.md`.
@@ -261,7 +261,7 @@ protocol with the gaps that cannot be closed (T11–T13, the GEDAI log signature
 root certificates); this gates the Phase 23 freeze ([handoff](handoffs/task-20b.md)). TSE's reply to the root-certificate request (protocol
 83529705172533) is due by 25 November 2026. File the TCU consolidated integrity test
 report when it is published (due within 30 days of the second round). The
-[study protocol](../../research/analysis-plan.md) (Revision 7) defines the claims,
+[study protocol](../../research/analysis-plan.md) (Revision 8) defines the claims,
 the threat-to-observable map, the integrity checks I1–I9, the confirmatory tests
 C1–C6, the power study and the data policy; the
 [completion plan](../../research/completion-plan.md) (Revision 14) defines

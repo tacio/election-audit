@@ -1,6 +1,6 @@
 # Task 20b — Integrity completion: checks added from DataUrnas-BR
 
-Document-ID: EA-HANDOFF-20B · Revision: 2 · Language: en
+Document-ID: EA-HANDOFF-20B · Revision: 3 · Language: en
 
 Objective: run nationally, for 2026 and both rounds, the checks DataUrnas-BR runs
 and this project lacked: an Ed521 cross-check against DataUrnas-BR's verifier, the
@@ -65,7 +65,7 @@ Acceptance (9 November 2026):
   after a signing error in one section per round, read in the logs.
 - JWS: key checks all true; 5786 files per round verified, equal to the plain files
   and to the EA20 snapshot; every altered copy refused.
-- `UV_OFFLINE=1 just check` passes with 435 tests.
+- `UV_OFFLINE=1 just check` passes with 437 tests.
 - Not done: the JWS revocation list, the GEDAI log signature files.
 
 Decisions:

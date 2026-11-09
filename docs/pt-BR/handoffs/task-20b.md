@@ -1,6 +1,6 @@
 # Tarefa 20b — Conclusão da integridade: verificações trazidas do DataUrnas-BR
 
-Document-ID: EA-HANDOFF-20B · Revision: 2 · Language: pt-BR
+Document-ID: EA-HANDOFF-20B · Revision: 3 · Language: pt-BR
 
 Objetivo: executar nacionalmente, para 2026 e nos dois turnos, as verificações que o
 DataUrnas-BR faz e que faltavam a este projeto: uma comparação do Ed521 com o
@@ -70,7 +70,7 @@ Aceitação (9 de novembro de 2026):
   depois de um erro de assinatura em uma seção por turno, lido nos logs.
 - JWS: verificações da chave todas verdadeiras; 5786 arquivos por turno verificados,
   iguais aos arquivos simples e ao snapshot EA20; toda cópia alterada recusada.
-- `UV_OFFLINE=1 just check` passa com 435 testes.
+- `UV_OFFLINE=1 just check` passa com 437 testes.
 - Não feito: a lista de revogação do JWS, os arquivos de assinatura dos logs do GEDAI.
 
 Decisões:

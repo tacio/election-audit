@@ -1,6 +1,6 @@
 # Statistical audit of the 2026 presidential election: study protocol
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 7 · Language: en
+Document-ID: EA-ANALYSIS-PLAN · Revision: 8 · Language: en
 
 [Português](analysis-plan.pt-BR.md) · [Completion plan](completion-plan.md) · [Related work](related-work.md)
 
@@ -81,6 +81,15 @@ writing it. As of this revision:
   the BU attendance of es/57932/0009/0112 (whose urn's log is in the package of
   section 0085), and the national total of completed cycles in official sessions
   per semantic-pass run, compared between versions 3 and 4 and not reported.
+- **Checks added from DataUrnas-BR (Phase 20b, 8–9 November 2026):** pass and
+  failure counts of the Ed521 cross-check and of Z1–Z5, G1–G3, H1–H2, E1–E2 and
+  J1–J4 (section 5), and the rows that fail or are unavailable. For the GEDAI
+  failures outside sp/0176 (13 and 70 sections): their BU load codes, urn numbers,
+  load-media serials and load times, and every GEDAI log line naming them. For the
+  signature errors: their digit-masked templates and the votes counted before and
+  after each; the raw lines around the two signing errors followed by a vote (about
+  ten lines each, voter-related lines excluded). National counts of late urn loads
+  by date and GEDAI match status, without results.
 - **Not seen:** section-level electoral results or operational measures outside AC,
   beyond the counts and disagreeing rows above; the contents of the 596
   protected/stress runoff logs.
@@ -98,6 +107,8 @@ confirmatory family.
 | Ballot stuffing or impersonation by poll workers | Non-biometric authorizations, cycles outside normal hours, bursts of fast cycles; turnout and share spikes | I5; C2, C3, C5 | Stuffing spread thinly over many sections at normal times and with biometric authorizations |
 | Suppression or obstruction of voters | Turnout drop from round 1 to round 2 relative to peers; long gaps, suspensions, late opening, urn replacement | C1 (turnout), C4, C5 | Causes outside the polling place; legitimate causes (transport, weather) produce the same signal |
 | Tampered, copied or fabricated logs | Block hashes; the round-1 segment inside each runoff log vs the round-1 log; clock discontinuities | I6, I7 | A complete, consistently re-signed artifact chain |
+| An urn not prepared through the official chain, or carrying unofficial software | GEDAI load records; zerésima before votes; package signature checks at start-up and their failures | G1–G3, Z1–Z5, H1–H2, E1–E2 | The logs record checks by name and result only, not program hashes; a compromised verifier would log success |
+| Altered results after publication | TSE's JWS signature on each published result file | J1–J4 | A change made before signing |
 | Errors in publication or in this pipeline | Any reconciliation failure | I1–I9 | — |
 
 Benign processes produce several of these signals: regional political swings,
@@ -118,6 +129,11 @@ benign alternative and a control (section 7.6).
 | 2022 presidential BWEB, BUs and logs, both rounds, with voter profile | Negative control (section 7.6) | To acquire |
 | TSE election-day integrity test reports, both rounds | External evidence about in-urn software | To collect |
 | Independent printed BU copies (QR codes) | I8 | Collected in Phase 20b (CMInd and Arvor, 518 sections); selection is not random |
+| GEDAI-UE preparation logs, both rounds (two exports each, with SHA-512 files) | G1–G3 | Acquired; some zones' logs not published (T11) |
+| TSE urn hash lists (`path1u13/15/20/22`) and JWS manual (key in appendix B) | H1–H2, J1–J4 | Downloaded in a browser and frozen (`tse-www-20261108/`, `tse-jws-key-20261108/`) |
+| Signed result files (`-u.jws`) for every EA20 node | J1–J4 | Fetched for both rounds (5786 files each) |
+| Revocation lists of `AC DIVULGACAO` and `AC TOTALIZACAO` | J1–J4 (key status) | Refused to scripts; to be downloaded in a browser |
+| DataUrnas-BR's Ed521 verifier and the `ed521rs` vectors | Ed521 cross-check | Frozen at fixed commits (`ed521-crosscheck-refs-20261108/`) |
 
 Rules that apply to every table:
 
@@ -174,6 +190,32 @@ a later revision, not before the freeze. The impact is low: no claim of this stu
 rests on these contests. The presidential runoff, the subject of C1–C6 and of the
 outcome sensitivity, is covered by I2 in every section with a BU, and the municipal
 contests are a small fraction of the round's contests (871 of 539819).
+
+**Supplementary checks (Phase 20b).** These come from the checks DataUrnas-BR runs
+and were added before the freeze. They test the urn's preparation and start-up and
+the published files, not the count; a failure is investigated like an I-check
+failure. Definitions are in the integrity checks guide.
+
+| ID | Check | Unit | A failure means |
+| --- | --- | --- | --- |
+| Ed521 cross-check | An independent Ed521 verifier (DataUrnas-BR's) gives the same verdict on every urn and CA signature | Signature | One of the two verifiers is wrong, so I1 rests on one implementation |
+| Z1–Z5 | Every voting urn printed a zerésima on election day, before any vote and before declaring itself ready, and none after votes | Section | Votes may predate the zero report |
+| G1–G3 | The BU's (section, load code, urn) and its load medium are in TSE's GEDAI preparation logs | Section | The urn's load is not recorded by the official preparation system, or its records are not published |
+| H1–H2 | Every program package verified in a log is named in TSE's hash lists, and every verification succeeded | Path × model | A package outside the published software, or a failed start-up check |
+| E1–E2 | No vote in the session of a signature verification error; after a signing error, only the vote in flight | Section | An urn kept voting after it failed to verify its software |
+| J1–J4 | Each published result file carries TSE's signature with the official key, over the same bytes as the plain file and the EA20 snapshot | Result file | The published result differs from what TSE signed |
+
+**Known gaps of the supplementary checks**, which stay open at the freeze unless TSE
+answers: G1 cannot be applied in three zones and G3 in three others whose
+preparation logs are not published (482 and 284 sections, T11); sp/0176 has the
+correspondences of only 169 of 437 sections; 13 and 70 late loads outside it have no
+published correspondence (T13), and these stay G1 failures; the GEDAI logs' own
+signature files are not verified; the hash lists do not name the files of the load
+media and the load (T12), and the logs carry names and results, not hashes, so H1
+shows that the verified names are published, not that the bytes match; the CA
+certificate chains stop at the intermediate CAs because the roots are not published
+(T1); the JWS key's revocation status depends on lists that TSE serves only to
+browsers.
 
 Agreement among artifacts produced by the same software chain (I1–I4) shows
 consistency, not voter intent. The TSE integrity tests and printed copies are the

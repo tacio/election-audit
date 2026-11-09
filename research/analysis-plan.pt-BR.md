@@ -1,6 +1,6 @@
 # Auditoria estatística da eleição presidencial de 2026: protocolo do estudo
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 7 · Language: pt-BR
+Document-ID: EA-ANALYSIS-PLAN · Revision: 8 · Language: pt-BR
 
 [English](analysis-plan.md) · [Plano de conclusão](completion-plan.pt-BR.md) · [Trabalhos relacionados](related-work.pt-BR.md)
 
@@ -88,6 +88,16 @@ escrevê-lo. Nesta revisão:
   de es/57932/0009/0112 (cujo log da urna está no pacote da seção 0085) e o total
   nacional de ciclos concluídos em sessões oficiais por execução da passada
   semântica, comparado entre as versões 3 e 4 e não relatado.
+- **Verificações trazidas do DataUrnas-BR (Fase 20b, 8–9 de novembro de 2026):**
+  contagens de aprovação e reprovação da verificação cruzada do Ed521 e de Z1–Z5,
+  G1–G3, H1–H2, E1–E2 e J1–J4 (seção 5), e as linhas reprovadas ou indisponíveis.
+  Para as reprovações do GEDAI fora de sp/0176 (13 e 70 seções): seus códigos de
+  carga do BU, números de urna, números de série das mídias de carga e horas de
+  carga, e toda linha de log do GEDAI que os cita. Para os erros de assinatura: seus
+  modelos com dígitos mascarados e os votos contados antes e depois de cada um; as
+  linhas brutas em torno dos dois erros de assinatura seguidos de um voto (cerca de
+  dez linhas cada, sem as linhas relativas a eleitores). Contagens nacionais de
+  cargas tardias de urna por data e situação no GEDAI, sem resultados.
 - **Não visto:** resultados eleitorais ou medidas operacionais por seção fora do AC,
   além das contagens e das linhas discordantes acima; o conteúdo dos 596 logs
   protegidos/de estresse do segundo turno.
@@ -105,6 +115,8 @@ família confirmatória.
 | Enchimento de urna ou personificação por mesários | Habilitações não biométricas, ciclos fora do horário normal, rajadas de ciclos rápidos; picos de comparecimento e de proporção | I5; C2, C3, C5 | Enchimento diluído em muitas seções, em horários normais e com habilitação biométrica |
 | Supressão ou obstrução de eleitores | Queda de comparecimento do primeiro para o segundo turno em relação aos pares; longas pausas, suspensões, abertura tardia, troca de urna | C1 (comparecimento), C4, C5 | Causas fora do local de votação; causas legítimas (transporte, clima) produzem o mesmo sinal |
 | Logs adulterados, copiados ou fabricados | Hashes de blocos; o trecho do primeiro turno dentro de cada log do segundo turno vs o log do primeiro turno; descontinuidades de relógio | I6, I7 | Uma cadeia de artefatos completa e reassinada de forma consistente |
+| Uma urna não preparada pela cadeia oficial, ou com software não oficial | Registros de carga do GEDAI; zerésima antes dos votos; verificações de assinatura de pacotes na inicialização e suas falhas | G1–G3, Z1–Z5, H1–H2, E1–E2 | Os logs registram verificações por nome e resultado, não hashes de programa; um verificador comprometido registraria sucesso |
+| Resultados alterados depois da publicação | A assinatura JWS do TSE em cada arquivo de resultado publicado | J1–J4 | Uma alteração feita antes da assinatura |
 | Erros na publicação ou neste pipeline | Qualquer falha de reconciliação | I1–I9 | — |
 
 Processos benignos produzem vários desses sinais: mudanças políticas regionais,
@@ -125,6 +137,11 @@ benigna declarada e um controle (seção 7.6).
 | BWEB, BUs e logs presidenciais de 2022, os dois turnos, com perfil do eleitorado | Controle negativo (seção 7.6) | A coletar |
 | Relatórios do teste de integridade do TSE no dia da eleição, os dois turnos | Evidência externa sobre o software da urna | A reunir |
 | Cópias impressas independentes do BU (QR codes) | I8 | Reunidas na Fase 20b (CMInd e Arvor, 518 seções); a seleção não é aleatória |
+| Logs de preparação do GEDAI-UE, dois turnos (duas exportações cada, com arquivos SHA-512) | G1–G3 | Obtidos; os logs de algumas zonas não foram publicados (T11) |
+| Listas de hash de urna do TSE (`path1u13/15/20/22`) e manual JWS (chave no apêndice B) | H1–H2, J1–J4 | Baixados num navegador e congelados (`tse-www-20261108/`, `tse-jws-key-20261108/`) |
+| Arquivos de resultado assinados (`-u.jws`) de todo nó do EA20 | J1–J4 | Baixados para os dois turnos (5786 arquivos cada) |
+| Listas de revogação da `AC DIVULGACAO` e da `AC TOTALIZACAO` | J1–J4 (situação da chave) | Recusadas a scripts; a baixar num navegador |
+| Verificador Ed521 do DataUrnas-BR e os vetores do `ed521rs` | Verificação cruzada do Ed521 | Congelados em commits fixos (`ed521-crosscheck-refs-20261108/`) |
 
 Regras que valem para toda tabela:
 
@@ -185,6 +202,33 @@ congelamento. O impacto é baixo: nenhuma afirmação deste estudo depende dessa
 disputas. O segundo turno presidencial, objeto de C1–C6 e da sensibilidade do
 resultado, é coberto pelo I2 em toda seção com BU, e as disputas municipais são uma
 pequena fração das disputas do turno (871 de 539819).
+
+**Verificações suplementares (Fase 20b).** Vêm das verificações que o DataUrnas-BR
+faz e foram acrescentadas antes do congelamento. Testam a preparação e a
+inicialização da urna e os arquivos publicados, não a contagem; uma reprovação é
+investigada como uma reprovação de verificação I. As definições estão no guia das
+verificações de integridade.
+
+| ID | Verificação | Unidade | Uma reprovação significa |
+| --- | --- | --- | --- |
+| Verificação cruzada do Ed521 | Um verificador Ed521 independente (o do DataUrnas-BR) dá o mesmo veredito em toda assinatura de urna e de AC | Assinatura | Um dos dois verificadores está errado, e o I1 depende de uma só implementação |
+| Z1–Z5 | Toda urna que votou imprimiu uma zerésima no dia da eleição, antes de qualquer voto e antes de se declarar pronta, e nenhuma depois de votos | Seção | Votos podem ser anteriores ao relatório zerado |
+| G1–G3 | A (seção, código de carga, urna) do BU e sua mídia de carga estão nos logs de preparação do GEDAI do TSE | Seção | A carga da urna não está registrada pelo sistema oficial de preparação, ou seus registros não foram publicados |
+| H1–H2 | Todo pacote de programa verificado num log aparece nas listas de hash do TSE, e toda verificação teve sucesso | Caminho × modelo | Um pacote fora do software publicado, ou uma verificação de inicialização que falhou |
+| E1–E2 | Nenhum voto na sessão de um erro de verificação de assinatura; depois de um erro de assinatura, só o voto em curso | Seção | Uma urna seguiu votando depois de não conseguir verificar seu software |
+| J1–J4 | Cada arquivo de resultado publicado tem a assinatura do TSE com a chave oficial, sobre os mesmos bytes do arquivo simples e do snapshot do EA20 | Arquivo de resultado | O resultado publicado difere do que o TSE assinou |
+
+**Lacunas conhecidas das verificações suplementares**, que ficam abertas no
+congelamento a menos que o TSE responda: G1 não pode ser aplicada em três zonas e G3
+em outras três cujos logs de preparação não foram publicados (482 e 284 seções, T11);
+sp/0176 tem as correspondências de só 169 de 437 seções; 13 e 70 cargas tardias fora
+dela não têm correspondência publicada (T13), e continuam reprovações em G1; os
+arquivos de assinatura dos próprios logs do GEDAI não são verificados; as listas de
+hash não nomeiam os arquivos das mídias de carga e da carga (T12), e os logs trazem
+nomes e resultados, não hashes, então a H1 mostra que os nomes verificados estão
+publicados, não que os bytes conferem; as cadeias de certificados das ACs param nas
+ACs intermediárias porque as raízes não foram publicadas (T1); a situação de
+revogação da chave JWS depende de listas que o TSE só entrega a navegadores.
 
 Concordância entre artefatos produzidos pela mesma cadeia de software (I1–I4) mostra
 consistência, não a intenção do eleitor. Os testes de integridade do TSE e as cópias
