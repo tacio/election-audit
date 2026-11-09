@@ -147,7 +147,9 @@ class SignedResultsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.sr.check_key(self.key_file, "2026-10-25")
 
-    def crls(self, name: str, revoke: Any = None, signer: Any = None, **dates: Any) -> Path:
+    def crls(
+        self, name: str, revoke: Any = None, signer: Any = None, pem: bool = False, **dates: Any
+    ) -> Path:
         from cryptography import x509
         from cryptography.hazmat.primitives.serialization import Encoding
 
@@ -173,7 +175,7 @@ class SignedResultsTests(unittest.TestCase):
                 )
                 builder = builder.add_revoked_certificate(entry)
             crl = builder.sign(signer or key, None)
-            (folder / file).write_bytes(crl.public_bytes(Encoding.DER))
+            (folder / file).write_bytes(crl.public_bytes(Encoding.PEM if pem else Encoding.DER))
         return folder
 
     def test_revocation_lists_are_checked_when_given(self) -> None:
@@ -190,6 +192,8 @@ class SignedResultsTests(unittest.TestCase):
         )
         lists = self.sr.check_crls(self.key_file, stale, "2026-10-25")
         self.assertFalse(lists["actot.crl"]["current_on_election_day"])  # reported, not failed
+        as_pem = self.sr.check_crls(self.key_file, self.crls("pem", pem=True), "2026-10-25")
+        self.assertTrue(all(v["signature_valid"] for v in as_pem.values()))
         plain = self.sr.run_verify(root, self.key_file, self.base / "plain")
         self.assertEqual(plain["key"]["revocation"], "not consulted")
 

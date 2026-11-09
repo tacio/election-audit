@@ -232,7 +232,12 @@ def check_crls(key_file: Path, crl_dir: Path, election_date: str) -> JSON:
     lists = {}
     for name, (subject, issuer) in CRLS.items():
         path = crl_dir / name
-        crl = x509.load_der_x509_crl(path.read_bytes())
+        raw = path.read_bytes()  # TSE serves these lists as PEM; DER is accepted too
+        crl = (
+            x509.load_pem_x509_crl(raw)
+            if raw.lstrip().startswith(b"-----BEGIN")
+            else x509.load_der_x509_crl(raw)
+        )
         cert, authority = certificates[subject], certificates[issuer]
         next_update = crl.next_update_utc
         issuer_key = authority.public_key()
