@@ -6,10 +6,14 @@ with its stream, block, session, local clock reading and the number of vote cycl
 earlier in the same block. This check reads those markers for the round's official blocks of
 each section's log and applies:
 
-- Z1: a zerésima was generated (``Gerando relatório [ZERÉSIMA] [INÍCIO]``) in the round;
+- Z1: a section whose official blocks hold completed votes has a zerésima (``Gerando
+  relatório [ZERÉSIMA] [INÍCIO]``); a log without official votes (no voting urn in the
+  publication) is counted as ``no_official_votes``, not failed;
 - Z2: no vote cycle was completed before the first zerésima of its stream (file order);
 - Z3: every zerésima is dated on the election day (urn clock reading);
-- Z4: one zerésima per section;
+- Z4: no zerésima after a vote cycle was completed earlier in its stream (file order). An urn
+  restarted before voting prints a new zerésima, and a replacement urn prints its own: several
+  zerésimas per section are counted (by urn), not failed;
 - Z5: no ``Urna pronta para receber votos`` before the first zerésima of its stream.
 
 Counts per stream (votes before, readiness lines before) take the largest stream of the
@@ -37,13 +41,13 @@ from election_audit.national_migration import atomic, sha
 from election_audit.section_table import distinct_sessions
 from election_audit.types import JSON, Row
 
-VERSION = "integrity-zeresima-v1"
+VERSION = "integrity-zeresima-v2"
 SEMANTIC_VERSION = "session-aggregates-v5"
 RULES = {
-    "Z1": "a zerésima was generated in the round's official block",
+    "Z1": "a section with completed votes in its official blocks has a zerésima",
     "Z2": "no vote cycle completed before the first zerésima of its stream (file order)",
     "Z3": "every zerésima is dated on the election day",
-    "Z4": "one zerésima per section",
+    "Z4": "no zerésima after a vote cycle completed earlier in its stream (file order)",
     "Z5": "no 'Urna pronta para receber votos' before the first zerésima of its stream",
 }
 MARKER_SQL = """
@@ -68,6 +72,8 @@ SECTION_SCHEMA = pa.schema(
         ("ready_before_zeresima", pa.int32()),
         ("devices_with_votes", pa.int32()),
         ("devices_with_votes_without_zeresima", pa.int32()),
+        ("zeresima_devices", pa.int32()),
+        ("zeresimas_after_votes", pa.int32()),
         ("failed_json", pa.string()),
     ]
 )
@@ -99,8 +105,18 @@ def _completed(session: Row) -> int:
     return sum(session[f"cycles_completed_{m}"] for m in ("biometric", "manual", "unknown"))
 
 
-def section_rules(markers: Sequence[Row], sessions: Sequence[Row], election_date: str) -> Row:
-    """Z1-Z5 for one section from its round markers and its distinct official sessions."""
+def section_rules(
+    markers: Sequence[Row],
+    sessions: Sequence[Row],
+    election_date: str,
+    stream_sessions: Sequence[Row] | None = None,
+) -> Row:
+    """Z1-Z5 for one section from its round markers and its distinct official sessions.
+
+    ``stream_sessions`` are all official sessions of the section's objects, memory copies
+    included, for the counts per stream (default: ``sessions``).
+    """
+    stream_sessions = sessions if stream_sessions is None else stream_sessions
     distinct: dict[tuple[str, str, str, int], Row] = {}
     for m in sorted(markers, key=lambda m: (m["object_sha256"], m["stream_ordinal"])):
         distinct.setdefault((m["device_id"], m["block_start"], m["kind"], m["rank"]), m)
@@ -108,23 +124,25 @@ def section_rules(markers: Sequence[Row], sessions: Sequence[Row], election_date
     streams: dict[tuple[str, int], list[Row]] = defaultdict(list)
     for m in markers:
         streams[(m["object_sha256"], m["stream_ordinal"])].append(m)
-    votes_before = ready_before = 0
-    for found in streams.values():
-        first = min(
-            (m for m in found if m["kind"] == "zeresima_start"),
-            key=lambda m: m["line"],
-            default=None,
-        )
-        if first is None:
-            continue
-        earlier = sum(  # votes in earlier official blocks of the same stream
+
+    def votes_before_marker(m: Row) -> int:
+        return m["completions_before"] + sum(  # earlier official blocks of the same stream
             _completed(s)
-            for s in sessions
-            if s["object_sha256"] == first["object_sha256"]
-            and s["stream_ordinal"] == first["stream_ordinal"]
-            and s["segment_ordinal"] < first["segment_ordinal"]
+            for s in stream_sessions
+            if s["object_sha256"] == m["object_sha256"]
+            and s["stream_ordinal"] == m["stream_ordinal"]
+            and s["segment_ordinal"] < m["segment_ordinal"]
         )
-        votes_before = max(votes_before, earlier + first["completions_before"])
+
+    votes_before = ready_before = after_votes = 0
+    for found in streams.values():
+        own = sorted((m for m in found if m["kind"] == "zeresima_start"), key=lambda m: m["line"])
+        if not own:
+            continue
+        first = own[0]
+        votes_before = max(votes_before, votes_before_marker(first))
+        later = sum(1 for m in own[1:] if votes_before_marker(m))
+        after_votes = max(after_votes, later)  # a memory copy repeats its stream
         early = sum(1 for m in found if m["kind"] == "ready" and m["line"] < first["line"])
         ready_before = max(ready_before, early)  # a memory copy repeats its stream
     off_day = sum(1 for m in zeresimas if (m["reading"] or "")[:10] != election_date)
@@ -134,13 +152,13 @@ def section_rules(markers: Sequence[Row], sessions: Sequence[Row], election_date
     devices = {d for d, n in voting.items() if n}
     with_zeresima = {m["device_id"] for m in zeresimas}
     failed = []
-    if not zeresimas:
+    if devices and not zeresimas:
         failed.append("Z1")
     if votes_before:
         failed.append("Z2")
     if off_day:
         failed.append("Z3")
-    if len(zeresimas) > 1:
+    if after_votes:
         failed.append("Z4")
     if ready_before:
         failed.append("Z5")
@@ -151,6 +169,8 @@ def section_rules(markers: Sequence[Row], sessions: Sequence[Row], election_date
         "ready_before_zeresima": ready_before,
         "devices_with_votes": len(devices),
         "devices_with_votes_without_zeresima": len(devices - with_zeresima),
+        "zeresima_devices": len(with_zeresima),
+        "zeresimas_after_votes": after_votes,
         "failed_json": json.dumps(failed, separators=(",", ":")),
     }
 
@@ -211,13 +231,13 @@ def run_zeresima(
             state = "error" if witnesses.get(key) else "protected_or_unavailable"
             rows.append({**base, "log": state})
             continue
-        found, _ = distinct_sessions(
-            [x for o in objects for x in official.get(o["object_sha256"], [])]
-        )
+        every = [x for o in objects for x in official.get(o["object_sha256"], [])]
+        found, _ = distinct_sessions(every)
         row = section_rules(
             [m for o in objects for m in markers.get(o["object_sha256"], [])],
             found,
             election.election_date,
+            every,
         )
         rows.append({**base, "log": "semantic", **row})
         failed = json.loads(row["failed_json"])
@@ -247,6 +267,10 @@ def run_zeresima(
             Counter(f for r in rows for f in json.loads(r.get("failed_json") or "[]"))
         ),
         "zeresimas": dict(Counter(str(r.get("zeresimas")) for r in rows)),
+        "zeresima_devices": dict(Counter(str(r.get("zeresima_devices")) for r in rows)),
+        "no_official_votes": sum(
+            1 for r in rows if r["log"] == "semantic" and not r["devices_with_votes"]
+        ),
         "sections_with_devices_without_zeresima": sum(
             1 for r in rows if r.get("devices_with_votes_without_zeresima")
         ),

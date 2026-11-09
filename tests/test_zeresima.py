@@ -68,8 +68,31 @@ class ZeresimaRuleTests(unittest.TestCase):
             [marker("zeresima_start", 5, reading="2026-10-24T17:00:00")], [session()], DAY
         )
         self.assertEqual(self.failed(off_day), ["Z3"])
-        two = [marker("zeresima_start", 5), marker("zeresima_start", 8, rank=2)]
-        self.assertEqual(self.failed(section_rules(two, [session()], DAY)), ["Z4"])
+        again = [marker("zeresima_start", 5), marker("zeresima_start", 80, before=3, rank=2)]
+        row = section_rules(again, [session()], DAY)
+        self.assertEqual((self.failed(row), row["zeresimas_after_votes"]), (["Z4"], 1))
+        next_block = [marker("zeresima_start", 5), marker("zeresima_start", 90, segment_ordinal=2)]
+        row = section_rules(next_block, [session(completed=4)], DAY)
+        self.assertEqual(self.failed(row), ["Z4"])  # votes in an earlier block of the stream
+
+    def test_a_section_without_official_votes_is_not_failed(self) -> None:
+        row = section_rules([], [session(completed=0)], DAY)
+        self.assertEqual((self.failed(row), row["devices_with_votes"]), ([], 0))
+
+    def test_restarts_and_replacements_before_voting_print_new_zeresimas(self) -> None:
+        restart = [
+            marker("zeresima_start", 5),
+            marker("zeresima_start", 90, segment_ordinal=2, block_start="b2"),
+        ]
+        row = section_rules(restart, [session(segment_ordinal=2)], DAY)
+        self.assertEqual((self.failed(row), row["zeresimas"]), ([], 2))
+        replaced = [
+            marker("zeresima_start", 5),
+            marker("zeresima_start", 5, device_id="d2", object_sha256="o2", block_start="b2"),
+        ]
+        sessions = [session("d2", object_sha256="o2")]
+        row = section_rules(replaced, sessions, DAY)
+        self.assertEqual((self.failed(row), row["zeresima_devices"]), ([], 2))
 
     def test_a_contingency_urn_without_its_own_zeresima_is_counted_not_failed(self) -> None:
         markers = [marker("zeresima_start", 5)]

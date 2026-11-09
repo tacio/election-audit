@@ -112,6 +112,26 @@ class GedaiTests(unittest.TestCase):
             (uncovered["load_medium"], json.loads(uncovered["failed_json"])), ("absent", ["G3"])
         )
 
+    def test_zones_whose_logs_hold_nothing_to_match_are_unavailable(self) -> None:
+        parsed = gedai.parse_archives(self.root, gedai.gedai_archives(self.root))
+        rows = []
+        for zone, section, load in (("0002", "0088", "4" * 24), ("0002", "0089", "1" * 24)):
+            rows.append(
+                {"uf": "ac", "zone": zone}
+                | gedai.section_rules(bu("0088", load, "2263093", "CB28DF40", zone=zone), parsed)
+            )
+        unpublished = {"uf": "ac", "zone": "0009"}
+        unpublished |= gedai.section_rules(
+            bu("0001", "5" * 24, "2000009", "00000009", zone="0009"), parsed
+        )
+        rows.append(unpublished)
+        gedai.zone_coverage(rows)
+        self.assertEqual(json.loads(rows[0]["failed_json"]), ["G1"])  # its zone has matches
+        self.assertEqual(
+            (rows[2]["correspondence"], json.loads(rows[2]["failed_json"])),
+            ("zone_unpublished", []),
+        )
+
     def test_pass_writes_a_release_bound_to_its_inputs(self) -> None:
         release = self.base / "sections" / "release"
         release.mkdir(parents=True)

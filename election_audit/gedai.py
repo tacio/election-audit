@@ -21,6 +21,12 @@ serial (``numeroSerieFC``):
 - G3: for a section correspondence, a load medium with that serial was generated for the
   section.
 
+Some zones' published logs hold no correspondence at all (only media generation: the computers
+that loaded the urns are not in the publication), or no load medium. A rule is not applied in
+a zone where the logs hold nothing it could match: G1 where no section of the zone matched any
+correspondence (``zone_unpublished``), G3 where no section of the zone matched a load medium.
+Such sections are unavailable, not failed; a zone with some matches keeps its failures.
+
 Logs of both rounds are read, and a match records which round's logs hold it. The signature
 files of the GEDAI logs are not verified (format not reviewed).
 """
@@ -43,7 +49,7 @@ from election_audit import integrity_checks as ic
 from election_audit.national_migration import atomic, sha
 from election_audit.types import JSON, Row
 
-VERSION = "integrity-gedai-v1"
+VERSION = "integrity-gedai-v2"
 ARCHIVE = re.compile(r"files/log_gedai_([12])t_([A-Z]{2})_(\d{12})\.zip")
 CORRESPONDENCE = re.compile(
     r"(?:Recebida|Transmitida a|Definida como atual a) correspondência de (seção|contingência): "
@@ -59,11 +65,12 @@ SECTION_SCHEMA = pa.schema(
         ("zone", pa.string()),
         ("section", pa.string()),
         ("package", pa.string()),
-        # section | contingency | contingency_other_zone | absent | no_bu_load
+        # section | contingency | contingency_other_zone | absent | zone_unpublished | no_bu_load
         ("correspondence", pa.string()),
         ("rounds_json", pa.string()),  # GEDAI rounds whose logs hold the match
         ("medium", pa.string()),  # match | differs | null
-        ("load_medium", pa.string()),  # covers_section | other_sections | absent | null
+        # covers_section | other_sections | absent | zone_unpublished | null
+        ("load_medium", pa.string()),
         ("failed_json", pa.string()),
     ]
 )
@@ -185,6 +192,27 @@ def section_rules(bu: Row, parsed: JSON) -> Row:
     }
 
 
+MATCHED = ("section", "contingency", "contingency_other_zone")
+
+
+def zone_coverage(rows: list[Row]) -> None:
+    """Mark G1/G3 as not applicable in zones whose published logs hold nothing to match."""
+    matched, media = Counter(), Counter()
+    for r in rows:
+        zone = (r["uf"], r["zone"])
+        matched[zone] += r["correspondence"] in MATCHED
+        media[zone] += r.get("load_medium") == "covers_section"
+    for r in rows:
+        zone, failed = (r["uf"], r["zone"]), json.loads(r["failed_json"])
+        if "G1" in failed and not matched[zone]:
+            r["correspondence"] = "zone_unpublished"
+            failed.remove("G1")
+        if "G3" in failed and not media[zone]:
+            r["load_medium"] = "zone_unpublished"
+            failed.remove("G3")
+        r["failed_json"] = json.dumps(failed, separators=(",", ":"))
+
+
 def run_gedai(
     sections_root: str | Path,
     gedai_roots: Sequence[str | Path],
@@ -212,6 +240,8 @@ def run_gedai(
         "kept": "correspondence and load-medium lines only; operator identifiers are not read "
         "into any output",
         "not_verified": "the GEDAI log signature files (format not reviewed)",
+        "zones": "G1 (G3) is not applied in a zone where no section matched a correspondence "
+        "(a load medium): the zone's preparation logs are not in the publication",
         "ufs": sorted(ufs) if ufs else None,
     }
     output.mkdir(parents=True)
@@ -226,23 +256,25 @@ def run_gedai(
         lines.update(part["lines"])
     columns = ["uf", "municipality", "zone", "section", "package", "bu_status"]
     columns += ["urn_serial", "load_code", "flash_serial"]
-    rows, issues = [], []
+    rows, loads, issues = [], [], []
     table = pq.read_table(release / "sections.parquet", columns=columns)
     for bu in table.to_pylist():
         if ufs and bu["uf"] not in ufs:
             continue
         base = {k: bu[k] for k in ("uf", "municipality", "zone", "section", "package")}
-        result = section_rules(bu, parsed)
-        rows.append({**base, **result})
-        failed = json.loads(result["failed_json"])
+        rows.append({**base, **section_rules(bu, parsed)})
+        loads.append({k: bu[k] for k in ("urn_serial", "load_code", "flash_serial")})
+    zone_coverage(rows)
+    for row, bu in zip(rows, loads, strict=True):
+        failed = json.loads(row["failed_json"])
         if failed:
             issues.append(
                 {
                     "check": "G",
                     "failed": failed,
-                    **base,
-                    "bu": {k: bu[k] for k in ("urn_serial", "load_code", "flash_serial")},
-                    **{k: result.get(k) for k in ("correspondence", "medium", "load_medium")},
+                    **{k: row[k] for k in ("uf", "municipality", "zone", "section", "package")},
+                    "bu": bu,
+                    **{k: row.get(k) for k in ("correspondence", "medium", "load_medium")},
                 }
             )
     final = output / ".release.tmp"
@@ -262,6 +294,22 @@ def run_gedai(
         "medium": dict(Counter(str(r.get("medium")) for r in rows)),
         "load_medium": dict(Counter(str(r.get("load_medium")) for r in rows)),
         "failed": dict(Counter(r["failed_json"] for r in rows)),
+        "zones_unpublished": {
+            "correspondence": sorted(
+                {
+                    f"{r['uf']}/{r['zone']}"
+                    for r in rows
+                    if r["correspondence"] == "zone_unpublished"
+                }
+            ),
+            "load_medium": sorted(
+                {
+                    f"{r['uf']}/{r['zone']}"
+                    for r in rows
+                    if r.get("load_medium") == "zone_unpublished"
+                }
+            ),
+        },
     }
     result = {
         **binding,
