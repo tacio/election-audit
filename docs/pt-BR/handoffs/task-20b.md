@@ -1,6 +1,6 @@
 # Tarefa 20b — Conclusão da integridade: verificações trazidas do DataUrnas-BR
 
-Document-ID: EA-HANDOFF-20B · Revision: 3 · Language: pt-BR
+Document-ID: EA-HANDOFF-20B · Revision: 4 · Language: pt-BR
 
 Objetivo: executar nacionalmente, para 2026 e nos dois turnos, as verificações que o
 DataUrnas-BR faz e que faltavam a este projeto: uma comparação do Ed521 com o
@@ -40,11 +40,13 @@ Entregas:
   `national-r{1,2}-zeresima-v2-20261109`, `phase20b-gedai/national-r{1,2}-gedai-v3-20261109`,
   `phase20b-hash-lists/national-v1-20261109`,
   `phase20b-signature-errors/national-r{1,2}-signature-errors-v1-20261109`,
-  `phase20b-jws/signed-r{1,2}-20261108` e `national-r{1,2}-jws-v1-20261109`. Os
+  `phase20b-jws/signed-r{1,2}-20261108` e `national-r{1,2}-jws-v2-20261109` (a v1
+  sem as listas de revogação). Os
   releases anteriores de zerésima e do GEDAI ficam como registro das primeiras regras.
 - Entradas congeladas: `inputs/ed521-crosscheck-refs-20261108/`,
   `inputs/tse-www-20261108/` (listas de hash e manual JWS, baixados pelo usuário num
-  navegador) e `inputs/tse-jws-key-20261108/`.
+  navegador), `inputs/tse-jws-key-20261108/` e `inputs/tse-jws-crls-20261109/` (as
+  duas listas de revogação, baixadas pelo usuário num navegador).
 - Observações T11, T12, T13, O18 e O19 (resolvida pela verificação de erros de
   assinatura).
 
@@ -71,7 +73,11 @@ Aceitação (9 de novembro de 2026):
 - JWS: verificações da chave todas verdadeiras; 5786 arquivos por turno verificados,
   iguais aos arquivos simples e ao snapshot EA20; toda cópia alterada recusada.
 - `UV_OFFLINE=1 just check` passa com 437 testes.
-- Não feito: a lista de revogação do JWS, os arquivos de assinatura dos logs do GEDAI.
+- JWS v2: as duas listas de revogação assinadas pelos emissores, vigentes no dia da
+  eleição (25 de agosto a 23 de novembro de 2026) e vazias; resultados por arquivo
+  iguais aos da v1.
+- A Revisão 9 do protocolo registra as verificações suplementares e suas lacunas.
+- Não feito: os arquivos de assinatura dos logs do GEDAI.
 
 Decisões:
 
@@ -101,11 +107,10 @@ Questões em aberto:
   reprovações têm uma mídia nunca lida de volta) e as 13 e 70 seções isoladas em G1
   (T13): por que faltam as correspondências das cargas tardias não está estabelecido.
   Os dois casos podem ir ao TSE no próximo pedido.
-- A verificação JWS não consulta a lista de revogação da `AC DIVULGACAO`.
 - As assinaturas dos logs do GEDAI (`.vsc`) não são verificadas: formato não revisto.
 - A memória agregada dos seis workers da comparação do Ed521 não foi medida.
 
-Próxima tarefa exata: a lista de revogação da `AC DIVULGACAO` para o JWS; depois
-registrar as verificações de zerésima, GEDAI, listas de hash, erros de assinatura e
-JWS e suas lacunas no [protocolo do estudo](../../../research/analysis-plan.pt-BR.md)
-antes do congelamento da Fase 23.
+Próxima tarefa exata: a Fase 23 do [plano de conclusão](../../../research/completion-plan.pt-BR.md),
+só com dados de desenvolvimento. Antes do seu congelamento, acrescentar ao
+[protocolo do estudo](../../../research/analysis-plan.pt-BR.md) a resposta do TSE
+sobre os certificados raiz (devida até 25 de novembro de 2026) e o relatório do TCU.

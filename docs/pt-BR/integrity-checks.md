@@ -1,6 +1,6 @@
 # Verificações de integridade de nível 1 (Fase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 8 · Language: pt-BR
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 9 · Language: pt-BR
 
 [English](../en/integrity-checks.md) · [Índice de implementação](implementation-index.md)
 
@@ -786,13 +786,17 @@ O TSE publica um `-u.jws` ao lado de cada arquivo de resultado `-u.json` do EA20
 JSON Web Signature (Ed25519) sobre os mesmos bytes. `results-hierarchy fetch-signed`
 (`signed-results-fetch-v1`) baixa os dois arquivos para cada nó de um snapshot EA20
 concluído, uma requisição por vez com pausa. `integrity-check jws`
-(`integrity-jws-v1`, módulo `signed_results`) verifica a chave fixada e depois cada
+(`integrity-jws-v2`, módulo `signed_results`) verifica a chave fixada e depois cada
 arquivo:
 
 - o arquivo de chave: o certificado da entidade final tem a chave do JWK, o `kid` é o
   identificador de chave do titular do certificado, a cadeia entidade final →
   `AC DIVULGACAO` → `AC TOTALIZACAO` verifica (Ed448) e o certificado era válido no
   dia da eleição;
+- com `--crls`, as listas de revogação indicadas nos certificados: `acdivulgacao.crl`
+  (para a entidade final) e `actot.crl` (para a `AC DIVULGACAO`) têm de estar
+  assinadas pelo seu emissor e não podem revogar o certificado; se cada uma estava
+  vigente no dia da eleição é relatado;
 - J1: o cabeçalho traz esse `kid` e `EdDSA`;
 - J2: a assinatura verifica;
 - J3: o conteúdo assinado é igual ao `-u.json` baixado junto;
@@ -803,7 +807,10 @@ arquivo:
 A chave e os três certificados vêm do apêndice B (chaves oficiais) do manual de
 verificação JWS do TSE de 16 de setembro de 2026, baixado num navegador e congelado em
 `tse-www-20261108/`; `tse-jws-key-20261108/` guarda o arquivo de chave e o script que
-o extraiu. O DataUrnas-BR cita a mesma chave.
+o extraiu. O DataUrnas-BR cita a mesma chave. O host das listas de revogação recusa
+requisições automatizadas (T5); o usuário baixou as duas num navegador em 9 de
+novembro de 2026, e elas estão congeladas como servidas (PEM) em
+`tse-jws-crls-20261109/`.
 
 ```sh
 just results-hierarchy fetch-signed \
@@ -812,13 +819,18 @@ just results-hierarchy fetch-signed \
 just integrity-check jws \
   --signed-root ~/data/election-audit-stage/phase20b-jws/signed-r1-20261108 \
   --key ~/data/election-audit-stage/inputs/tse-jws-key-20261108/key.json \
-  --output ~/data/election-audit-stage/phase20b-jws/national-r1-jws-v1-20261109
+  --crls ~/data/election-audit-stage/inputs/tse-jws-crls-20261109 \
+  --output ~/data/election-audit-stage/phase20b-jws/national-r1-jws-v2-20261109
 ```
 
 Nos dois turnos, os 5786 arquivos (Brasil, 28 arquivos de UF e 5757 municípios) têm o
 cabeçalho esperado e assinatura válida; cada conteúdo é igual ao seu arquivo simples e
 ao snapshot EA20 de 4 de novembro (nenhum foi republicado), e toda cópia alterada foi
-recusada. A lista de revogação indicada nos certificados não foi consultada.
+recusada. As duas listas de revogação verificam com seus emissores, foram emitidas em
+25 de agosto de 2026 com próxima atualização em 23 de novembro de 2026, então estavam
+vigentes no dia da eleição, e estão vazias: nenhum dos certificados está revogado. A
+versão 1 (`national-r{1,2}-jws-v1-20261109`) deu os mesmos resultados por arquivo sem
+as listas.
 
 ### Execuções
 
@@ -833,6 +845,7 @@ recusada. A lista de revogação indicada nos certificados não foi consultada.
 | Listas de hash | 0:01 | — | 0,10 GB | 60 kB |
 | Download JWS, 1º / 2º turno | 3:11:27 / 2:30:26 | — | 0,08 GB | 256 / 166 MB |
 | Verificação JWS, 1º / 2º turno | 0:17 / 0:10 | — | 0,11 GB | 0,2 MB |
+| Verificação JWS v2 (com listas de revogação), 1º / 2º turno | 0:11 / 0:09 | — | 0,11 GB | 0,2 MB |
 
 A memória de pico é a do maior processo individual; o agregado dos seis workers da
 verificação cruzada não foi medido. O passe semântico v5 que alimenta as verificações
@@ -854,8 +867,9 @@ de zerésima e de listas de hash está no [guia do passe semântico](semantic-pa
   dia); rs/89060/0017/0191 fica um ciclo abaixo além do seu ciclo não resolvido.
   Quatro logs cobrem só parte do dia de eleição (O17), então suas medidas são
   parciais.
-- A verificação JWS não consulta a lista de revogação do TSE para a `AC DIVULGACAO`;
-  a verificação das listas de hash compara só nomes e resultados, pois os logs não
+- As listas de revogação do JWS foram lidas em 9 de novembro de 2026; uma lista
+  posterior poderia revogar a chave depois dessa data. A verificação das listas de
+  hash compara só nomes e resultados, pois os logs não
   trazem hash de programa; os arquivos de assinatura dos próprios logs do GEDAI não
   são verificados.
 - GEDAI: as 13 e 70 seções isoladas reprovadas em G1 são cargas tardias cuja

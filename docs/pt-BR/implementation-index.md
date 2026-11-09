@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 38 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 39 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -111,7 +111,7 @@ uma amostra de dez tribunais (SP, AC, AL, DF, ES, PR, MG, RJ, BA, RS):
 ([referência de aquisição](acquisition-reference.md#documentos-do-teste-de-integridade-sites-dos-tres)).
 Veja o [handoff da Fase 19](handoffs/task-19.md).
 
-**Fase 20b (conclusão da integridade): em andamento.** O Ed521 está implementado
+**Fase 20b (conclusão da integridade): concluída; resposta do TSE sobre os certificados raiz pendente.** O Ed521 está implementado
 (`election_audit/ed521.py`, confirmado com o verificador do pacote de formatos de
 2026 do TSE) e roda no país todo pelo [`ed521rs`](https://pypi.org/project/ed521rs/),
 cujos veredictos são iguais aos do Python puro em toda linha e aos do ECPy em toda
@@ -174,7 +174,8 @@ terminaram em `ERRO` ([O19](observations.md#operação)), e nenhuma urna conclui
 voto na sessão de um erro de verificação de assinatura: votos depois de um erro só vêm
 depois de um reinício. Os 5786 arquivos de resultado
 assinados com JWS por turno verificam com a chave oficial do TSE e são iguais ao
-snapshot EA20. O passe semântico `session-aggregates-v5` acrescenta as tabelas de
+snapshot EA20, e as listas de revogação da chave (vigentes no dia da eleição) não
+revogam nada. O passe semântico `session-aggregates-v5` acrescenta as tabelas de
 marcadores e de pacotes que essas verificações leem e é igual à versão 4 no resto.
 Veja o [handoff da Fase 20b](handoffs/task-20b.md), o
 [guia das verificações de integridade](integrity-checks.md#fase-20b-verificações-trazidas-do-dataurnas-br),
@@ -270,16 +271,16 @@ convenções estão em `CLAUDE.md`.
 
 ## Próximo passo
 
-Fechar a última pendência da Fase 20b, a lista de revogação da `AC DIVULGACAO` para o
-JWS, e depois registrar no protocolo as verificações de zerésima, GEDAI, listas de
-hash, erros de assinatura e JWS com as lacunas que não puderem ser fechadas (T11–T13,
-as assinaturas dos logs do GEDAI, os certificados raiz); isso é condição para o
-congelamento da Fase 23 ([handoff](handoffs/task-20b.md)). A resposta do TSE ao pedido dos
+Começar a Fase 23 (modelagem de desenvolvimento, estudo de poder, congelamento do
+protocolo) só com dados de desenvolvimento. A Fase 20b está concluída e suas
+verificações e lacunas estão registradas no protocolo
+([handoff](handoffs/task-20b.md)); antes do congelamento, acrescentar ao protocolo a
+resposta do TSE sobre os certificados raiz e o relatório do TCU. A resposta do TSE ao pedido dos
 certificados raiz (protocolo 83529705172533) é devida até 25 de novembro de 2026.
 Arquivar o relatório
 consolidado do TCU sobre o teste de integridade quando for publicado (previsto até
 30 dias após o segundo turno). O
-[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 8) define as
+[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 9) define as
 afirmações, o mapa de ameaças e observáveis, as verificações de integridade I1–I9, os
 testes confirmatórios C1–C6, o estudo de poder e a política de dados; o
 [plano de conclusão](../../research/completion-plan.pt-BR.md) (Revisão 14) define as
@@ -356,7 +357,7 @@ com verificações aritméticas reais do AC (177 testes).
 | 20 | Concluída: I1–I9 para 2026, nos dois turnos, todas as seções; ECDSA verificada, BWEB, EA20 e correspondências concordam | Assinaturas Ed521, cadeias de certificados, releitura por prefixo do I6, diferenças em aberto do I5/I6, I8, 2022 | [20](handoffs/task-20.md) |
 | 21 | Concluída: 2026 nos dois turnos (v1, reproduzida pela v2 no AC) e 2022 nos dois turnos (v2); os registros conciliam todas as seções; logs SA atribuídos | Agrupar sessões com várias execuções e regras de relógio passam para a Fase 22 | [21](handoffs/task-21.md) |
 | 22 | Concluída: passada semântica v3 no país todo (2026 e 2022, igual às versões anteriores nas colunas em comum); tabelas por seção dos dois anos com mapeamento entre turnos, regras de relógio e registro | Resultados e valores operacionais sem leitura até o congelamento; diferenças de modelo e regras de encerramento do Amazonas passam para a Fase 20b | [22](handoffs/task-22.md) |
-| 20b | Em andamento: Ed521 verificado no país todo (`ed521rs`, igual ao verificador em Python puro), especificações oficiais do TSE, certificados das urnas conferidos contra as ACs publicadas e listas de revogados, tabelas por seção v3 com a lista do Amazonas, releitura por prefixo do I6 (todo bloco aberto é prefixo verificado; 112 de 113 pares divergentes explicados, O14/O15), I8 (528 cópias impressas, todas iguais), lacuna municipal do I2 registrada, I3/I5 conciliados (regras de sessão v2, cópias de memória contadas uma vez, I5 85/36 → 10/7, O16/O17; passadas semânticas, I6 e tabelas por seção v4 refeitos); verificações trazidas do DataUrnas-BR executadas (comparação do Ed521 com 0 divergências, zerésima v2, GEDAI v3 com T11/T13, listas de hash com T12/O19, erros de assinatura (O19 resolvida: nenhum voto na sessão de um erro), JWS todo verificado; passe semântico v5); lista de revogação do JWS e registro no protocolo em aberto; condição para o congelamento da Fase 23 | Raízes pedidas ao TSE | [20b](handoffs/task-20b.md) |
+| 20b | Concluída: Ed521 verificado no país todo (`ed521rs`, igual ao verificador em Python puro), especificações oficiais do TSE, certificados das urnas conferidos contra as ACs publicadas e listas de revogados, tabelas por seção v3 com a lista do Amazonas, releitura por prefixo do I6 (todo bloco aberto é prefixo verificado; 112 de 113 pares divergentes explicados, O14/O15), I8 (528 cópias impressas, todas iguais), lacuna municipal do I2 registrada, I3/I5 conciliados (regras de sessão v2, cópias de memória contadas uma vez, I5 85/36 → 10/7, O16/O17; passadas semânticas, I6 e tabelas por seção v4 refeitos); verificações trazidas do DataUrnas-BR executadas (comparação do Ed521 com 0 divergências, zerésima v2, GEDAI v3 com T11/T13, listas de hash com T12/O19, erros de assinatura (O19 resolvida: nenhum voto na sessão de um erro), JWS todo verificado com as listas de revogação; passe semântico v5); registrada no protocolo (Revisão 9); concluída | Raízes pedidas ao TSE | [20b](handoffs/task-20b.md) |
 | 23–26 | Não iniciadas; definidas no [plano de conclusão](../../research/completion-plan.pt-BR.md#fases-revisadas) | Todas | — |
 
 ## Onde estão os resultados

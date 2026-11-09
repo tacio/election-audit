@@ -1,6 +1,6 @@
 # Transparency and operational observations
 
-Document-ID: EA-OBSERVATIONS · Revision: 8 · Language: en
+Document-ID: EA-OBSERVATIONS · Revision: 9 · Language: en
 
 [Português](../pt-BR/observations.md) · [Implementation index](implementation-index.md)
 
@@ -73,6 +73,7 @@ The frozen inputs named above are under `~/data/election-audit-stage/inputs/`:
 | `ed521-crosscheck-refs-20261108/` | DataUrnas-BR's Ed521 verifier at commit `f5e8005` and the `ed521rs` vectors at commit `e711763`, with `SOURCES.txt` and `SHA256SUMS` |
 | `tse-www-20261108/` | TSE files downloaded in a browser on 2026-11-08: the four urn hash lists and the JWS verification manual, with `SOURCES.txt` and `SHA256SUMS` |
 | `tse-jws-key-20261108/` | The official JWS key and its three certificates, extracted from appendix B of the manual, with the extraction script and `SHA256SUMS` |
+| `tse-jws-crls-20261109/` | The revocation lists of `AC DIVULGACAO` and `AC TOTALIZACAO` named in the JWS certificates, downloaded in a browser on 2026-11-09 (PEM, as served), with `SOURCES.txt` and `SHA256SUMS` |
 
 [DataUrnas-BR](https://github.com/alissonlinneker/DataUrnas-BR) is compared in
 [related work](../../research/related-work.md).

@@ -1,6 +1,6 @@
 # Observações de transparência e de operação
 
-Document-ID: EA-OBSERVATIONS · Revision: 8 · Language: pt-BR
+Document-ID: EA-OBSERVATIONS · Revision: 9 · Language: pt-BR
 
 [English](../en/observations.md) · [Índice de implementação](implementation-index.md)
 
@@ -74,6 +74,7 @@ As entradas congeladas citadas acima ficam em `~/data/election-audit-stage/input
 | `ed521-crosscheck-refs-20261108/` | O verificador Ed521 do DataUrnas-BR no commit `f5e8005` e os vetores do `ed521rs` no commit `e711763`, com `SOURCES.txt` e `SHA256SUMS` |
 | `tse-www-20261108/` | Arquivos do TSE baixados num navegador em 2026-11-08: as quatro listas de hash de urna e o manual de verificação JWS, com `SOURCES.txt` e `SHA256SUMS` |
 | `tse-jws-key-20261108/` | A chave JWS oficial e seus três certificados, extraídos do apêndice B do manual, com o script de extração e `SHA256SUMS` |
+| `tse-jws-crls-20261109/` | As listas de revogação da `AC DIVULGACAO` e da `AC TOTALIZACAO` indicadas nos certificados do JWS, baixadas num navegador em 2026-11-09 (PEM, como servidas), com `SOURCES.txt` e `SHA256SUMS` |
 
 O [DataUrnas-BR](https://github.com/alissonlinneker/DataUrnas-BR) é comparado nos
 [trabalhos relacionados](../../research/related-work.pt-BR.md).

@@ -1,6 +1,6 @@
 # Task 20b — Integrity completion: checks added from DataUrnas-BR
 
-Document-ID: EA-HANDOFF-20B · Revision: 3 · Language: en
+Document-ID: EA-HANDOFF-20B · Revision: 4 · Language: en
 
 Objective: run nationally, for 2026 and both rounds, the checks DataUrnas-BR runs
 and this project lacked: an Ed521 cross-check against DataUrnas-BR's verifier, the
@@ -39,11 +39,13 @@ Deliverables:
   `national-r{1,2}-zeresima-v2-20261109`, `phase20b-gedai/national-r{1,2}-gedai-v3-20261109`,
   `phase20b-hash-lists/national-v1-20261109`,
   `phase20b-signature-errors/national-r{1,2}-signature-errors-v1-20261109`,
-  `phase20b-jws/signed-r{1,2}-20261108` and `national-r{1,2}-jws-v1-20261109`. The
+  `phase20b-jws/signed-r{1,2}-20261108` and `national-r{1,2}-jws-v2-20261109` (v1
+  without the revocation lists). The
   earlier zerésima and GEDAI releases are kept as the record of the first rules.
 - Frozen inputs: `inputs/ed521-crosscheck-refs-20261108/`, `inputs/tse-www-20261108/`
-  (hash lists and JWS manual, downloaded by the user in a browser) and
-  `inputs/tse-jws-key-20261108/`.
+  (hash lists and JWS manual, downloaded by the user in a browser),
+  `inputs/tse-jws-key-20261108/` and `inputs/tse-jws-crls-20261109/` (the two
+  revocation lists, downloaded by the user in a browser).
 - Observations T11, T12, T13, O18 and O19 (resolved by the signature-error check).
 
 Acceptance (9 November 2026):
@@ -66,7 +68,10 @@ Acceptance (9 November 2026):
 - JWS: key checks all true; 5786 files per round verified, equal to the plain files
   and to the EA20 snapshot; every altered copy refused.
 - `UV_OFFLINE=1 just check` passes with 437 tests.
-- Not done: the JWS revocation list, the GEDAI log signature files.
+- JWS v2: both revocation lists signed by their issuers, current on election day
+  (25 August to 23 November 2026) and empty; file results equal to v1.
+- Protocol Revision 9 registers the supplementary checks and their gaps.
+- Not done: the GEDAI log signature files.
 
 Decisions:
 
@@ -94,10 +99,10 @@ Unresolved issues:
   have a medium never read back) and the 13 and 70 isolated G1 sections (T13): why the
   late loads' correspondences are missing is not established. Both can go to TSE with
   the next request.
-- The JWS check does not consult the `AC DIVULGACAO` revocation list.
 - The GEDAI log signatures (`.vsc`) are not verified: format not reviewed.
 - The aggregate memory of the six cross-check workers was not measured.
 
-Exact next task: the JWS revocation list for `AC DIVULGACAO`; then register the
-zerésima, GEDAI, hash-list, signature-error and JWS checks and their gaps in the
-[study protocol](../../../research/analysis-plan.md) before the Phase 23 freeze.
+Exact next task: Phase 23 of the [completion plan](../../../research/completion-plan.md),
+on development data only. Before its freeze, add TSE's reply on the root certificates
+(due 25 November 2026) and the TCU report to the
+[study protocol](../../../research/analysis-plan.md).

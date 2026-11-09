@@ -1,6 +1,6 @@
 # Statistical audit of the 2026 presidential election: study protocol
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 8 · Language: en
+Document-ID: EA-ANALYSIS-PLAN · Revision: 9 · Language: en
 
 [Português](analysis-plan.pt-BR.md) · [Completion plan](completion-plan.md) · [Related work](related-work.md)
 
@@ -132,7 +132,7 @@ benign alternative and a control (section 7.6).
 | GEDAI-UE preparation logs, both rounds (two exports each, with SHA-512 files) | G1–G3 | Acquired; some zones' logs not published (T11) |
 | TSE urn hash lists (`path1u13/15/20/22`) and JWS manual (key in appendix B) | H1–H2, J1–J4 | Downloaded in a browser and frozen (`tse-www-20261108/`, `tse-jws-key-20261108/`) |
 | Signed result files (`-u.jws`) for every EA20 node | J1–J4 | Fetched for both rounds (5786 files each) |
-| Revocation lists of `AC DIVULGACAO` and `AC TOTALIZACAO` | J1–J4 (key status) | Refused to scripts; to be downloaded in a browser |
+| Revocation lists of `AC DIVULGACAO` and `AC TOTALIZACAO` | J1–J4 (key status) | Downloaded in a browser on 9 November 2026 and frozen (`tse-jws-crls-20261109/`); current on election day, none revoked |
 | DataUrnas-BR's Ed521 verifier and the `ed521rs` vectors | Ed521 cross-check | Frozen at fixed commits (`ed521-crosscheck-refs-20261108/`) |
 
 Rules that apply to every table:
@@ -214,8 +214,8 @@ signature files are not verified; the hash lists do not name the files of the lo
 media and the load (T12), and the logs carry names and results, not hashes, so H1
 shows that the verified names are published, not that the bytes match; the CA
 certificate chains stop at the intermediate CAs because the roots are not published
-(T1); the JWS key's revocation status depends on lists that TSE serves only to
-browsers.
+(T1); the JWS key's revocation status is known as of the lists read on
+9 November 2026, which TSE serves only to browsers.
 
 Agreement among artifacts produced by the same software chain (I1–I4) shows
 consistency, not voter intent. The TSE integrity tests and printed copies are the

@@ -1,6 +1,6 @@
 # Tier 1 integrity checks (Phase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 8 · Language: en
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 9 · Language: en
 
 [Português](../pt-BR/integrity-checks.md) · [Implementation index](implementation-index.md)
 
@@ -758,12 +758,16 @@ TSE publishes a `-u.jws` beside each EA20 `-u.json` result file: a JSON Web
 Signature (Ed25519) over the same bytes. `results-hierarchy fetch-signed`
 (`signed-results-fetch-v1`) downloads both files for every node of a finished EA20
 snapshot, one request at a time with a pause. `integrity-check jws`
-(`integrity-jws-v1`, module `signed_results`) checks the pinned key, then every
+(`integrity-jws-v2`, module `signed_results`) checks the pinned key, then every
 file:
 
 - the key file: the end-entity certificate holds the JWK's key, the `kid` is the
   certificate's subject key identifier, the chain end entity → `AC DIVULGACAO` →
   `AC TOTALIZACAO` verifies (Ed448), and the certificate was valid on election day;
+- with `--crls`, the revocation lists named in the certificates: `acdivulgacao.crl`
+  (for the end entity) and `actot.crl` (for `AC DIVULGACAO`) must be signed by
+  their issuer and must not revoke the certificate; whether each was current on
+  election day is reported;
 - J1: the header names that `kid` and `EdDSA`;
 - J2: the signature verifies;
 - J3: the signed payload equals the plain `-u.json` fetched with it;
@@ -774,7 +778,9 @@ file:
 The key and the three certificates come from appendix B (official keys) of TSE's
 JWS verification manual of 16 September 2026, downloaded in a browser and frozen in
 `tse-www-20261108/`; `tse-jws-key-20261108/` holds the key file and the script that
-extracted it. DataUrnas-BR quotes the same key.
+extracted it. DataUrnas-BR quotes the same key. The host serving the revocation
+lists refuses scripted requests (T5); the user downloaded both in a browser on
+9 November 2026, and they are frozen as served (PEM) in `tse-jws-crls-20261109/`.
 
 ```sh
 just results-hierarchy fetch-signed \
@@ -783,13 +789,17 @@ just results-hierarchy fetch-signed \
 just integrity-check jws \
   --signed-root ~/data/election-audit-stage/phase20b-jws/signed-r1-20261108 \
   --key ~/data/election-audit-stage/inputs/tse-jws-key-20261108/key.json \
-  --output ~/data/election-audit-stage/phase20b-jws/national-r1-jws-v1-20261109
+  --crls ~/data/election-audit-stage/inputs/tse-jws-crls-20261109 \
+  --output ~/data/election-audit-stage/phase20b-jws/national-r1-jws-v2-20261109
 ```
 
 In both rounds all 5786 files (Brazil, 28 UF files and 5757 municipalities) have
 the expected header and a valid signature; each payload equals its plain file and
 the 4 November EA20 snapshot (none was republished), and every altered copy was
-refused. The revocation list named in the certificates was not consulted.
+refused. Both revocation lists verify against their issuers, were issued on
+25 August 2026 with their next update due on 23 November 2026, so they were current
+on election day, and are empty: neither certificate is revoked. Version 1
+(`national-r{1,2}-jws-v1-20261109`) gave the same file results without the lists.
 
 ### Runs
 
@@ -804,6 +814,7 @@ refused. The revocation list named in the certificates was not consulted.
 | Hash lists | 0:01 | — | 0.10 GB | 60 kB |
 | JWS fetch, round 1 / 2 | 3:11:27 / 2:30:26 | — | 0.08 GB | 256 / 166 MB |
 | JWS check, round 1 / 2 | 0:17 / 0:10 | — | 0.11 GB | 0.2 MB |
+| JWS check v2 (with revocation lists), round 1 / 2 | 0:11 / 0:09 | — | 0.11 GB | 0.2 MB |
 
 Peak memory is the largest single process; the aggregate of the six cross-check
 workers was not measured. The semantic pass v5 that feeds the zerésima and
@@ -824,7 +835,8 @@ hash-list checks is in the [semantic pass guide](semantic-pass.md#version-5-phas
   cycles, another section's urn, a broken stream, a log covering part of the day);
   rs/89060/0017/0191 is one cycle short beyond its unresolved cycle. Four logs cover
   only part of election day (O17), so their measures are partial.
-- The JWS check does not consult TSE's revocation list for `AC DIVULGACAO`; the
+- The JWS revocation lists were read on 9 November 2026; a later list could revoke
+  the key after that date. The
   hash-list check compares names and results only, since the logs carry no program
   hash; the GEDAI logs' own signature files are not verified.
 - GEDAI: the 13 and 70 isolated G1 sections are late loads whose correspondence did

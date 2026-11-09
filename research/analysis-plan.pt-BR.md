@@ -1,6 +1,6 @@
 # Auditoria estatística da eleição presidencial de 2026: protocolo do estudo
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 8 · Language: pt-BR
+Document-ID: EA-ANALYSIS-PLAN · Revision: 9 · Language: pt-BR
 
 [English](analysis-plan.md) · [Plano de conclusão](completion-plan.pt-BR.md) · [Trabalhos relacionados](related-work.pt-BR.md)
 
@@ -140,7 +140,7 @@ benigna declarada e um controle (seção 7.6).
 | Logs de preparação do GEDAI-UE, dois turnos (duas exportações cada, com arquivos SHA-512) | G1–G3 | Obtidos; os logs de algumas zonas não foram publicados (T11) |
 | Listas de hash de urna do TSE (`path1u13/15/20/22`) e manual JWS (chave no apêndice B) | H1–H2, J1–J4 | Baixados num navegador e congelados (`tse-www-20261108/`, `tse-jws-key-20261108/`) |
 | Arquivos de resultado assinados (`-u.jws`) de todo nó do EA20 | J1–J4 | Baixados para os dois turnos (5786 arquivos cada) |
-| Listas de revogação da `AC DIVULGACAO` e da `AC TOTALIZACAO` | J1–J4 (situação da chave) | Recusadas a scripts; a baixar num navegador |
+| Listas de revogação da `AC DIVULGACAO` e da `AC TOTALIZACAO` | J1–J4 (situação da chave) | Baixadas num navegador em 9 de novembro de 2026 e congeladas (`tse-jws-crls-20261109/`); vigentes no dia da eleição, nenhum revogado |
 | Verificador Ed521 do DataUrnas-BR e os vetores do `ed521rs` | Verificação cruzada do Ed521 | Congelados em commits fixos (`ed521-crosscheck-refs-20261108/`) |
 
 Regras que valem para toda tabela:
@@ -228,7 +228,8 @@ hash não nomeiam os arquivos das mídias de carga e da carga (T12), e os logs t
 nomes e resultados, não hashes, então a H1 mostra que os nomes verificados estão
 publicados, não que os bytes conferem; as cadeias de certificados das ACs param nas
 ACs intermediárias porque as raízes não foram publicadas (T1); a situação de
-revogação da chave JWS depende de listas que o TSE só entrega a navegadores.
+revogação da chave JWS é conhecida a partir das listas lidas em 9 de novembro de 2026,
+que o TSE só entrega a navegadores.
 
 Concordância entre artefatos produzidos pela mesma cadeia de software (I1–I4) mostra
 consistência, não a intenção do eleitor. Os testes de integridade do TSE e as cópias

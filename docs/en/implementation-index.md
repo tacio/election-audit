@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 38 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 39 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -104,7 +104,7 @@ documents, every one matching its browser hash
 ([acquisition reference](acquisition-reference.md#integrity-test-documents-tre-sites)).
 See the [Phase 19 handoff](handoffs/task-19.md).
 
-**Phase 20b (integrity completion): in progress.** Ed521 is implemented
+**Phase 20b (integrity completion): complete; TSE's root-certificate reply pending.** Ed521 is implemented
 (`election_audit/ed521.py`, confirmed with the verifier in TSE's 2026 format package)
 and runs nationally through [`ed521rs`](https://pypi.org/project/ed521rs/), whose
 verdicts equal the pure-Python ones in every row and ECPy's in every signature. BU,
@@ -162,7 +162,8 @@ start-up verification lines ended in `ERRO` ([O19](observations.md#operations)),
 no urn completed a vote in the session of a signature verification error: votes
 after an error come only after a restart. All
 5786 JWS-signed result files per round verify against TSE's official key and equal
-the EA20 snapshot. Semantic pass `session-aggregates-v5` adds the markers and package
+the EA20 snapshot, and the key's revocation lists (current on election day) revoke
+nothing. Semantic pass `session-aggregates-v5` adds the markers and package
 tables these checks read and is equal to version 4 elsewhere. See the
 [Phase 20b handoff](handoffs/task-20b.md), the
 [integrity checks guide](integrity-checks.md#phase-20b-checks-added-from-dataurnas-br),
@@ -255,13 +256,13 @@ and `ty check` (pinned 0.0.94) reports no diagnostics; the conventions are in
 
 ## Next step
 
-Close the last Phase 20b follow-up, the JWS revocation list for `AC DIVULGACAO`,
-then register the zerésima, GEDAI, hash-list, signature-error and JWS checks in the
-protocol with the gaps that cannot be closed (T11–T13, the GEDAI log signatures, the
-root certificates); this gates the Phase 23 freeze ([handoff](handoffs/task-20b.md)). TSE's reply to the root-certificate request (protocol
+Start Phase 23 (development modelling, power study, protocol freeze) on development
+data only. Phase 20b is complete and its checks and gaps are registered in the
+protocol ([handoff](handoffs/task-20b.md)); before the freeze, add TSE's reply on the
+root certificates and the TCU report to the protocol. TSE's reply to the root-certificate request (protocol
 83529705172533) is due by 25 November 2026. File the TCU consolidated integrity test
 report when it is published (due within 30 days of the second round). The
-[study protocol](../../research/analysis-plan.md) (Revision 8) defines the claims,
+[study protocol](../../research/analysis-plan.md) (Revision 9) defines the claims,
 the threat-to-observable map, the integrity checks I1–I9, the confirmatory tests
 C1–C6, the power study and the data policy; the
 [completion plan](../../research/completion-plan.md) (Revision 14) defines
@@ -337,7 +338,7 @@ checks (177 tests).
 | 20 | Complete: I1–I9 for 2026, both rounds, all sections; ECDSA verified, BWEB, EA20 and correspondences agree | Ed521 signatures, certificate chains, I6 prefix re-read, I5/I6 open differences, I8, 2022 | [20](handoffs/task-20.md) |
 | 21 | Complete: 2026 both rounds (v1, reproduced by v2 on AC) and 2022 both rounds (v2); ledgers reconcile every section; SA logs attributed | Grouping multi-run sessions and clock rules move to Phase 22 | [21](handoffs/task-21.md) |
 | 22 | Complete: semantic pass v3 nationally (2026 and 2022, equal to earlier releases on shared columns); section tables for both years with crosswalk, clock rules and ledger | Results and operational values unread until the freeze; model differences and Amazonas close rules move to Phase 20b | [22](handoffs/task-22.md) |
-| 20b | In progress: Ed521 verified nationally (`ed521rs`, equal to the pure-Python verifier), official TSE specifications, urn certificates checked against the published CAs and revocation lists, section tables v3 with the Amazonas list, I6 prefix re-read (every open block a verified prefix; 112 of 113 differing pairs explained, O14/O15), I8 (528 printed copies, all equal), I2 municipal gap recorded, I3/I5 reconciled (session rules v2, memory copies counted once, I5 85/36 → 10/7, O16/O17; semantic passes, I6 and section tables v4 rerun); checks added from DataUrnas-BR run (Ed521 cross-check 0 disagreements, zerésima v2, GEDAI v3 with T11/T13, hash lists with T12/O19, signature errors (O19 resolved: no vote in the session of an error), JWS all verified; semantic pass v5); JWS revocation list and protocol registration open; gates the Phase 23 freeze | Roots requested from TSE | [20b](handoffs/task-20b.md) |
+| 20b | Complete: Ed521 verified nationally (`ed521rs`, equal to the pure-Python verifier), official TSE specifications, urn certificates checked against the published CAs and revocation lists, section tables v3 with the Amazonas list, I6 prefix re-read (every open block a verified prefix; 112 of 113 differing pairs explained, O14/O15), I8 (528 printed copies, all equal), I2 municipal gap recorded, I3/I5 reconciled (session rules v2, memory copies counted once, I5 85/36 → 10/7, O16/O17; semantic passes, I6 and section tables v4 rerun); checks added from DataUrnas-BR run (Ed521 cross-check 0 disagreements, zerésima v2, GEDAI v3 with T11/T13, hash lists with T12/O19, signature errors (O19 resolved: no vote in the session of an error), JWS all verified with the revocation lists; semantic pass v5); registered in the protocol (Revision 9); complete | Roots requested from TSE | [20b](handoffs/task-20b.md) |
 | 23–26 | Not started; defined in the [completion plan](../../research/completion-plan.md#revised-phases) | All | — |
 
 ## Where results are
