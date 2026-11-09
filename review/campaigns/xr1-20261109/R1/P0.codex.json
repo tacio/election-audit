@@ -1,0 +1,77 @@
+{
+  "reviewer": "codex",
+  "packet": "P0",
+  "round": "R1",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Four findings reproduced with synthetic inputs. The four counterexample probes and 18 existing targeted tests pass. No protected or raw acquisition data was accessed, and no tracked files were changed. Impact on existing national releases remains unmeasured.",
+  "findings": [
+    {
+      "local_id": "codex-P0-01",
+      "severity": "critical",
+      "category": "bug",
+      "title": "Section-table build publishes changed votes under the original input hash",
+      "location": [
+        "election_audit/section_table.py:112",
+        "election_audit/section_table.py:188"
+      ],
+      "claim": "The section-table builder checks an input archive's size but never verifies its recorded SHA-256 before reading it. A same-size altered BWEB is accepted, and the resulting release attributes the changed votes to the original digest.",
+      "evidence": "section_table.py:112–116:\nif status != \"complete\" or not digest_:\n    raise ValueError(f\"Input file is not complete: {path}\")\nif (root / path).stat().st_size != size:\n    raise ValueError(f\"Input file size differs from its manifest: {path}\")\nfound.append({\"path\": path, \"sha256\": digest_, \"bytes\": size, \"match\": match})\n\nload_bweb subsequently streams that archive and returns the recorded digest without hashing its contents.\n\nRan `.venv/bin/python review-scratch/codex-p0/probes.py`. The full synthetic build reported:\nTAMPER: same_size=True; actual_sha_differs=True; build_succeeded=True; bound_sha_is_old=True; published_votes=[(13,3),(22,4)]",
+      "failure_scenario": "After acquisition verification, replace a BWEB archive containing candidate counts 4 and 3 with a valid, equal-size archive containing 3 and 4. Leave its manifest unchanged. `section-table build` publishes the altered counts while recording the original archive hash, breaking both frozen-input provenance and the link to earlier integrity checks.",
+      "falsification": "Run `.venv/bin/python review-scratch/codex-p0/probes.py Probes.test_01_same_size_changed_bweb_is_published_with_old_hash`. A corrected implementation must reject the changed digest before publishing. Establishing actual national impact requires rehashing the precise input archives used by the existing section-table releases against their recorded manifests.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P0-02",
+      "severity": "high",
+      "category": "vacuous-check",
+      "title": "Zero GEDAI matches erase whole-zone discrepancies",
+      "location": [
+        "election_audit/gedai.py:238",
+        "election_audit/gedai.py:285",
+        "election_audit/gedai.py:311"
+      ],
+      "claim": "GEDAI coverage is inferred from successful matches rather than independently established source coverage. When every tested load in a zone disagrees, the code relabels the zone as unpublished and removes its failures, even when its preparation records are present.",
+      "evidence": "gedai.py:245–253:\nfor r in rows:\n    zone, failed = (r[\"uf\"], r[\"zone\"]), json.loads(r[\"failed_json\"])\n    if \"G1\" in failed and not matched[zone]:\n        r[\"correspondence\"] = \"zone_unpublished\"\n        failed.remove(\"G1\")\n    if \"G3\" in failed and not media[zone]:\n        r[\"load_medium\"] = \"zone_unpublished\"\n        failed.remove(\"G3\")\n    r[\"failed_json\"] = json.dumps(failed, separators=(\",\", \":\"))\n\n`run_gedai` applies this before constructing its discrepancy ledger. The synthetic full-run probe reported:\nGEDAI: published_zone_has_section_record=True; before=[G1]; after=[]; correspondence=zone_unpublished; discrepancies=0",
+      "failure_scenario": "A published GEDAI log records section 0088 in zone 0002 with load code 111…111. Its BU instead names load code 444…444, and no other tested section in that zone matches. G1 initially detects the discrepancy, but `zone_coverage` removes it and the release's discrepancy file is empty. A zone-wide substitution therefore becomes an alleged publication gap.",
+      "falsification": "Run `.venv/bin/python review-scratch/codex-p0/probes.py Probes.test_03_published_gedai_zone_mismatches_are_removed`. Independently determine coverage from source records, then require mismatching loads in covered zones to remain failures. Assessing the currently reported unpublished zones requires checking their source-log presence independently of BU matching.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P0-03",
+      "severity": "high",
+      "category": "vacuous-check",
+      "title": "Unknown aggregation becomes resolved singleton membership and comparability",
+      "location": [
+        "election_audit/features.py:136",
+        "election_audit/section_table.py:264",
+        "election_audit/section_table.py:975",
+        "election_audit/section_table.py:1164"
+      ],
+      "claim": "Unknown composition sentinels and malformed compositions fall back to the principal section alone, but the uncertainty flag is set only when the original value is Python None. Those invented singleton memberships can receive ready profile covariates and become comparable cross-round units.",
+      "evidence": "section_table.py:264–271:\ntry:\n    members = verified_member_sections(section, {\"composition_raw\": raw})\nexcept ValueError:\n    members, errors = [], errors + 1\nif not members:  # unknown composition: the principal alone is certain\n    members = [section]\nfor member in members:\n    rows.append((uf, municipality, zone, section, member, raw is None))\n\n`verified_member_sections` treats #NE#, #NE and -3 as unknown. Profile completeness subsequently checks only the fallback members; `harmonize` requires ready results but does not require resolved composition.\n\nThe full-build probe reported:\nCOMPOSITION: source=#NE#; composition=bweb; members=[\"0070\"]; profile_state=ready; comparable=True; errors={1: 0, 2: 0}",
+      "failure_scenario": "Both rounds name principal 0070 but one or both have an unknown aggregated-section list. Section 0071 might have joined or left that principal between rounds. The builder nevertheless constructs a singleton unit for 0070, labels its composition as BWEB-resolved, uses only 0070's voter profile, and declares the unit comparable. Unknown electorate membership thereby becomes an assumption of unchanged membership.",
+      "falsification": "Run `.venv/bin/python review-scratch/codex-p0/probes.py Probes.test_02_unknown_composition_becomes_comparable`. Extend the cases to -3, malformed lists and null compositions. Without an independently resolved crosswalk, these cases should retain composition uncertainty, avoid claiming complete aggregate covariates, and remain non-comparable.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P0-04",
+      "severity": "high",
+      "category": "vacuous-check",
+      "title": "I7 checks the closing of the last archive stream instead of the last session",
+      "location": [
+        "election_audit/integrity_checks.py:2287",
+        "election_audit/integrity_checks.py:2431"
+      ],
+      "claim": "I7's R2 selects the last session by stream ordinal and session ordinal, although stream order does not establish chronology across urns or archive members. An earlier closed session can therefore conceal an unclosed final session.",
+      "evidence": "integrity_checks.py:2287–2289:\nordered = sorted(sessions, key=lambda s: (s[\"stream_ordinal\"], s[\"session_ordinal\"]))\nif ordered[-1][\"closing_reading\"] is None:\n    failed.append(\"R2\")\n\nThe synthetic `run_logs` probe used two non-overlapping sessions in one object, with the later unclosed session in stream 0 and the earlier closed session in stream 1. It reported:\nCLOCK: chronologically_last_closing=None; i5=equal; i7=[]; discrepancies={}\n\nChanging only the stream ordinals makes `clock_rules` return [\"R2\"].",
+      "failure_scenario": "An archive lists a replacement urn's later session before the old urn's earlier session. The old session has a closing reading; the replacement session ends without one. Attendance still reconciles. R2 examines the old session and I7 reports no failure, so archive ordering controls whether an incomplete final history is detected.",
+      "falsification": "Run `.venv/bin/python review-scratch/codex-p0/probes.py Probes.test_04_last_unclosed_session_passes_i7`. Permuting archive-member or stream order while preserving the session histories should not change R2. Determine the last session from justified temporal or operational ordering, and retain uncertainty when that ordering cannot be resolved.",
+      "confidence": "high",
+      "speculative": false
+    }
+  ],
+  "responses": []
+}

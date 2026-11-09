@@ -1,0 +1,79 @@
+{
+  "reviewer": "codex",
+  "packet": "P6",
+  "round": "R1",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Four findings confirmed with synthetic probes: protected-content alias leakage, diagnostic token disclosure, release identity collisions across writer implementations, and export reservations that prevent retry. No protected data was inspected or tracked files changed. All 16 targeted existing tests passed.",
+  "findings": [
+    {
+      "local_id": "codex-P6-01",
+      "severity": "critical",
+      "category": "leakage",
+      "title": "Benchmark selection can process content belonging to an excluded section",
+      "location": [
+        "election_audit/national_benchmark.py:98",
+        "election_audit/national_benchmark.py:206",
+        "election_audit/national_benchmark.py:494"
+      ],
+      "claim": "Benchmark exclusions filter only the representative section retained in ranked, rather than excluding every hash witnessed by a protected section. Consequently, an unexcluded alias can admit protected bytes into development parsing and tuning.",
+      "evidence": "profile_source constructs ranked using row_number() OVER(PARTITION BY uf,sha256 ORDER BY url), keeping witness_rank=1. select_sample then filters only that representative: eligible = \"(SELECT r.* FROM ranked r WHERE NOT EXISTS(SELECT 1 FROM excluded e WHERE e.uf=r.uf AND e.municipality=r.municipality AND e.zone=r.zone AND e.section=r.section))\". run_compact_sample retrieves the selected source and calls process_compact_original without another exclusion check. Command: UV_OFFLINE=1 .venv/bin/python -B review-scratch/p6-probes/probe.py alias. Output: ALIAS {\"excluded_section\": \"0002\", \"selected_sections\": [\"0001\"], \"processed_protected_sha\": true, \"events\": 1}. The probe uses synthetic identical archives and bypasses only benchmark disk guards.",
+      "failure_scenario": "Sections 0001 and protected 0002 advertise identical content. Within their UF, 0001 sorts first and becomes the ranked representative. Excluding 0002 leaves 0001 eligible, and compact benchmarking reads and parses their shared protected content.",
+      "falsification": "Run the alias probe. Selection should reject the shared hash or return no eligible source, and parsing must never access it. Derive protected hashes from all profile.sources witnesses before filtering ranked; test aliases both within and across UFs.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P6-02",
+      "severity": "critical",
+      "category": "privacy",
+      "title": "Safe pilot diagnostics export unchecked source tokens as dates",
+      "location": [
+        "election_audit/pilot.py:210",
+        "election_audit/pilot.py:233",
+        "election_audit/pilot.py:331"
+      ],
+      "claim": "The original-message review copies the first ten characters of any six-column row into structured output without validating its timestamp. A malformed row can therefore disclose an identifier or other sensitive token while the output explicitly claims free_text_exported=false.",
+      "evidence": "The review accepts rows solely by column count, then executes dates[fields[0][:10]] += 1. Its return value includes \"naive_device_dates\": dict(dates) and \"free_text_exported\": False. run_pilot includes review_original_messages(snapshot) in the result and writes pilot-results.json. Command: UV_OFFLINE=1 .venv/bin/python -B review-scratch/p6-probes/probe.py privacy. Output: PRIVACY {\"naive_device_dates\": {\"ID12345678\": 1, \"25/10/2026\": 1}, \"free_text_exported\": false, \"saved\": true}. This exercised the complete pilot path with synthetic source bytes.",
+      "failure_scenario": "A malformed six-column log row starts with a sensitive token instead of a timestamp. The structural parser can reject that timestamp, but the separate message review still exports its prefix into pilot-results.json and the CLI result; review bundles also copy pilot-results.json.",
+      "falsification": "Run the privacy probe and verify that ID12345678 never appears in generated diagnostics. Validate the entire timestamp before recording a canonical date, and count invalid timestamps under a fixed diagnostic label. No real identifier-bearing logs are needed.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P6-03",
+      "severity": "high",
+      "category": "reproducibility",
+      "title": "Operational release identity omits the writer implementation",
+      "location": [
+        "election_audit/publication.py:345",
+        "election_audit/publication.py:355",
+        "election_audit/publication.py:506"
+      ],
+      "claim": "Operational release IDs pin shard IDs, parse ID, resources and a fixed format-version string, but neither writer code nor library versions. Different mart implementations can publish different logical contents under the same release ID, and an existing release is silently reused after such a code change.",
+      "evidence": "The complete identity is inputs = {\"version\": VERSION, \"shards\": [p.name for p in shards], \"parse_id\": next(iter(parse_ids)), \"config\": asdict(config)}; key = digest(inputs). On an existing target, inspect_release(target) is followed immediately by return target. Command: UV_OFFLINE=1 .venv/bin/python -B review-scratch/p6-probes/probe.py identity. A controlled replacement of coverage_rows changed a mart payload while preserving the input shard/config. Output: IDENTITY {\"same_release_id\": true, \"different_mart_digest\": true, \"first_valid\": \"passed\", \"second_valid\": \"passed\", \"old_release_reused_after_rule_change\": true, \"identity_keys\": [\"config\", \"parse_id\", \"shards\", \"version\"]}.",
+      "failure_scenario": "A maintainer fixes a coverage or late-voting calculation without changing operational-release-v1. A fresh store publishes the revised results under the previous ID, while rebuilding into the old store returns the previous results. Both releases validate independently.",
+      "falsification": "Run the identity probe. Changing output-affecting writer logic should change the release identity or explicitly reject reuse. Pin the relevant implementation/resources and runtime versions in release provenance and the computation key.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P6-04",
+      "severity": "medium",
+      "category": "bug",
+      "title": "Interrupted analytical exports cannot reuse their quota reservation",
+      "location": [
+        "election_audit/national_summary_release.py:140",
+        "election_audit/national_summary_release.py:153",
+        "election_audit/national_summary_release.py:481",
+        "docs/en/feature-oriented-processing.md:221"
+      ],
+      "claim": "An export commits its quota reservation before writing, but retry neither reuses nor releases that reservation when the destination was never published. The documented conservative reservation behavior understates the consequence: a failed small-budget export can block both retry and further ingestion.",
+      "evidence": "Allowance subtracts meta[\"released_bytes\"], then the exporter increments released_bytes and executes INSERT INTO analysis_reservations VALUES(?,?,NULL,'reserved') before committing. The exception handler only re-raises. Documentation says an interrupted reservation remains conservative until \"reviewed/retried\". Command: UV_OFFLINE=1 .venv/bin/python -B review-scratch/p6-probes/export_probe.py. With a synthetic ledger and an injected Parquet-writer interruption: FIRST OSError synthetic interruption during export; RETRY OSError Combined recovery/analysis output budget exhausted; RESERVATION [(25165824, 'reserved')] output_exists False. Loader/resource enforcement were mocked to isolate reservation handling.",
+      "failure_scenario": "A job has a 32 MiB output budget and no published analysis. Export reserves the remaining 24 MiB, then fails during Parquet writing. Repeating the same export finds zero available allowance despite the absent destination. With larger remaining budgets, retry instead attempts to insert the same reservation primary key.",
+      "falsification": "Run the export probe. After removing the injected failure, retry should complete using the existing reservation without double charging. Also verify that recovery accounts for retained staging bytes and leaves producer capacity consistent.",
+      "confidence": "high",
+      "speculative": false
+    }
+  ],
+  "responses": []
+}

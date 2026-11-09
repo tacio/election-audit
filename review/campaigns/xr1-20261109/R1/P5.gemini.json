@@ -1,0 +1,73 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [
+    {
+      "category": "bug",
+      "claim": "When a section's BWEB composition text is unparseable or unpublished ('#NE#'), compositions() records composition_unknown as False because it evaluates 'raw is None' rather than checking if parsing succeeded. This causes _section_row() to falsely declare composition='bweb', silently dropping aggregated members, omitting their electors from voter profile covariates, and breaking cross-round harmonized unit recombination.",
+      "confidence": "high",
+      "evidence": "In election_audit/section_table.py:264-271:\n```python\n        try:\n            members = verified_member_sections(section, {\"composition_raw\": raw})\n        except ValueError:\n            members, errors = [], errors + 1\n        if not members:  # unknown composition: the principal alone is certain\n            members = [section]\n        for member in members:\n            rows.append((uf, municipality, zone, section, member, raw is None))\n```\nRunning `UV_OFFLINE=1 .venv/bin/python review-scratch/probe_composition.py` outputs:\n```\nerrors: 1\nmember row: ('ac', '01007', '0001', '0001', '0001', False)\nmember row: ('ac', '01007', '0001', '0002', '0002', False)\nmember row: ('ac', '01007', '0001', '0003', '0003', True)\nSection 0001 composition: bweb, members_json: [\"0001\"]\nSection 0002 composition: bweb, members_json: [\"0002\"]\nSection 0003 composition: unknown, members_json: [\"0003\"]\n```",
+      "failure_scenario": "A BWEB entry has members_raw = '#NE#' (composition not published) or an unparseable/duplicate composition string. verified_member_sections() returns [] or raises ValueError. members falls back to [section]. Because raw is a string, 'raw is None' evaluates to False. As a result, composition_unknown is stored as False in members{round_number}, _section_row() sets row['composition'] = 'bweb', all aggregated member sections are omitted from members_json, voter profile covariates only aggregate the principal section dropping all member section electors, and harmonize() fails to connect member sections into a recombined unit.",
+      "falsification": "Run section-table build on data containing a principal section with members_raw = '#NE#' or invalid aggregated section text. Inspect row['composition'] and row['members_json'] in sections.parquet; verify whether composition reads 'unknown' or 'bweb', and whether member electors are included in profile covariates.",
+      "local_id": "gemini-P5-01",
+      "location": [
+        "election_audit/section_table.py:271"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Unparseable or unpublished BWEB composition silently recorded as valid BWEB composition in compositions()"
+    },
+    {
+      "category": "bug",
+      "claim": "_canonical() only collects supersessions from eligible (totalized) versions, so an administrative annulment or rejection of an earlier result is ignored and the obsolete totalized version is selected as canonical. Furthermore, unresolved conflates unassigned versions (v in unknown) with unknown status, failing to flag competing un-superseded versions in observed that have result_status='unknown'.",
+      "confidence": "high",
+      "evidence": "In election_audit/electoral_results.py:280-294:\n```python\n        eligible = [v for v in observed if v[\"result_status\"] == \"totalized\" and evidence[v[\"result_version_id\"]][\"official_target\"]]\n        superseded = {old for v in eligible for old in evidence[v[\"result_version_id\"]][\"supersedes\"]}\n        survivors = [v for v in eligible if v[\"result_version_id\"] not in superseded]\n        unresolved = [\n            v for v in unknown + observed\n            if v[\"result_version_id\"] not in superseded\n            and (v in unknown and v[\"result_status\"] in {\"totalized\", \"unknown\", \"conflict\"} or v[\"result_status\"] == \"conflict\")\n        ]\n```\nRunning `UV_OFFLINE=1 .venv/bin/python review-scratch/probe_canonical.py` outputs:\n```\nCase A (rejected supersedes totalized):\n  selection_state: selected\n  result_version_id: v\nCase B (competing unknown in same snapshot):\n  selection_state: selected\n  result_version_id: v\n```",
+      "failure_scenario": "In Case A, an election tribunal revokes or rejects a section result that was previously totalized (e.g. due to annulment or fraud). A new result version with result_status = 'rejected' is recorded with verified supersession of version 'v'. Because the rejecting version is not totalized, it is omitted from eligible, its supersession is ignored, and version 'v' is selected as the canonical totalized result. In Case B, a section has two result observations in the same snapshot—one totalized and one unknown—neither superseding the other. Because the unknown version has evidence, it is in observed, not unknown (unassigned). Thus v in unknown is False, v['result_status'] == 'conflict' is False, and the unknown competing version is ignored while the totalized version is selected without flagging a conflict.",
+      "falsification": "Construct a test with an eligible version v1 superseded by v2 where v2['result_status'] = 'rejected'. Run derive_electoral(data) and check whether canonical_result[0]['selection_state'] is 'selected' (selecting v1) instead of 'ineligible' or 'conflict'. Also test with competing totalized and unknown versions in observed without supersession.",
+      "local_id": "gemini-P5-02",
+      "location": [
+        "election_audit/electoral_results.py:281",
+        "election_audit/electoral_results.py:290"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Canonical result selection ignores supersession by non-totalized versions and ignores competing unknown-status observations"
+    },
+    {
+      "category": "doc-mismatch",
+      "claim": "_hierarchy() in electoral_results.py restricts reconciliation metrics strictly to TOTAL_FIELDS, which only includes aggregate valid_candidate_votes and omits candidate tallies. Passing official reference metrics from electoral_references.reference_metrics() raises PublicationError, and an inversion or discrepancy between candidate votes that preserves total valid votes is vacuously accepted as 'matched'.",
+      "confidence": "high",
+      "evidence": "In election_audit/electoral_results.py:492-498:\n```python\n        for field, reference in ref[\"metrics\"].items():\n            if field not in TOTAL_FIELDS or type(reference) is not int or reference < 0:\n                raise PublicationError(\"Invalid hierarchy metric\")\n            values = [totals.get(r[\"result_version_id\"], {}).get(field) for r in eligible if r and r[\"selection_state\"] == \"selected\"]\n```\nIn election_audit/electoral_references.py:24-35:\n```python\ndef reference_metrics(ref: JSON) -> JSON:\n    return {\n        \"principals\": int(ref[\"s\"][\"st\"]),\n        \"eligible_electors\": int(ref[\"e\"][\"te\"]),\n        \"attending_voters\": int(ref[\"e\"][\"c\"]),\n        \"abstaining_electors\": int(ref[\"e\"][\"a\"]),\n        \"total_presidential_ballots\": int(ref[\"v\"][\"tv\"]),\n        \"blank_votes\": int(ref[\"v\"][\"vb\"]),\n        \"null_votes\": int(ref[\"v\"][\"vn\"]),\n        \"technical_null_votes\": int(ref[\"v\"].get(\"vnt\", 0)),\n        **{\"candidate_\" + c: v[\"votes\"] for c, v in _candidates(ref).items()},\n    }\n```\nPassing reference_metrics() to final_result_reference['metrics'] raises:\n`PublicationError: Invalid hierarchy metric`.\nReconciliation with swapped candidate counts where valid_candidate_votes matches produces:\n`State with valid_candidate_votes=10: matched`.",
+      "failure_scenario": "An audit imports hierarchical final references from official TSE EA20 files using electoral_references.reference_metrics(). Because the dictionary contains 'candidate_13', 'candidate_22', 'principals', and 'technical_null_votes', derive_electoral immediately aborts with PublicationError. If metrics is stripped down to TOTAL_FIELDS, candidate tallies are never compared against official totals: a corruption or swap of votes between candidate 13 and candidate 22 is reported as 'matched' as long as their sum equals valid_candidate_votes.",
+      "falsification": "Run derive_electoral() with a final_result_reference containing candidate votes or pass an official EA20 reference metric dictionary to final_result_reference. Check if it raises PublicationError or whether candidate vote differences are detected.",
+      "local_id": "gemini-P5-03",
+      "location": [
+        "election_audit/electoral_results.py:493",
+        "election_audit/electoral_references.py:34"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Hierarchy reconciliation cannot reconcile candidate-level votes and crashes on official EA20 reference metrics"
+    },
+    {
+      "category": "bug",
+      "claim": "verify_section() and verify() parse DS_SECOES_AGREGADAS by filtering only {'#NULO#', '#NULO', '-1'}. When DS_SECOES_AGREGADAS is an empty string, ''.split('/') produces [''], which .zfill(4) converts into '0000', injecting a phantom aggregated section into member_sections and corrupting composition data on '#NE#' and '-3'.",
+      "confidence": "high",
+      "evidence": "In election_audit/electoral_verification.py:261-264:\n```python\n    members = [key[2]]\n    if r[\"DS_SECOES_AGREGADAS\"] not in {\"#NULO#\", \"#NULO\", \"-1\"}:\n        members += [x.strip().zfill(4) for x in r[\"DS_SECOES_AGREGADAS\"].split(\"/\")]\n    _required(len(members) == len(set(members)), \"Duplicate principal/member composition\")\n```\nRunning `UV_OFFLINE=1 .venv/bin/python review-scratch/probe_verification_members.py` outputs:\n```\nWith raw='': ['0001', '0000']\nWith raw='#NE#': ['0001', '#NE#']\nWith raw='-3': ['0001', '-003']\n```",
+      "failure_scenario": "A BWEB record has DS_SECOES_AGREGADAS = '' indicating no aggregated sections. verify_section() executes ''.split('/'), generating [''], which .zfill(4) formats as '0000'. For principal section '0001', member_sections in evidence.sqlite is saved as ['0000', '0001']. Any downstream stage that joins or aggregates member sections treats section '0000' as an actual registered member of section '0001'. If the principal section happens to be '0000', len(members) == len(set(members)) fails with Duplicate principal/member composition.",
+      "falsification": "Call verify_section with a BWEB record where DS_SECOES_AGREGADAS = '' and observe the returned member_sections list.",
+      "local_id": "gemini-P5-04",
+      "location": [
+        "election_audit/electoral_verification.py:262",
+        "election_audit/electoral_verification.py:399"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "electoral_verification invents phantom aggregated section '0000' on empty string and misparses TSE missing tokens"
+    }
+  ],
+  "packet": "P5",
+  "responses": [],
+  "reviewer": "gemini",
+  "round": "R1",
+  "summary": "Review of packet P5 (electoral results and joins). Four findings identified: (1) section_table.py:compositions incorrectly uses 'raw is None' instead of checking parse success, causing sections with unpublished ('#NE#') or unparseable composition to be marked as valid 'bweb' composition with members truncated to [section], silently dropping member electors from voter profile covariates and breaking harmonized unit recombination; (2) electoral_results.py:_canonical computes supersession only from eligible (totalized) versions, ignoring supersessions declared by rejected/excluded versions and leaving annulled results selected as canonical, while also failing to detect un-superseded competing versions with status 'unknown' in observed; (3) electoral_results.py:_hierarchy restricts reconciliation metrics strictly to TOTAL_FIELDS, causing PublicationError when passed official EA20 reference metrics from electoral_references.reference_metrics(), and making hierarchy reconciliation vacuous for candidate-level accuracy; (4) electoral_verification.py:verify_section omits empty string and TSE missing tokens when parsing DS_SECOES_AGREGADAS, converting empty strings into phantom aggregated section '0000' and corrupting member identifiers on '#NE#' and '-3'."
+}

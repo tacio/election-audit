@@ -1,0 +1,81 @@
+{
+  "reviewer": "codex",
+  "packet": "P2",
+  "round": "R1",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Four failures confirmed with synthetic inputs. All 66 scoped tests pass after adding PYTHONPATH=.:tests. No raw election data was accessed; tracked files remain unchanged.",
+  "findings": [
+    {
+      "local_id": "codex-P2-01",
+      "severity": "critical",
+      "category": "bug",
+      "title": "Semantic workers accept changed objects under their certified hashes",
+      "location": [
+        "election_audit/semantic_pass.py:938",
+        "election_audit/semantic_pass.py:953"
+      ],
+      "claim": "The staged-input path trusts the manifest's SHA-256 without hashing the object being parsed. Changed, CRC-valid archives can therefore produce different counts while retaining the original object's certified identity.",
+      "evidence": "At semantic_pass.py:940: `source, digest = Path(staged_root) / item[\"path\"], item[\"sha256\"]`. At :953: `summary = summarize_object(source, digest, round_number, year)`; no intervening source-hash validation occurs. Ran `.venv/bin/python review-scratch/codex_p2_probe.py review-scratch/codex-p2-final-check`, exit 0. Output: `HASH {\"actual_matches_expected\": false, \"reported_sha_is_expected\": true, \"status\": \"complete\", \"errors\": 0, \"completed\": 2}`.",
+      "failure_scenario": "Freeze a staging manifest and its matching certificate for an archive containing one completed cycle. Replace its object with a valid ZIP containing two completed cycles, leaving the manifest and certificate unchanged. The pass publishes two cycles under the original hash and reports no error.",
+      "falsification": "Run `.venv/bin/python review-scratch/codex_p2_probe.py review-scratch/codex-p2-falsify-01` with an unused output directory. The HASH case should reject the replacement rather than publish it as complete. No real data is needed.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P2-02",
+      "severity": "critical",
+      "category": "vacuous-check",
+      "title": "I6 can report byte equality after malformed history lines change",
+      "location": [
+        "election_audit/semantic_pass.py:508",
+        "election_audit/semantic_pass.py:556",
+        "election_audit/round1_prefix.py:237",
+        "election_audit/round1_prefix.py:113"
+      ],
+      "claim": "Segment fingerprints exclude malformed records, and the prefix rereader applies the same exclusion. Consequently, I6 can certify different physical histories as equal, including histories with inserted invalid-timestamp records.",
+      "evidence": "semantic_pass.py:508–515 increments `self.malformed` and executes `continue` for invalid columns or timestamps; hashing occurs later at :557: `segment[\"hash\"].update(line)`. round1_prefix.py:237–242 likewise skips malformed records. Its equality SQL at :117 uses only `b1.fingerprint = b2.fingerprint AND b1.lines = b2.lines`. The synthetic probe exited 0 and printed: `MALFORMED {\"history_bytes_equal\": false, \"status\": \"complete\", \"malformed_lines\": 1, \"i6\": \"equal\", \"objects_reread\": 0}`.",
+      "failure_scenario": "Insert a six-column record with an invalid timestamp into the first-round history embedded in a runoff log. Both objects have valid archive CRCs and their actual object hashes. The insertion changes the history bytes but leaves the segment fingerprint unchanged; I6 reports equal without rereading either object.",
+      "falsification": "Run the probe with a fresh output directory and inspect the MALFORMED case. An exact-history check must report a difference or unavailable coverage. Also vary or delete malformed lines already present on both sides; these changes should never retain an unconditional equality verdict.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P2-03",
+      "severity": "high",
+      "category": "vacuous-check",
+      "title": "Unsupported software becomes ready operational zeros",
+      "location": [
+        "election_audit/semantic_pass.py:568",
+        "election_audit/semantic_pass.py:682",
+        "election_audit/section_table.py:425",
+        "election_audit/section_table.py:1052",
+        "docs/en/semantic-pass.md:19"
+      ],
+      "claim": "Unsupported or missing software markers leave sessions classified as official while suppressing every cycle transition. Downstream aggregation treats their zero counts as ready, contrary to the documented exclusion of unsupported versions.",
+      "evidence": "At semantic_pass.py:568: `official = in_round and on_day`; software support is absent from this classification. At :682–690, `active` additionally requires `self.software`, otherwise execution returns. section_table.py:425 selects official sessions without checking software support, and :1053 assigns `\"partial\" if unresolved else \"ready\"`. Probe output: `SOFTWARE {\"session_kind\": \"official_vota\", \"software_supported\": false, \"authorization_events\": 1, \"completion_events\": 1, \"completed\": 0, \"unresolved\": 0, \"operations_state\": \"ready\"}`.",
+      "failure_scenario": "Change only the version line from 10.23.0.0 to 10.24.0.0 in an otherwise supported election-day log containing authorization and completion. The semantic pass recognizes both events but publishes zero completed and unresolved cycles; section-table readiness becomes ready.",
+      "falsification": "Run the probe's SOFTWARE case with a fresh output directory. Repeat with the version line removed or its codename changed. Unsupported semantics should propagate an unavailable reason instead of ready zero counts.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P2-04",
+      "severity": "high",
+      "category": "bug",
+      "title": "Clock excursions discard transitions while preserving the pending cycle",
+      "location": [
+        "election_audit/semantic_pass.py:682",
+        "election_audit/semantic_pass.py:733",
+        "election_audit/operational_review.py:484",
+        "election_audit/section_table.py:1052"
+      ],
+      "claim": "The date filter skips suspension and authorization transitions outside election day without invalidating an already pending cycle. When the clock returns, a later completion can be attached to an earlier suspended authorization and receive the wrong method, while operational counts remain ready.",
+      "evidence": "semantic_pass.py:682–690 requires `on_day` and otherwise returns before changing pending state; :734–735 completes any remaining authorized pending cycle. operational_review.py:484–503 applies the same date gate and skips inactive events. Probe output: `CLOCK {\"completed_biometric\": 1, \"completed_unknown\": 0, \"suspended_biometric\": 0, \"unresolved\": 0, \"orphans\": 0, \"backsteps\": 1, \"operations_state\": \"ready\", \"control_suspended_biometric\": 1, \"control_completed_unknown\": 1}`.",
+      "failure_scenario": "A biometric authorization occurs on election day. The clock jumps to 2009, where the log records full suspension followed by another authorization, then returns to election day for completion. The code ignores both intervening transitions and counts a biometric completion. Identical events without the date excursion correctly produce a suspended biometric cycle and a completed unknown-method cycle.",
+      "falsification": "Run the probe's CLOCK case with a fresh output directory and compare its control. The excursion must either preserve evidenced transitions or mark the affected cycle/counts unresolved. A recorded backstep alone is insufficient while incorrect method counts remain ready.",
+      "confidence": "high",
+      "speculative": false
+    }
+  ],
+  "responses": []
+}

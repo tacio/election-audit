@@ -1,0 +1,104 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [
+    {
+      "category": "vacuous-check",
+      "claim": "When a section's authoritative auxiliary file (aux.json) fails verification or is missing, coverage.py catches the error and falls back to unverified historical URLs, marking the section as 'acquired' with log_availability='available' if those files exist. This bypasses official TSE package metadata verification and emits zero package/asset contract rows while claiming complete acquisition.",
+      "confidence": "high",
+      "evidence": "election_audit/coverage.py:287-293:\n        except (ValueError, KeyError, TypeError, AttributeError, OSError) as exc:\n            aux_states[key] = str(exc)\n            per_section_assets[key] = sorted(\n                {row[\"url\"] for row in log_history[key]} | current_log_urls[key]\n            )\nelection_audit/coverage.py:323-324:\n        elif urls and len(successes) == len(urls):\n            state, availability = \"acquired\", \"available\"\n\nExecution output from review-scratch probe:\nPublished snapshot created with missing aux.json:\nMember accounting: {'acquired': 1}\nAcquired unique principals: 1\nPackages emitted: 0\nPackage assets emitted: 0",
+      "failure_scenario": "A section whose auxiliary JSON was corrupted, blocked by HTTP 403, or omitted from acquisition has a log file present in files. The official package status, official phase, and any other advertised packages in aux.json remain completely unverified. coverage.py marks the section as acquired and available, allowing a snapshot to report complete indexed coverage with broken package lineage.",
+      "falsification": "Run create_snapshot on a manifest where an official section index and log file exist, but aux.json is absent or fails SHA-256 verification. If the coverage ledger records log_availability='available' and member_accounting counts it as 'acquired' instead of 'unresolved' or 'failed', the finding is confirmed.",
+      "local_id": "gemini-P1-01",
+      "location": [
+        "election_audit/coverage.py:287",
+        "election_audit/coverage.py:323"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Unverified or Missing Auxiliary Files Bypassed to Mark Sections as Acquired"
+    },
+    {
+      "category": "bug",
+      "claim": "sevenzip.read enforces the unpacked size bound limit only per folder rather than cumulatively across the archive. In multi-folder 7z archives, total decompressed memory accumulates unbounded in memory, completely bypassing caller limits such as archive_parsing.py's max_total_bytes and causing worker OOM crashes.",
+      "confidence": "high",
+      "evidence": "election_audit/sevenzip.py:182-184:\ndef _decode(folder: Folder, packed: memoryview, limit: int) -> bytes:\n    if folder[\"size\"] > limit:\n        raise SevenZipError(\"Unpacked size bound exceeded\")\nelection_audit/sevenzip.py:228:\n        body = _decode(folder, memoryview(data)[offset : offset + size], limit)\n        ...\n        outputs.append(piece)\n\nExecution of review-scratch probe:\nArchive with two 60-byte folders (120 bytes total) decoded with limit=99:\nEntries unpacked with limit=99: 2 entries, 120 bytes (no SevenZipError raised).",
+      "failure_scenario": "A hostile or crafted 7z archive contains 100 folders of 100 MB each (each folder within the default 128 MB max_member_bytes limit). When processed by archive_parsing.py:311 or semantic_pass.py:270, sevenzip.read decompresses all 100 folders into memory before returning, allocating 10 GB of RAM and triggering an OOM kill on workers, completely bypassing the 512 MB max_total_bytes configuration limit.",
+      "falsification": "Construct a 7z archive with 2 folders of 60 bytes each and invoke sevenzip.read(archive, limit=99). If it returns decoded entries instead of raising SevenZipError('Unpacked size bound exceeded'), the cumulative bound is not enforced and the finding is confirmed.",
+      "local_id": "gemini-P1-02",
+      "location": [
+        "election_audit/sevenzip.py:183",
+        "election_audit/sevenzip.py:228",
+        "election_audit/archive_parsing.py:311"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Multi-Folder Decompression Bomb Bypasses Memory Limit in 7z Reader"
+    },
+    {
+      "category": "bug",
+      "claim": "manifest_objects and url_order in source_staging.py open the SQLite database with URI parameter mode=ro&immutable=1, which instructs SQLite to bypass shared memory and ignore uncheckpointed WAL frames. If the acquisition manifest has uncheckpointed WAL writes, source_staging reads an incomplete or stale database state.",
+      "confidence": "high",
+      "evidence": "election_audit/source_staging.py:68:\n    uri = Path(manifest_path).resolve().as_uri() + \"?mode=ro&immutable=1\"\n    with contextlib.closing(sqlite3.connect(uri, uri=True)) as db:\nelection_audit/source_staging.py:165:\n    uri = Path(manifest_path).resolve().as_uri() + \"?mode=ro&immutable=1\"\n    with contextlib.closing(sqlite3.connect(uri, uri=True)) as db:\n\nIn contrast, election_audit/source_inventory.py:106-107 explicitly documents:\n# ``mode=ro`` intentionally does not use SQLite's ``immutable`` flag, which\n# would ignore a live WAL. No collector lock or write transaction is taken.",
+      "failure_scenario": "A live or recently completed acquisition run committed objects into manifest.sqlite-wal. When stage-sources copy or benchmark runs against that manifest, SQLite with immutable=1 ignores the -wal file completely, reading only the un-checkpointed base database file and failing with missing objects or reconciliation mismatches against the certificate.",
+      "falsification": "Create a WAL-mode SQLite database, commit rows to a table without running a checkpoint, and connect using sqlite3.connect('file:db.sqlite?mode=ro&immutable=1', uri=True). If the committed rows in the WAL are invisible, the finding is confirmed.",
+      "local_id": "gemini-P1-03",
+      "location": [
+        "election_audit/source_staging.py:68",
+        "election_audit/source_staging.py:165"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "SQLite immutable=1 Flag in Staging Ignores Uncheckpointed WAL Frames"
+    },
+    {
+      "category": "bug",
+      "claim": "sevenzip.py extracts entry names directly from UTF-16LE header strings without validating or sanitizing directory traversal sequences (such as ../ or absolute paths), returning unconstrained path strings to downstream consumers.",
+      "confidence": "high",
+      "evidence": "election_audit/sevenzip.py:248-257:\n        elif prop == NAME:\n            if payload.byte():\n                raise SevenZipError(\"External names are not supported\")\n            raw = payload.data[payload.pos :].decode(\"utf-16-le\")\n            names = raw.split(\"\\x00\")[:-1]\n            if len(names) != count:\n                raise SevenZipError(\"Name count mismatch\")\n...\n    return empty_stream, empty_file, names or [\"\"] * count\n\nExecution of review-scratch probe:\nmake_7z([('../../../../etc/shadow', b'root:secret')])\nResult: [('../../../../etc/shadow', b'root:secret', False)] returned without error.",
+      "failure_scenario": "An untrusted 7z archive contains a file with an entry name containing directory traversal components (e.g. ../../etc/cron.d/job). sevenzip.read returns the entry name without sanitization or error. Any downstream tool extracting or locating files based on entry names is vulnerable to directory traversal.",
+      "falsification": "Construct a 7z archive with an entry named '../../escaped.txt' and invoke sevenzip.read(archive). If it returns the entry without raising SevenZipError, path sanitization is absent and the finding is confirmed.",
+      "local_id": "gemini-P1-04",
+      "location": [
+        "election_audit/sevenzip.py:251"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Path Traversal in 7z Reader Entry Filenames"
+    },
+    {
+      "category": "vacuous-check",
+      "claim": "The downloader's national_coverage check in coverage.json does not verify that saved_log_versions equals advertised_log_versions and has no independent section denominator check, allowing runs with missing sections or unsaved logs to report national_coverage: true.",
+      "confidence": "high",
+      "evidence": "scripts/download_tse_logs.py:846-851:\n        advertised, saved = collector.query(\n            \"\"\"SELECT COUNT(*), COUNT(f.url) FROM logs l\n            LEFT JOIN files f ON l.url=f.url WHERE l.run=?\"\"\",\n            (run,),\n            one=True,\n        )\nscripts/download_tse_logs.py:869-873:\n            \"national_coverage\": outcome == \"finished\"\n            and not args.limit\n            and set(args.ufs) == set(UFS)\n            and not any(counts.get(s, 0) for s in (\"error\", \"aux_not_published\", \"no_log_listed\")),",
+      "failure_scenario": "A download run finishes where an advertised log version was not saved in files (saved < advertised), or where TSE's per-UF configuration endpoint returned a truncated list of sections omitting an entire municipality. Because counts only groups sections actually processed, and none of them returned error, aux_not_published, or no_log_listed, coverage.json writes national_coverage: true despite incomplete coverage.",
+      "falsification": "Simulate a download run where advertised is 10 and saved is 5 (or where only 1 section exists in the UF index). If national_coverage evaluates to True, the check is confirmed vacuous.",
+      "local_id": "gemini-P1-05",
+      "location": [
+        "scripts/download_tse_logs.py:869"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Downloader national_coverage Check Does Not Verify Saved vs Advertised Log Count or Expected Section Denominator"
+    },
+    {
+      "category": "bug",
+      "claim": "read_manifest constructs an inline SQL query joining four-column tuples with OR clauses for all keys in section_keys. When section_keys exceeds SQLite's maximum expression tree depth (1000 nodes), SQLite raises an OperationalError.",
+      "confidence": "high",
+      "evidence": "election_audit/source_inventory.py:146-150:\n        if selected is not None:\n            predicate = \" OR \".join(\n                \"(uf=? AND municipality=? AND zone=? AND section=?)\" for key in selected\n            )\n            parameters = tuple(value for key in selected for value in key)\n\nTesting in review-scratch probe with 1000 section keys:\nsqlite3.OperationalError: Expression tree is too large (maximum depth 1000)",
+      "failure_scenario": "A caller requests a snapshot with 1000 or more explicit sections (e.g. sampling a whole electoral zone or municipality). read_manifest constructs a query with 1000 OR clauses and crashes with sqlite3.OperationalError: Expression tree is too large, preventing snapshot creation.",
+      "falsification": "Invoke read_manifest(root, section_keys=keys) with a list of 1000 valid 4-tuples. If it raises sqlite3.OperationalError: Expression tree is too large, the finding is confirmed.",
+      "local_id": "gemini-P1-06",
+      "location": [
+        "election_audit/source_inventory.py:147"
+      ],
+      "severity": "low",
+      "speculative": false,
+      "title": "Query Expression Tree Overflow on Large Explicit Section Selections"
+    }
+  ],
+  "packet": "P1",
+  "responses": [],
+  "reviewer": "gemini",
+  "round": "R1",
+  "summary": "Review of Packet P1 (acquisition, snapshots, coverage, staging, bulk download, and 7z decoding) identified 6 concrete findings: (1) coverage.py catches aux.json verification failures and falls back to unverified historical URLs, marking sections as fully 'acquired' and 'available' with zero package/asset contract rows emitted; (2) sevenzip.py bounds unpacked sizes only per folder rather than cumulatively across the archive, enabling multi-folder decompression bombs that bypass caller memory limits and cause OOM worker crashes; (3) source_staging.py opens the SQLite manifest with mode=ro&immutable=1, which ignores active or uncheckpointed WAL frames; (4) sevenzip.py does not sanitize entry names against path traversal (../); (5) download_tse_logs.py reports national_coverage: true without verifying that saved log versions equal advertised log versions or checking section counts against an authoritative denominator; and (6) source_inventory.py builds an inline OR chain for explicit section selections that fails with SQLite expression tree depth limits when selecting >=1000 sections."
+}

@@ -1,0 +1,181 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [
+    {
+      "category": "vacuous-check",
+      "claim": "check_section fails to append any issue to the issues list when a BU hash mismatches the signed hash list, when file or self-signatures fail math verification, when a signature file is missing or corrupted, or when a certificate is revoked. Because merge populates discrepancies.jsonl and manifest[\"discrepancies\"] exclusively from the issues list, runs with tampered files or broken signatures report zero discrepancies.",
+      "confidence": "high",
+      "evidence": "In check_section (integrity_checks.py:666-685), issues are appended only for bu_chain_signature when verify is not None; check_signatures never appends to issues for i1_hash_mismatches or file_failed. Concrete probe testing tampering with published BU digest: ic.check_section(...) returned row[\"i1_hash_mismatches\"] == 1, but len(issues) == 0 and issues == [].",
+      "failure_scenario": "An attacker alters bu.dat or deletes vota.vsc for an urn. check_section sets i1_hash_mismatches=1 or vsc_status=\"missing\", but leaves issues empty. discrepancies.jsonl receives 0 entries and manifest[\"discrepancies\"] is recorded as 0, misleading auditors into concluding that all Tier 1 checks passed without discrepancies.",
+      "falsification": "Run check_section with a modified BU hash or missing VSC blob and inspect the returned issues list and resulting discrepancies.jsonl. If len(issues) == 0, the finding is confirmed.",
+      "local_id": "gemini-P0-01",
+      "location": [
+        "election_audit/integrity_checks.py:574-579",
+        "election_audit/integrity_checks.py:666-685",
+        "election_audit/integrity_checks.py:1037-1056"
+      ],
+      "severity": "critical",
+      "speculative": false,
+      "title": "Tier 1 BU and file signature failures, hash mismatches, and revoked certificates produce zero discrepancies in manifest and discrepancy reports"
+    },
+    {
+      "category": "vacuous-check",
+      "claim": "section_rules only fails Z1 if devices and not zeresimas (no zerésima in the entire section). When an urn is replaced and the replacement urn votes without printing a zerésima, zeresimas is non-empty from the first urn, so Z1 passes, while Z2–Z5 skip streams without a zerésima, leaving failed_json as empty.",
+      "confidence": "high",
+      "evidence": "In zeresima.py:155: \"if devices and not zeresimas: failed.append('Z1')\". Tested with Urn 1 having a zerésima and 10 votes, and replacement Urn 2 having 100 votes and no zerésima: zm.section_rules returned failed_json: \"[]\" and devices_with_votes_without_zeresima: 1. Because failed is empty, run_zeresima appends nothing to issues.",
+      "failure_scenario": "A polling station replaces a defective urn during voting. The replacement urn is placed into voting mode without running the startup zerésima routine. The section passes Z1–Z5 with zero rule failures in discrepancies.jsonl, violating the stated claim that every voting urn printed a zerésima before voting.",
+      "falsification": "Execute section_rules with two device IDs where device 1 has a zerésima and device 2 has votes without a zerésima. If failed_json is empty, the finding is confirmed.",
+      "local_id": "gemini-P0-02",
+      "location": [
+        "election_audit/zeresima.py:155-156",
+        "election_audit/zeresima.py:171",
+        "election_audit/zeresima.py:243-252"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Zerésima rules Z1–Z5 pass without issue when a replacement voting urn completes votes without printing a zerésima"
+    },
+    {
+      "category": "vacuous-check",
+      "claim": "In check I5, if a section log contains no official voting sessions or the log object errored, i5 evaluates to \"unavailable\" and no issue is appended to issues. Similarly, in check I3, if the RDV file is missing, i3 evaluates to \"no_rdv\" and no issue is logged, hiding missing voting sessions or ballot records from discrepancy reports.",
+      "confidence": "high",
+      "evidence": "integrity_checks.py:2404-2416: \"if bu is None or not found: i5 = i5b = 'unavailable' ... if i5 == 'differs' or i5b == 'differs': issues.append(...)\". When not found (no official session), issues.append is bypassed. Lines 706-712: \"if recount is None: i3 = 'no_rdv' ... else: ... issues.append(...)\". When recount is None, issues.append is bypassed.",
+      "failure_scenario": "An urn log is erased or corrupted so no official session is identified, while the BU records 300 voters. Check I5 sets i5=\"unavailable\" and logs zero issues in discrepancies.jsonl. An adversary who suppresses the log avoids an I5 discrepancy report.",
+      "falsification": "Execute run_logs on a section with non-zero BU attendance and empty parsed sessions, and check_section with blobs missing rdv. If no issue is added to discrepancies.jsonl, the finding is confirmed.",
+      "local_id": "gemini-P0-03",
+      "location": [
+        "election_audit/integrity_checks.py:706-712",
+        "election_audit/integrity_checks.py:2404-2430"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Missing official log sessions or missing RDVs quietly produce \"unavailable\" or \"no_rdv\" without logging discrepancies"
+    },
+    {
+      "category": "bug",
+      "claim": "election_audit.ed521.decode does not verify that decoded public keys have prime order L or are non-identity. In cofactorless verification [S]B = R + [k]A, if public key A is the identity point (0, 1), [k]A vanishes to identity for all k, allowing arbitrary messages to verify with a fixed signature R = [1]B and S = 1.",
+      "confidence": "high",
+      "evidence": "In ed521.py:163-173: verify calculates _equal(_base_multiply(s), _add(r, _fast_multiply(k, a))). Tested with pk = ed521.encode(ed521._IDENTITY), sig = ed521.encode(ed521.BASE) + (1).to_bytes(66, \"little\"): ed521.verify(pk, sig, b\"arbitrary message\") returned True for all messages tested.",
+      "failure_scenario": "An attacker who supplies or substitutes an urn certificate whose SubjectPublicKeyInfo contains the encoded identity point can forge valid signatures for any published file or hash list without possessing a private key, and ed521.verify will report True.",
+      "falsification": "Call ed521.verify(ed521.encode(ed521._IDENTITY), ed521.encode(ed521.BASE) + (1).to_bytes(66, \"little\"), b\"test\"). If it returns True, the vulnerability is confirmed.",
+      "local_id": "gemini-P0-04",
+      "location": [
+        "election_audit/ed521.py:139-156",
+        "election_audit/ed521.py:163-173"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Ed521 verification accepts universal forged signatures for small-order or identity public keys"
+    },
+    {
+      "category": "unstated-assumption",
+      "claim": "zone_coverage automatically strips G1 from failed_json for all sections in any electoral zone where no section matched a correspondence, re-labeling them as zone_unpublished. If an entire zone was loaded using unauthorized computers or if its preparation records were omitted from the publication, the check suppresses the failure rather than reporting an integrity violation.",
+      "confidence": "high",
+      "evidence": "gedai.py:246-249: \"if 'G1' in failed and not matched[zone]: r['correspondence'] = 'zone_unpublished'; failed.remove('G1')\". In run_gedai:313-315, issues are only appended if failed is non-empty. Removing G1 ensures discrepancies.jsonl records zero issues for the entire zone.",
+      "failure_scenario": "Preparation logs for a compromised zone are withheld or deleted. Rather than failing check G1, all sections in the zone have G1 silently removed from their failure list, appearing in reports as benignly unavailable rather than unverified.",
+      "falsification": "Run zone_coverage on a synthetic zone where all sections fail G1 and none match GEDAI logs. Verify that G1 is removed from failed_json and no issue is logged. If so, the finding is confirmed.",
+      "local_id": "gemini-P0-05",
+      "location": [
+        "election_audit/gedai.py:245-253"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "GEDAI check G1 automatically pardons all sections in any zone where preparation logs are unpublished or omitted"
+    },
+    {
+      "category": "reproducibility",
+      "claim": "national_relocation caches resolved filesystem roots and SQLite connections in a module-global _CACHE variable. When multiple tasks or test suites run in the same process, stale cache entries cause subsequent runs to crash with ValueError: Verified relocated source mount/root changed or access stale databases.",
+      "confidence": "high",
+      "evidence": "Running unittest discover across tests fails with ValueError: Verified relocated source mount/root changed in test_national_workload.py because _CACHE was populated by earlier tests in test_national_migration.py. Running test_national_workload.py in a fresh process succeeds completely (10/10 tests pass).",
+      "failure_scenario": "An operator running a multi-stage pipeline script in a single Python interpreter experiences unexpected crashes or reads stale database connections from prior stages because relocation._CACHE is not invalidated between stages.",
+      "falsification": "Execute tests/test_national_migration.py followed by tests/test_national_workload.py in the same Python process without manual cache clearing. If test_national_workload fails, the finding is confirmed.",
+      "local_id": "gemini-P0-06",
+      "location": [
+        "election_audit/national_relocation.py:14",
+        "election_audit/national_relocation.py:25-35",
+        "election_audit/national_relocation.py:72-76"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Global mutable cache in national_relocation._CACHE causes cross-test and cross-run state pollution"
+    },
+    {
+      "category": "doc-mismatch",
+      "claim": "While research/analysis-plan.md (Revision 9) specifies the Tier 2 statistical audit around a 6-test confirmatory family (C1–C6) using a beta-binomial swing model with 10-fold cross-fitting, within-location contrasts, and a 10% sealed holdout, no implementation of C1–C6 or the beta-binomial model exists in election_audit/. The existing research code implements only the superseded Phase 15/16 quantile forest prototype with a 60/20/20 split.",
+      "confidence": "high",
+      "evidence": "Searching election_audit/ and tests/ for C1 through C6 or confirmatory yields zero source code matches. election_audit/research_protocol.py:23 retains fractions: {\"training\": 0.6, \"calibration\": 0.2, \"test\": 0.2}, directly conflicting with the study protocol's 10% sealed holdout design.",
+      "failure_scenario": "A reviewer relying on analysis-plan.md attempts to reproduce or inspect the confirmatory analysis pipeline C1–C6 on the 2026 data. The pipeline cannot run because the code has never been implemented in the checkout.",
+      "falsification": "Grep for C1, C2, C3, C4, C5, C6 or beta_binomial across election_audit/. If no matching implementation exists, the finding is confirmed.",
+      "local_id": "gemini-P0-07",
+      "location": [
+        "research/analysis-plan.md:305-327",
+        "docs/en/implementation-index.md:267-270",
+        "election_audit/research_protocol.py:20-60"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Confirmatory test family C1–C6 and beta-binomial swing model described in the study protocol are completely unimplemented in the codebase"
+    },
+    {
+      "category": "vacuous-check",
+      "claim": "distinct_sessions groups memory copies of a session by (device_id, block_start, rank_in_segment). When copies disagree on completed cycles, it sorts by block_lines and arbitrarily keeps the copy with the most lines, recording copy_conflicts that is discarded by run_logs, leaving the section unflagged even when memory media disagree on vote counts.",
+      "confidence": "high",
+      "evidence": "In integrity_checks.py:2389: \"found, _ = distinct_sessions(raw)\" explicitly discards the conflict count. In section_table.py:468-470: \"if any(_completed(c) > _completed(best) for c in copies[1:]): conflicts += 1; kept.append(best)\". The conflict is never raised as an issue or error.",
+      "failure_scenario": "An urn's external flash card and internal memory record different vote totals due to tampering or mid-day media replacement. distinct_sessions silently selects the copy with more log lines, discards the disagreement, and check I5 evaluates to equal if the selected copy matches BU attendance, completely hiding the physical discrepancy.",
+      "falsification": "Supply distinct_sessions with two session copies with the same copy key but differing completed cycle counts. Confirm that conflicts > 0 but run_logs ignores it and logs no issue.",
+      "local_id": "gemini-P0-08",
+      "location": [
+        "election_audit/section_table.py:458-472",
+        "election_audit/integrity_checks.py:2388-2395"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "distinct_sessions silently suppresses vote-count copy conflicts between internal and external urn memory logs"
+    },
+    {
+      "category": "unstated-assumption",
+      "claim": "In round 2, 10,844 sections were downloaded with status Recebido rather than Totalizado. The study protocol specifies that Recebido packages are never added to totalized votes, and electoral_verification.py strictly requires Totalizado. Omitting 10,844 sections (over 3 million votes) without evaluating their totalization in BWEB introduces severe selection bias that exceeds the margin of victory.",
+      "confidence": "high",
+      "evidence": "docs/en/implementation-index.md:23: \"round 2 has 488333 Totalizado and 10844 Recebido\". research/analysis-plan.md:150: \"Recebido (received, not totalized) packages are never added to totalized votes\". electoral_verification.py:426: \"groups = [g for g in aux['hashes'] if g['st'] == 'Totalizado']\" requires exactly 1 totalized group.",
+      "failure_scenario": "Because the acquisition downloader froze metadata while 10,844 sections were in Recebido state, all 10,844 sections are excluded from electoral verification and analysis. In a close election, discarding over 3 million votes can flip or distort swing calculations and outcome bounds.",
+      "falsification": "Inspect electoral_verification.py:426 and section_table.py to verify whether sections with Recebido packages are excluded from totalized vote calculations.",
+      "local_id": "gemini-P0-09",
+      "location": [
+        "docs/en/implementation-index.md:20-26",
+        "research/analysis-plan.md:150-151",
+        "election_audit/electoral_verification.py:426-427"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Over 10,000 round-2 sections marked Recebido in the acquisition manifest are excluded from totalized electoral processing without outcome sensitivity analysis"
+    },
+    {
+      "category": "doc-mismatch",
+      "claim": "Across 11 locations in 7 core modules, multiple exceptions in except clauses are written without parentheses (e.g., except FileNotFoundError, ProcessLookupError:). While tolerated by Python 3.14's experimental parser, this is invalid Python 3 syntax across all released Python versions <= 3.13, raising SyntaxError: multiple exception types must be parenthesized on import.",
+      "confidence": "high",
+      "evidence": "Running python3 -m unittest discover under Python 3.12 fails immediately during test discovery with: SyntaxError: multiple exception types must be parenthesized at national_migration.py:62. Grepping for except [A-Za-z0-9_]+,[ ]*[A-Za-z0-9_]+: identifies 11 instances across the codebase.",
+      "failure_scenario": "An auditor or reproducibility environment running Python <= 3.13 attempts to run the audit suite or import election_audit modules, failing immediately on syntax error before any verification commands can execute.",
+      "falsification": "Attempt to import election_audit.national_migration or election_audit.integrity_checks under Python 3.12. If SyntaxError is raised, the finding is confirmed.",
+      "local_id": "gemini-P0-10",
+      "location": [
+        "election_audit/national_migration.py:62",
+        "election_audit/national_migration.py:122",
+        "election_audit/integrity_checks.py:311",
+        "election_audit/signed_results.py:248",
+        "election_audit/signed_results.py:278",
+        "election_audit/printed_bu.py:229",
+        "election_audit/national_tuning.py:76",
+        "election_audit/national_summary_tuning.py:81",
+        "election_audit/contracts.py:83"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Multiple unparenthesized exception tuples cause SyntaxError crashes on standard Python versions"
+    }
+  ],
+  "packet": "P0",
+  "responses": [],
+  "reviewer": "gemini",
+  "round": "R1",
+  "summary": "Independent adversarial review of the 2026 Brazilian presidential election audit repository (commit 1801029bdc04). The review identified 10 high-impact findings spanning deterministic integrity checks, cryptographic verification, log semantics, statistical methodology, and software portability.\n\nKey critical and high findings:\n1. In Tier 1 deterministic check I1 (check_section), file hash mismatches, invalid hardware self-signatures, invalid file signatures, missing signature files, and revoked certificates fail to append issues to the discrepancy list. Consequently, manifest.json and discrepancies.jsonl report zero discrepancies even when file tampering or signature failures occur.\n2. In supplementary check Z1–Z5, replacement voting urns that vote without printing a zerésima are never flagged as failing any rule because Z1 only checks whether zero zerésimas were printed across all devices in the section, and Z2–Z5 ignore streams lacking a zeresima_start marker.\n3. In checks I3 and I5, missing official log sessions and missing RDV files default to 'unavailable' and 'no_rdv' without emitting any issue to discrepancies.jsonl, allowing missing ballots or blank logs to pass without discrepancy records.\n4. The pure-Python Ed521 verification allows universal signature forgery when a public key is encoded as the curve's identity or small-order point, because cofactorless verification [S]B = R + [k]A reduces to [S]B = R.\n5. Supplementary check G1 silently clears failures for any zone where preparation logs are not found in the published archives, pardoning entire zones loaded outside the official chain.\n6. The confirmatory family C1–C6 and beta-binomial cross-fitted swing models prominently described in the study protocol are entirely absent from the codebase.\n7. Over 10,800 round-2 sections marked 'Recebido' in the acquisition manifest are excluded from totalized electoral verification without outcome sensitivity analysis, potentially biasing results by millions of votes.\n8. Multiple unparenthesized exception tuples cause SyntaxError crashes on standard Python versions (Python <= 3.13)."
+}

@@ -1,0 +1,124 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [
+    {
+      "category": "vacuous-check",
+      "claim": "Start-up signature verification errors have session_ordinal as None, which bypasses rule E1; votes completed in the same power-cycle/boot without restarting are mistakenly summed into votes_after_restart, vacously passing E1 and contradicting observation O19.",
+      "confidence": "high",
+      "evidence": "In election_audit/signature_errors.py:128-147:\n    after_block = sum(s[\"done\"] for s in block) - m[\"completions_before\"]\n    same = None\n    if m[\"session_ordinal\"] is not None:\n        upto = sum(s[\"done\"] for s in block if s[\"session_ordinal\"] <= m[\"session_ordinal\"])\n        same = upto - m[\"completions_before\"]\n    ...\n    return {\"votes_same_session\": same, \"votes_after_restart\": after_block - (same or 0) + later}\nIn review-scratch/probe_signature_errors.py, a start-up verification error in segment 1 followed by session 1 with 150 votes in segment 1 output: failed_json: [], votes_same_session: None, votes_after_restart: 150.",
+      "failure_scenario": "An urn fails program verification at boot (e.g. avboot.vst fails signature check), but instead of shutting down, the voting application starts in that same boot and completes 150 votes. The check reports failed_json: [] and counts all 150 votes as votes_after_restart, certifying that the urn was restarted when it never was.",
+      "falsification": "Evaluate section_rules with a start-up error marker (session_ordinal=None) and an official session in the same segment_ordinal. Observe that failed_json is [] and votes_after_restart equals the session votes despite segment_ordinal never incrementing.",
+      "local_id": "gemini-P4-01",
+      "location": [
+        "election_audit/signature_errors.py:128-147",
+        "election_audit/signature_errors.py:173-177",
+        "docs/en/observations.md:62"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Rule E1 ignores start-up verification errors followed by votes, miscrediting votes to restart"
+    },
+    {
+      "category": "vacuous-check",
+      "claim": "zone_coverage infers publication status strictly from whether sections matched correspondences or load media. If all sections in a zone fail G1 or G3, the check retroactively labels the zone zone_unpublished and erases all failures, masking wholesale mismatches or wrong media generation.",
+      "confidence": "high",
+      "evidence": "In election_audit/gedai.py:240-253:\n    for r in rows:\n        zone = (r[\"uf\"], r[\"zone\"])\n        matched[zone] += r[\"correspondence\"] in MATCHED\n        media[zone] += r.get(\"load_medium\") == \"covers_section\"\n    for r in rows:\n        zone, failed = (r[\"uf\"], r[\"zone\"]), json.loads(r[\"failed_json\"])\n        if \"G1\" in failed and not matched[zone]:\n            r[\"correspondence\"] = \"zone_unpublished\"\n            failed.remove(\"G1\")\n        if \"G3\" in failed and not media[zone]:\n            r[\"load_medium\"] = \"zone_unpublished\"\n            failed.remove(\"G3\")",
+      "failure_scenario": "GEDAI preparation logs for an entire zone are published, but due to administrative error or tampering, all deployed urns in that zone carry mismatched load codes, or load media were generated for the wrong sections. Because matched[zone] or media[zone] is 0, zone_coverage converts every failing section to zone_unpublished and removes G1 and G3 from failed_json, reporting 0 failures and 0 discrepancies.",
+      "falsification": "Pass a dataset where a zone has published GEDAI logs but every section has a completely mismatched load code. Observe that zone_coverage reports 0 failures under G1 and sets correspondence to zone_unpublished.",
+      "local_id": "gemini-P4-02",
+      "location": [
+        "election_audit/gedai.py:238-254",
+        "docs/en/integrity-checks.md:613-615"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Zone coverage rule in GEDAI check circularly excuses zones with 100% failure rate as unpublished"
+    },
+    {
+      "category": "vacuous-check",
+      "claim": "When an RDV is missing/unparseable, or when an election contest present in the BU is missing from the RDV, check I3 records i3 as 'no_rdv' or 'missing_in_rdv' but does not increment i3_differ and logs no issue in issues or discrepancies.jsonl.",
+      "confidence": "high",
+      "evidence": "In election_audit/integrity_checks.py:706-714:\n    if recount is None:\n        i3 = \"no_rdv\" if rdv is None else \"missing_in_rdv\"\n    elif recount[\"entries\"] == +contest[\"entries\"]:\n        i3, equal = \"equal\", equal + 1\n    else:\n        i3, differ = \"differs\", differ + 1\n        issues.append({\"check\": \"I3\", \"kind\": \"rdv_recount\", ...})\nIn review-scratch/probe_i3.py, dropping an RDV or dropping a contest from an RDV yielded: i3 statuses: ['equal', 'missing_in_rdv'], issues: [], i3_differ: 0.",
+      "failure_scenario": "An election archive contains a BU with presidential and gubernatorial results, but the RDV omits the gubernatorial contest completely (or the RDV is missing). Check I3 passes with i3_differ = 0 and issues remains empty, so no discrepancy is written to discrepancies.jsonl.",
+      "falsification": "Execute check_section with an RDV lacking one contest present in the BU. Verify that contests_out has i3='missing_in_rdv' while i3_differ is 0 and issues has no I3 entry.",
+      "local_id": "gemini-P4-03",
+      "location": [
+        "election_audit/integrity_checks.py:706-724",
+        "election_audit/integrity_checks.py:776"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Missing RDV file or contest omitted in RDV produces zero I3 failures and logs no discrepancy"
+    },
+    {
+      "category": "vacuous-check",
+      "claim": "If a BU record lacks load_code or urn_serial, section_rules returns failed_json as '[]', grouping unverified sections with passed sections in summary['failed'] without logging any discrepancy.",
+      "confidence": "high",
+      "evidence": "In election_audit/gedai.py:194-195:\n    if not bu.get(\"load_code\") or not bu.get(\"urn_serial\"):\n        return {\"correspondence\": \"no_bu_load\", \"failed_json\": \"[]\"}\nIn election_audit/gedai.py:313-315 and 343:\n    failed = json.loads(row[\"failed_json\"])\n    if failed:\n        issues.append(...)\n    ...\n    \"failed\": dict(Counter(r[\"failed_json\"] for r in rows))",
+      "failure_scenario": "A corrupt or incomplete BU row has urn_serial=None or load_code=None. It is evaluated by run_gedai, receives failed_json='[]', is tallied under '[]' in summary['failed'], and generates no discrepancy in discrepancies.jsonl.",
+      "falsification": "Evaluate section_rules(bu, parsed) with load_code=None. Confirm that row['failed_json'] == '[]' and no issue is appended in run_gedai.",
+      "local_id": "gemini-P4-04",
+      "location": [
+        "election_audit/gedai.py:194-195",
+        "election_audit/gedai.py:343"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Missing BU load code or urn serial in GEDAI check is treated as pass in summary"
+    },
+    {
+      "category": "bug",
+      "claim": "MAX_SPLIT = 3 in printed_bu.py fails to reassemble Arvor printed BUs that span 4 or more QR codes, causing check_record to falsely classify authentic printed BUs as 'not_authentic'.",
+      "confidence": "high",
+      "evidence": "In election_audit/printed_bu.py:48 and 125-129:\n    MAX_SPLIT = 3  # codes searched when only the reassembled content is known\n    ...\n    for parts in range(2, max_parts + 1):\n        found = search(0, parts, [])\n        if found:\n            return found\nIn election_audit/printed_bu.py:628-629:\n    if not authentic:\n        row[\"status\"] = \"not_authentic\"\nIn review-scratch/probe_split.py, split_search with max_parts=3 on a 4-part chain returned None, which forces chain_status='slices_not_recovered', authentic=False, and status='not_authentic'.",
+      "failure_scenario": "A first-round election section with 5 contested offices generates a printed BU requiring 4 QR codes. Arvor records the full content and final hash. split_search fails to find the split points because max_parts is 3. The check sets chunks_recovered=False and brands an authentic printed BU as not_authentic.",
+      "falsification": "Call split_search on a valid 4-chunk chained message with max_parts=3. Observe that it returns None, and check_record returns status='not_authentic'.",
+      "local_id": "gemini-P4-05",
+      "location": [
+        "election_audit/printed_bu.py:48",
+        "election_audit/printed_bu.py:125-129",
+        "election_audit/printed_bu.py:628-629"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Printed BU split search caps at 3 parts, falsely branding valid multi-part BUs as not authentic"
+    },
+    {
+      "category": "threat-to-validity",
+      "claim": "Rule Z1 requires only that some device in the section printed a zerésima, while Z2-Z5 check only within the device's own stream. An urn can record votes all day without ever generating a zerésima report and still pass all Z rules as long as an unused or previous device generated a zerésima.",
+      "confidence": "high",
+      "evidence": "In election_audit/zeresima.py:138-156:\n    for found in streams.values():\n        own = sorted((m for m in found if m[\"kind\"] == \"zeresima_start\"), key=lambda m: m[\"line\"])\n        if not own:\n            continue\n        first = own[0]\n        ...\n    if devices and not zeresimas:\n        failed.append(\"Z1\")\nUrns with votes but without zerésima have own=[] and are skipped by continue; Z1 checks global zeresimas across all devices.",
+      "failure_scenario": "Device A prints a zerésima at 07:00 and records 0 votes. Device B is powered on with pre-seeded ballots or corrupt initialization, records 300 votes, and never prints a zerésima. All rules Z1-Z5 pass with failed_json='[]'.",
+      "falsification": "Run section_rules with device A having a zerésima marker and 0 session votes, and device B having 200 session votes and 0 markers. Confirm that failed_json is '[]'.",
+      "local_id": "gemini-P4-06",
+      "location": [
+        "election_audit/zeresima.py:138-164",
+        "docs/en/integrity-checks.md:567-569"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Replacement urn recording votes without a zerésima vacuously passes rules Z1 to Z5"
+    },
+    {
+      "category": "unstated-assumption",
+      "claim": "absent_detail partitions unexplained G1 missing correspondences in T13 by comparing unsynchronized real-time clocks of the GEDAI PC and the urn at a one-minute grain without drift tolerance, creating an unverified explanatory narrative.",
+      "confidence": "high",
+      "evidence": "In election_audit/gedai.py:180-190:\n    def absent_detail(bu: Row, parsed: JSON) -> str:\n        last = parsed[\"received\"].get((bu.get(\"flash_serial\") or \"\").upper())\n        if last is None:\n            return \"medium_never_read_back\"\n        if not bu.get(\"loaded_at\"):\n            return \"no_load_time\"\n        if last <= bu[\"loaded_at\"]:\n            return \"medium_not_read_back_after_load\"\n        return \"medium_read_back_later_without_it\"\nIn docs/en/observations.md:38 (T13), this inequality categorizes 9/55 loads as 'medium not read back after load', asserting that this pattern 'fits a load medium that was not read back into GEDAI after a late reload'.",
+      "failure_scenario": "An urn is loaded and the load medium is read back into GEDAI 2 minutes later. However, the GEDAI PC's RTC lags the urn's RTC by 3 minutes. The comparison last <= bu['loaded_at'] evaluates to True, misclassifying the medium as 'medium_not_read_back_after_load' and creating a false narrative of failure to read back media.",
+      "falsification": "Evaluate absent_detail with last and loaded_at differing by 60 seconds; observe the status flips from 'medium_not_read_back_after_load' to 'medium_read_back_later_without_it'.",
+      "local_id": "gemini-P4-07",
+      "location": [
+        "election_audit/gedai.py:180-190",
+        "docs/en/observations.md:38"
+      ],
+      "severity": "low",
+      "speculative": false,
+      "title": "Unsynchronized inter-machine clocks at 1-minute grain drive the absent-detail explanation in T13"
+    }
+  ],
+  "packet": "P4",
+  "responses": [],
+  "reviewer": "gemini",
+  "round": "R1",
+  "summary": "Audit of Packet P4 (integrity checks, zerésima, GEDAI, signature errors, printed BU, and integrity documents). Identified critical test gaps and vacuous checks: (1) Rule E1 does not detect start-up signature verification errors that continue to record votes in the same boot, misclassifying them as votes after restart; (2) GEDAI zone_coverage circularly excuses zones where 100% of sections fail G1/G3 as 'zone_unpublished'; (3) Missing RDV files or contests dropped from RDV never fail I3 and produce zero discrepancies; (4) Missing load codes or urn serials in GEDAI section_rules return empty failures, counting as passed in summary; (5) Printed BU chunk recovery caps MAX_SPLIT at 3, misclassifying authentic 4+ QR code BUs as not_authentic; (6) Zerésima checks allow replacement urns with votes to completely lack a zerésima as long as any device in the section generated one; (7) T13's absent_detail explanation depends on comparing unsynchronized machine clocks at minute grain."
+}

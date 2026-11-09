@@ -1,0 +1,131 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [
+    {
+      "category": "reproducibility",
+      "claim": "Every recipe in justfile and all documented commands in README.md wrap execution with 'rtk proxy', causing immediate command-not-found failures (exit code 127) when rtk is absent. The documentation provides no explanation of what rtk is or how to run without it, and election-audit doctor omits checking for rtk while verifying uv and just.",
+      "confidence": "high",
+      "evidence": "justfile:\n11: setup:\n12:     rtk proxy uv sync --locked\n15:     rtk proxy uv run --locked election-audit doctor\n\nelection_audit/cli.py:24-27:\n    for executable in (\"uv\", \"just\"):\n        path = shutil.which(executable)\n        print(f\"{executable}: {path or 'MISSING'}\")\n        ready = ready and path is not None\n\nCommand run:\n$ just doctor\nrtk proxy uv run --locked election-audit doctor\ndoctor: line 1: rtk: command not found\nerror: Recipe `doctor` failed on line 15 with exit code 127",
+      "failure_scenario": "An outsider on a clean machine installs uv, just, and Python 3.14, and attempts to run the documented quickstart command 'rtk proxy just doctor' or 'just doctor'. The command fails immediately with exit code 127 ('rtk: command not found') because rtk is not installed and justfile hardcodes 'rtk proxy' on every single recipe without an unproxied fallback.",
+      "falsification": "Uninstall or remove rtk from PATH and run 'just doctor' or 'just check'. Observe exit code 127.",
+      "local_id": "gemini-P8-01",
+      "location": [
+        "justfile:11",
+        "justfile:15",
+        "README.md:38",
+        "election_audit/cli.py:24"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Hardcoded rtk proxy in justfile and documentation breaks execution when rtk is absent"
+    },
+    {
+      "category": "bug",
+      "claim": "The reproduction documentation instructs newcomers to run bundled code by setting the working directory to BUNDLE/source and installing from the lock with uv sync. Doing so creates a .venv directory inside BUNDLE/source containing symlinks and unmanifested files, causing subsequent verify_bundle and reproduce calls to fail with PublicationError.",
+      "confidence": "high",
+      "evidence": "docs/en/reproduction.md:24-25:\n\"To run the exact bundled source, set the working directory to BUNDLE/source and use the already-installed Python interpreter with -B ... or install the bundled project from its lock with a populated offline cache.\"\n\nelection_audit/reproduction.py:262-264:\n    for path in sorted(Path(root).rglob(\"*\")):\n        if path.is_symlink():\n            raise PublicationError(\"Review bundle must not contain symlinks\")\n\nExecution log (review-scratch/installed-bundle-verify.log):\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    from election_audit.reproduction import verify_bundle; verify_bundle(\"review-scratch/install-review\")\n  File \"election_audit/reproduction.py\", line 279, in verify_bundle\n    actual = file_pins(bundle)\n  File \"election_audit/reproduction.py\", line 264, in file_pins\n    raise PublicationError(\"Review bundle must not contain symlinks\")\nelection_audit.publication.PublicationError: Review bundle must not contain symlinks",
+      "failure_scenario": "A reviewer receives a valid review bundle and follows the documented instruction to run from BUNDLE/source by installing the locked project via uv sync. uv creates BUNDLE/source/.venv. Subsequent verification via 'election-audit review-bundle <bundle> --verify' or 'reproduce' crashes with 'PublicationError: Review bundle must not contain symlinks' (or file inventory mismatches if symlinks are replaced with copies).",
+      "falsification": "Generate a review bundle with review_bundle, run 'uv sync --locked' in <bundle>/source, and run verify_bundle(<bundle>). The function raises PublicationError.",
+      "local_id": "gemini-P8-02",
+      "location": [
+        "election_audit/reproduction.py:263",
+        "election_audit/reproduction.py:282",
+        "docs/en/reproduction.md:24"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Documented bundle source installation creates symlinks and unmanifested files that fail verify_bundle"
+    },
+    {
+      "category": "reproducibility",
+      "claim": "The codebase unconditionally imports Unix-only standard library modules fcntl and resource at top level and directly reads Linux /proc pseudo-files. On Windows, executing election-audit demo crashes immediately on ModuleNotFoundError: No module named 'fcntl', and on macOS national pipelines crash on missing /proc, while election-audit doctor passes vacuously with exit code 0.",
+      "confidence": "high",
+      "evidence": "election_audit/publication.py:5:\nimport fcntl\n\nelection_audit/cli.py:13-28:\ndef doctor() -> int:\n    ...\n    return 0 if ready else 1\n\nSimulating Windows environment (sys.modules['fcntl'] = None):\ndoctor_exit = 0\ndemo_error = ModuleNotFoundError: import of fcntl halted; None in sys.modules\n\nelection_audit/national_parallel.py:295:\nfields = Path(\"/proc/self/stat\").read_text().rsplit(\")\", 1)[1].split()",
+      "failure_scenario": "A user on Windows or macOS installs the required Python and packages and runs 'election-audit doctor', which reports ready and exits with code 0. Running 'election-audit demo' on Windows immediately crashes with 'ModuleNotFoundError: No module named fcntl'. On macOS, running national workloads crashes with 'FileNotFoundError: /proc/self/stat'.",
+      "falsification": "On a Windows machine or a runtime where sys.modules['fcntl'] is masked, run 'election-audit doctor' followed by 'election-audit demo'. Observe doctor exits 0 but demo crashes on import.",
+      "local_id": "gemini-P8-03",
+      "location": [
+        "election_audit/publication.py:5",
+        "election_audit/archive_parsing.py:10",
+        "election_audit/cli.py:13",
+        "election_audit/national_parallel.py:295"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Unconditional Unix-specific imports and Linux /proc dependencies crash on Windows and macOS while doctor reports ready"
+    },
+    {
+      "category": "unstated-assumption",
+      "claim": "The offline demo command initializes ResourceConfig with reserve_bytes=10 GiB and spill_bytes=8 GiB without providing CLI overrides. Volumes with less than 18 GiB free space fail immediately with PublicationError even though the synthetic demo writes only ~12 MiB of data.",
+      "confidence": "high",
+      "evidence": "election_audit/publication.py:84-86:\n    memory_bytes: int = 12 * 1024**3\n    spill_bytes: int = 8 * 1024**3\n    reserve_bytes: int = 10 * 1024**3\n\nelection_audit/publication.py:98-100:\ndef _guard(path: str | Path, config: ResourceConfig, extra_bytes: int = 0) -> None:\n    if shutil.disk_usage(path).free < config.reserve_bytes + config.spill_bytes + extra_bytes:\n        raise PublicationError(\"SSD free space cannot preserve reserve plus spill cap\")\n\nMocking 15 GiB free disk space:\nPublicationError: SSD free space cannot preserve reserve plus spill cap",
+      "failure_scenario": "A newcomer on a laptop, VM, or CI container with 15 GiB of available storage attempts to evaluate the project using the quickstart 'just demo --output data/my-demo'. The command fails with 'PublicationError: SSD free space cannot preserve reserve plus spill cap', despite the actual demo footprint being only 12.3 MiB, with no CLI option to lower the reserve.",
+      "falsification": "Execute 'election-audit demo --output <dir>' on a volume with 15 GiB of free disk space; observe PublicationError.",
+      "local_id": "gemini-P8-04",
+      "location": [
+        "election_audit/publication.py:85",
+        "election_audit/publication.py:99",
+        "election_audit/reproduction.py:210",
+        "election_audit/reproduction.py:488"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Synthetic demo hardcodes an undocumented 18 GiB free disk space requirement, crashing despite writing only ~12 MiB"
+    },
+    {
+      "category": "doc-mismatch",
+      "claim": "Documented reproduction and backfill commands hardcode developer-specific absolute paths referencing the username 'tacio' and specific external block device UUIDs. An outsider executing the documented commands encounters immediate FileNotFoundError.",
+      "confidence": "high",
+      "evidence": "docs/en/reproduction.md:40:\nrtk proxy env UV_OFFLINE=1 just pilot --source /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/raw/2026/turno-2 --output data/my-pilot\n\ndocs/en/backfill.md:10:\nrtk proxy env UV_OFFLINE=1 just snapshot --source /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/raw/2026/turno-2 --store /large-volume/audit/snapshots --ufs ac al am ap ba ce df es go ma mg ms mt pa pb pe pi pr rj --reserve-gib 10\n\ndocs/en/acquisition-reference.md:154-155:\n  --output /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/raw/2026/turno-2 \\\n  --manifest /home/tacio/code/personal/research/election-audit/.local-state/tse-2026.sqlite \\",
+      "failure_scenario": "An external reviewer reading docs/en/reproduction.md copies and runs the documented pilot command: 'rtk proxy env UV_OFFLINE=1 just pilot --source /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/... --output data/my-pilot'. The command fails immediately with FileNotFoundError because the path references the author's local username and external drive UUID.",
+      "falsification": "Run the exact command from docs/en/reproduction.md:40 on any independent machine; verify FileNotFoundError.",
+      "local_id": "gemini-P8-05",
+      "location": [
+        "docs/en/reproduction.md:40",
+        "docs/en/backfill.md:10",
+        "docs/en/acquisition-reference.md:154"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Documented quickstart and pilot commands contain author-specific user paths and drive UUIDs"
+    },
+    {
+      "category": "test-gap",
+      "claim": "The test fixture in test_national_migration.py hardcodes 'mount: \\\"/\\\"' while creating temporary directories. If the test runner's temporary directory is on a separate filesystem from '/', root.stat().st_dev != anchor.stat().st_dev evaluates to True and causes test failures.",
+      "confidence": "high",
+      "evidence": "tests/test_national_migration.py:70-73:\n        self.item = {\n            \"round\": 2,\n            \"pleito\": \"3221\",\n            \"manifest\": str(self.manifest),\n            \"old_root\": str(self.old),\n            \"new_root\": str(self.new),\n            \"mount\": \"/\",\n        }\n\nelection_audit/national_relocation.py:44-48:\n        if (\n            not anchor.is_mount()\n            or list((root.stat().st_dev, root.stat().st_ino)) != certificate[\"root_identity\"]\n            or root.stat().st_dev != anchor.stat().st_dev\n        ):\n            raise ValueError(\"Verified relocated source mount/root changed\")\n\nTest failure:\nAssertionError: \"not in the pinned\" does not match \"Verified relocated source mount/root changed\"",
+      "failure_scenario": "When running unit tests on an environment where the temporary directory or project workspace is on a different mount point from the root filesystem '/' (such as a separate /home partition, tmpfs /tmp, or container bind mount), tests.test_national_migration fails with ValueError: Verified relocated source mount/root changed.",
+      "falsification": "Run 'python -m unittest tests.test_national_migration' with TMPDIR located on a different partition or tmpfs mount from '/'. Observe test failure.",
+      "local_id": "gemini-P8-06",
+      "location": [
+        "tests/test_national_migration.py:72",
+        "election_audit/national_relocation.py:46"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Migration relocation tests hardcode root mount '/' causing test suite failure on multi-partition or container systems"
+    },
+    {
+      "category": "threat-to-validity",
+      "claim": "Critical verification inputs including TSE urn software hash lists, JWS verification manuals, format specifications, and certificate revocation lists cannot be acquired using the project's tooling because TSE servers block non-browser requests with HTTP 403. These inputs are pinned to unredistributed local paths in the author's home directory, preventing outsiders from running independent end-to-end verification.",
+      "confidence": "high",
+      "evidence": "election_audit/resources/pki/pki.json:39:\n\"revocation_lists_acquired\": \"2026-11-05, downloaded by the project owner in a browser; frozen at ~/data/election-audit-stage/inputs/tse-crls-20261105-complete/\"\n\nelection_audit/resources/tse-format-2026-official.json:5:\n\"acquired\": \"2026-11-05, downloaded by the project owner in a browser (non-browser clients get HTTP 403); frozen at ~/data/election-audit-stage/inputs/tse-format-docs-20261105/\"\n\ndocs/en/observations.md:30:\n\"T5 | 2026-11-05 | Official documents and certificate-revocation lists return HTTP 403 to non-browser clients... Collection cannot be fully automated, which weakens reproducibility\"",
+      "failure_scenario": "An external auditor attempts to perform full integrity and electoral verification from scratch. The CLI tools provide no automated mechanism to acquire CRLs or urn software hash lists because TSE blocks non-browser requests, and the project documentation points only to private unredistributed staging directories (~/data/election-audit-stage/inputs/...).",
+      "falsification": "Inspect bulk_acquisition.py and scripts/download_tse_logs.py to confirm the absence of automated retrieval for TSE CRLs and official browser-acquired format specifications.",
+      "local_id": "gemini-P8-07",
+      "location": [
+        "election_audit/resources/pki/pki.json:39",
+        "election_audit/resources/tse-format-2026-official.json:5",
+        "docs/en/observations.md:30"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Official verification inputs depend on manual browser downloads and non-redistributed staging directories"
+    }
+  ],
+  "packet": "P8",
+  "responses": [],
+  "reviewer": "gemini",
+  "round": "R1",
+  "summary": "Packet P8 review tested reproducibility and newcomer experience on an independent checkout.\n\nHands-on reproduction findings:\n1. Building the environment from lock offline succeeded when an explicit Python 3.14 path was provided. The default uv offline search fails if Python 3.14 is not already placed in ~/.local/share/uv or in standard PATH.\n2. The documented quickstart recipes ('rtk proxy just doctor', 'rtk proxy env UV_OFFLINE=1 just check') fail immediately with exit code 127 because 'rtk' is not installed and every recipe in justfile wraps commands with 'rtk proxy'. 'doctor' verifies uv and just but omits checking for rtk.\n3. Once run without rtk proxy: doctor and lint passed; ty check failed when an external VIRTUAL_ENV path from the author's machine was inherited in the environment, but passed once unpolluted.\n4. The synthetic demo, review-bundle export, review-bundle --verify (417 files), and reproduce pipeline were executed into review-scratch/ and completed with matching parse identity and logical results across all 4 release stages.\n\nKey architectural and reproducibility gaps identified:\n- Hardcoded 'rtk proxy' in all justfile recipes and documentation without fallback or documentation on running without it (gemini-P8-01).\n- Documented bundle-install alternative (running uv sync in BUNDLE/source) permanently invalidates the review bundle by introducing .venv symlinks and untracked files (gemini-P8-02).\n- Unconditional imports of Unix-only fcntl and resource modules crash on Windows, and /proc reads crash on macOS, while 'doctor' reports ready = True (gemini-P8-03).\n- Undocumented 18 GiB disk space guard crashes demo on systems with under 18 GiB free, despite demo generating only ~12 MiB (gemini-P8-04).\n- Author-specific user and mount paths (/media/tacio/...) embedded in documented commands (gemini-P8-05).\n- Migration test fixtures hardcode mount: '/' causing test suite failures on multi-mount filesystems (gemini-P8-06).\n- Manual browser downloads for CRLs and hash lists stored in private unredistributed staging directories prevent independent end-to-end verification (gemini-P8-07)."
+}

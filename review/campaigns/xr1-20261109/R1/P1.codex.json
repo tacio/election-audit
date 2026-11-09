@@ -1,0 +1,80 @@
+{
+  "reviewer": "codex",
+  "packet": "P1",
+  "round": "R1",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Four failures reproduced with synthetic fixtures: corrupted partial downloads become verified acquisitions, missing completed files remain counted, missing auxiliary metadata promotes coverage to complete, and tiny 7z archives bypass memory bounds. Existing targeted tests ran: 68 tests, one skipped. No raw or protected data was accessed; tracked files remain unchanged.",
+  "findings": [
+    {
+      "local_id": "codex-P1-01",
+      "severity": "critical",
+      "category": "bug",
+      "title": "Resume certifies corrupted partial bytes as a complete acquisition",
+      "location": [
+        "election_audit/bulk_acquisition.py:170",
+        "election_audit/bulk_acquisition.py:215",
+        "election_audit/bulk_acquisition.py:434",
+        "election_audit/bulk_acquisition.py:481"
+      ],
+      "claim": "A resumed download hashes the existing partial prefix without checking it against previously received bytes. For resources without a published SHA-512, corruption in that prefix becomes the authoritative acquisition digest and passes subsequent verification.",
+      "evidence": "bulk_acquisition.py:170:\nwith partial.open(\"rb\") as stream:\n    for block in iter(lambda: stream.read(CHUNK), b\"\"):\n        digest.update(block)\n        long_digest.update(block)\n        offset += len(block)\n\nbulk_acquisition.py:215:\nif expected[\"bytes\"] is not None and offset != expected[\"bytes\"]:\n    raise ValueError(f\"Short download ({offset} of {expected['bytes']} bytes): {url}\")\nif sha(partial) != digest.hexdigest():\n    raise ValueError(f\"Stored bytes differ from received bytes: {url}\")\nmembers = None\nif target.name.endswith(\".zip\"):\n    with zipfile.ZipFile(partial) as archive:\n        members = len(archive.infolist())\n\nThe probe interrupted a 122-byte ZIP at byte 55, flipped one payload byte in .part, then supplied the exact remaining server bytes with unchanged ETag and correct range headers. Output: 'PARTIAL resumed: {\"statuses\": {\"complete\": 1}, \"published_sha512\": {\"not_published\": 1}, \"complete_files\": 1, \"complete_bytes\": 122} matches_server= False verify= {\"verified_files\": 1, \"verified_bytes\": 122}'. A separate ZIP CRC check returned 'a.bu'.",
+      "failure_scenario": "An interrupted bulk archive suffers disk corruption or modification in its saved prefix. Resume authenticates only the remaining HTTP range, accepts the combined damaged ZIP, and records its new hashes. bulk-download verify subsequently passes because it compares against those hashes. A later CRC-aware reader may reject the member, but acquisition has already certified altered bytes.",
+      "falsification": "Run `.venv/bin/python -c \"import runpy; p = runpy.run_path('review-scratch/p1-probes/probe.py'); p['corrupted_partial_probe']()\"`. The finding is falsified if the changed prefix is detected or replaced before the archive is marked complete.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P1-02",
+      "severity": "high",
+      "category": "vacuous-check",
+      "title": "Missing auxiliary metadata promotes partial coverage to complete",
+      "location": [
+        "election_audit/coverage.py:287",
+        "election_audit/coverage.py:323",
+        "election_audit/coverage.py:437"
+      ],
+      "claim": "When auxiliary metadata cannot be verified, coverage substitutes historically recorded or downloaded URLs for the unknown advertised inventory. Having every URL in that reduced set then counts as acquired and can produce a complete national coverage verdict.",
+      "evidence": "coverage.py:287:\nexcept (ValueError, KeyError, TypeError, AttributeError, OSError) as exc:\n    aux_states[key] = str(exc)\n    # These are current section URLs, with explicit *unknown* per-run\n    # attribution. They establish local availability, never old run bytes.\n    per_section_assets[key] = sorted(\n        {row[\"url\"] for row in log_history[key]} | current_log_urls[key]\n    )\n\ncoverage.py:323:\nelif urls and len(successes) == len(urls):\n    state, availability = \"acquired\", \"available\"\n\ncoverage.py:437-446 grants complete_indexed_local_assets without requiring verified auxiliaries.\n\n`.venv/bin/python review-scratch/p1-probes/probe.py` used one indexed principal per UF, two advertised log versions per principal, and only one downloaded version. Output before auxiliary loss: 'partial_national {\\'unresolved\\': 28}'. After deleting the auxiliary bodies, publication and full snapshot verification succeeded with 'national_status': 'complete_indexed_local_assets', 'member_accounting': {'acquired': 28}, auxiliary_states=['metadata_not_verified'], and package_assets=0.",
+      "failure_scenario": "A newer auxiliary file is saved before its advertised links are committed, then becomes missing or corrupt. An older downloaded log remains available, while another advertised version is absent. The fallback drops the absent version from the asset denominator and upgrades the section to acquired. If other sections are complete, this can upgrade the national verdict too.",
+      "falsification": "Run `.venv/bin/python review-scratch/p1-probes/probe.py`. Coverage should remain partial when the auxiliary inventory becomes unavailable, retaining an unknown completeness state despite locally available logs.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P1-03",
+      "severity": "high",
+      "category": "vacuous-check",
+      "title": "Bulk resume counts deleted completed files without checking storage",
+      "location": [
+        "election_audit/bulk_acquisition.py:362",
+        "election_audit/bulk_acquisition.py:453",
+        "election_audit/bulk_acquisition.py:463"
+      ],
+      "claim": "Bulk resume trusts a complete manifest row without checking that its file exists or has the recorded length. It can report finished and count complete bytes when the corresponding archive is absent.",
+      "evidence": "bulk_acquisition.py:362:\nexisting = db.execute(\n    \"SELECT status,etag,expected_bytes FROM files WHERE url=?\", (url,)\n).fetchone()\nif existing and existing[0] == \"complete\":\n    rows.append((url, None))\n    continue\n\nbulk_acquisition.py:453:\ntotals = db.execute(\n    \"SELECT count(*), coalesce(sum(bytes),0) FROM files WHERE status='complete'\"\n).fetchone()\n\nThe mock-only bulk probe acquired one archive, deleted it, and resumed. Output: 'after_delete_and_resume': {'statuses': {'complete': 1}, 'complete_files': 1, 'complete_bytes': 115}, 'stage': 'finished', 'exists': false. Explicit bulk.verify then raised FileNotFoundError.",
+      "failure_scenario": "A completed archive is deleted or truncated between acquisition attempts. A resume performed to finish other resources skips that archive and reports a finished acquisition with its original file and byte counts. The separate verify command detects the problem, but resume does not require it.",
+      "falsification": "Run `.venv/bin/python review-scratch/p1-probes/probe.py`. After deleting the completed archive, resume should reacquire it or fail explicitly instead of returning finished with complete_files=1.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P1-04",
+      "severity": "high",
+      "category": "bug",
+      "title": "7z dictionary allocation bypasses decompression bounds",
+      "location": [
+        "election_audit/sevenzip.py:182",
+        "election_audit/sevenzip.py:198",
+        "election_audit/sevenzip.py:210",
+        "election_audit/archive_parsing.py:310"
+      ],
+      "claim": "The 7z reader bounds decoded output but passes the archive-controlled LZMA dictionary size directly to the decoder. A tiny archive can therefore allocate gigabytes before producing bounded output, and allocation failures escape the normal archive-error handling.",
+      "evidence": "sevenzip.py:182:\ndef _decode(folder: Folder, packed: memoryview, limit: int) -> bytes:\n    if folder[\"size\"] > limit:\n        raise SevenZipError(\"Unpacked size bound exceeded\")\n\nsevenzip.py:198:\n\"dict_size\": struct.unpack(\"<I\", props[1:5])[0],\n\nsevenzip.py:210:\ndecoder = lzma.LZMADecompressor(format=lzma.FORMAT_RAW, filters=[spec])\ntry:\n    out = decoder.decompress(bytes(packed), max_length=folder[\"size\"])\nexcept lzma.LZMAError as error:\n    raise SevenZipError(f\"Corrupt LZMA stream: {error}\") from None\n\narchive_parsing.py:310:\ntry:\n    entries = sevenzip.read(stream.read(), limit=self.config.max_member_bytes)\nexcept sevenzip.SevenZipError:\n    self.issue(\"invalid_archive\", segments)\n    return\n\n`.venv/bin/python review-scratch/p1-probes/probe.py --7z-child` ran under a 256 MiB address-space cap. Output: '7Z compressed_bytes= 110 output_bytes=5 limit=16 dictionary_bytes= 1073741824' followed by '7Z exception= MemoryError'.",
+      "failure_scenario": "A 2022 log archive declares five output bytes and a 1 GiB LZMA dictionary. It passes the output-size check, then exhausts a bounded worker's memory. Multiple such workers can exceed the aggregate processing budget; MemoryError is not converted into a retained invalid-archive diagnostic.",
+      "falsification": "Run `.venv/bin/python review-scratch/p1-probes/probe.py --7z-child`. The reader should reject the oversized dictionary with SevenZipError before decoder allocation, while keeping memory within the configured budget.",
+      "confidence": "high",
+      "speculative": false
+    }
+  ],
+  "responses": []
+}

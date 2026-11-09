@@ -1,0 +1,78 @@
+{
+  "reviewer": "codex",
+  "packet": "P4",
+  "round": "R1",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Four failure paths reproduced with synthetic inputs. The 48 existing focused tests pass. Effects on the recorded national results cannot be determined without the absent inputs; no protected data was inspected or tracked files edited.",
+  "findings": [
+    {
+      "local_id": "codex-P4-01",
+      "severity": "critical",
+      "category": "vacuous-check",
+      "title": "I8 counts an untrusted printed signature as equal when the published certificate is unavailable",
+      "location": [
+        "election_audit/printed_bu.py:605",
+        "election_audit/printed_bu.py:623",
+        "election_audit/printed_bu.py:715"
+      ],
+      "claim": "The authenticity decision ignores certificate issuer verification and revocation, and the equality decision accepts an unavailable published certificate. A forged QR record signed with an attacker's self-signed certificate can therefore enter the summary as equal.",
+      "evidence": "At line 605: `authentic = chain_status == \"ok\" and signature == \"verified\" and not detail[\"errors\"]`.\nAt lines 623–624: `bu_cert = hardware_certificate(vsc)` and `row[\"certificate_matches_bu\"] = None if bu_cert is None else bu_cert == cert_sha`.\nAt lines 632–635: `elif row[\"certificate_matches_bu\"] is False:` selects `equal_content_other_certificate`; otherwise the status is `equal`.\nAt line 715, `contests_compared` includes records whose status is `equal`.\nRunning `.venv/bin/python review-scratch/p4_probes.py` produced: `self_signed_printed_record_without_vsc {\"certificate_matches_bu\": null, \"chain\": \"ok\", \"pki_issuer_signature\": \"unknown_issuer\", \"pki_revoked\": null, \"signature\": \"verified\", \"status\": \"equal\", \"summary_status\": {\"equal\": 1}}`.",
+      "failure_scenario": "A collector fabricates a paper-BU record by copying published content and signing its QR hash with a fresh P-521 key and self-signed certificate. The published BU exists but its VSC is absent. I8 reports equal, creating apparent corroboration from an authentic printed copy. The separate PKI columns retain the problem, but the equal summary count still accepts the record.",
+      "falsification": "Run the scratch probe, which uses the existing printed-BU test fixture and a newly generated signing key. Require issuer verification, non-revocation and an affirmative certificate match for a complete I8 pass; unknown certificate comparisons should remain unavailable. The reproduced record should cease contributing to equal.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P4-02",
+      "severity": "critical",
+      "category": "reproducibility",
+      "title": "I6 reads the round-1 release without validating its file hashes",
+      "location": [
+        "election_audit/integrity_checks.py:2329",
+        "election_audit/integrity_checks.py:2340",
+        "election_audit/integrity_checks.py:2364"
+      ],
+      "claim": "run_logs validates the section and runoff release files but only checks the round number of the round-1 release. Altering that release's segment table can change I6 from differs to equal while the output continues to bind the unchanged original manifest.",
+      "evidence": "Lines 2329–2332 read `first / \"manifest.json\"` only to check `[\"round\"] != 1`; there is no corresponding file-hash validation loop.\nLine 2340 records `\"semantic_round1_manifest_sha256\": sha(first / \"manifest.json\") if first else None`.\nLines 2364–2365 call `round1_statuses(semantic, first)` and `_witness_map(first)` on the unchecked tables.\nRunning `.venv/bin/python review-scratch/p4_probes.py` produced: `mutated_round1_table {\"after_i6\": {\"equal\": 1}, \"before_i6\": {\"differs\": 1}, \"hash_matches_manifest\": false, \"same_bound_manifest\": true}`. Both run_logs invocations completed successfully.",
+      "failure_scenario": "After a round-1 release is frozen, its segments.parquet is replaced or accidentally rewritten without updating its manifest. Matching its fingerprint to the runoff table suppresses a discrepancy, and the resulting integrity-logs release claims the original parent manifest. This affects the standalone logs command; the later prefix command separately validates its inputs.",
+      "falsification": "Run the scratch probe. It changes only the round-1 segment fingerprint after writing its manifest. run_logs should reject the second invocation with a release-file hash mismatch before computing I6, as it already does for its other release inputs.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P4-03",
+      "severity": "high",
+      "category": "vacuous-check",
+      "title": "Startup verification errors are cleared without evidence of a restart",
+      "location": [
+        "election_audit/signature_errors.py:125",
+        "election_audit/signature_errors.py:145",
+        "election_audit/signature_errors.py:173",
+        "docs/en/integrity-checks.md:740"
+      ],
+      "claim": "For an error outside a VOTA session, every subsequent completion in its block is automatically classified as after restart. E1 therefore cannot establish the documented O19 conclusion that voting after an error occurred only after the urn was switched on again.",
+      "evidence": "Lines 127–130 leave `same = None` unless `m[\"session_ordinal\"] is not None`.\nLine 145 computes `\"votes_after_restart\": after_block - (same or 0) + later` without examining restart evidence.\nLines 173–177 fail E1 only when `most(\"verification\", \"votes_same_session\")` is truthy.\nThe documentation at lines 740–741 concludes that every vote after an error follows another switch-on.\nRunning `.venv/bin/python review-scratch/p4_probes.py` parsed a synthetic log through summarize_object and returned: `startup_without_restart {\"failed_json\": \"[]\", \"inconsistent_counts\": 0, \"reboot_lines\": 0, \"sessions\": 1, \"verification_errors\": 1, \"votes_after_restart\": 1, \"votes_same_session_after_verification\": null, \"signing_errors\": 0, \"votes_same_session_after_signing\": null}`.",
+      "failure_scenario": "An official-round GAP package-verification error occurs before VOTA starts. VOTA then launches and completes a vote, with no intervening shutdown, switch-on or repeated successful checks. The check reports no failure and labels that vote after restart, despite this being the first VOTA session.",
+      "falsification": "Run the scratch probe and require explicit restart evidence between the startup error and subsequent voting, or mark that continuation unresolved. To assess the published O19 conclusion, inspect the eligible unprotected logs behind startup errors followed by votes and verify the intervening switch-on and repeated checks.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P4-04",
+      "severity": "high",
+      "category": "bias",
+      "title": "GEDAI infers unpublished zones from failed comparisons",
+      "location": [
+        "election_audit/gedai.py:238",
+        "election_audit/gedai.py:311"
+      ],
+      "claim": "Zone availability is inferred from successful BU-to-GEDAI matches rather than the presence of GEDAI records for the zone. Consequently, a zone whose published records all contradict its BUs loses its G1 failures and is labeled unpublished; G3 has the same circular exclusion.",
+      "evidence": "Lines 243–244 count `r[\"correspondence\"] in MATCHED` and `r.get(\"load_medium\") == \"covers_section\"`.\nLines 247–252 replace failures with `zone_unpublished` and remove G1/G3 when those successful-match counts are zero.\nLine 311 applies `zone_coverage(rows)` before discrepancies are emitted.\nRunning `.venv/bin/python review-scratch/p4_probes.py` found two parsed section keys, but a BU with a conflicting load changed from `correspondence=\"absent\", failed_json=\"[\\\"G1\\\"]\"` to `correspondence=\"zone_unpublished\", failed_json=\"[]\"`. With a correct correspondence but wrong medium, G3 was removed despite a parsed load-medium record being present.",
+      "failure_scenario": "A zone's GEDAI logs contain correspondences for its sections, but every published BU names a different load. With no successful match, all G1 discrepancies disappear from discrepancies.jsonl. The output attributes the conflict to unpublished preparation logs even though those records exist. The documented T11 exclusion thus also suppresses a materially different anomaly.",
+      "falsification": "Run the scratch probe. Determine availability independently from parsed source-record coverage by zone, before matching BU load codes or medium serials. Conflicting records should retain G1/G3; only genuinely absent source coverage should produce zone_unpublished. National impact requires examining the source records of excluded zones, not merely their match counts.",
+      "confidence": "high",
+      "speculative": false
+    }
+  ],
+  "responses": []
+}

@@ -1,0 +1,110 @@
+{
+  "reviewer": "codex",
+  "packet": "P5",
+  "round": "R1",
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "summary": "Six findings reproduced with synthetic inputs. The 45 targeted tests passed with PYTHONPATH=tests. No raw or protected data was examined, and no tracked files were changed; effects on existing national releases remain unmeasured.",
+  "findings": [
+    {
+      "local_id": "codex-P5-01",
+      "severity": "critical",
+      "category": "bug",
+      "title": "Section-table aggregation doubles retransmissions and marks inconsistent results ready",
+      "location": [
+        "election_audit/section_table.py:244",
+        "election_audit/section_table.py:250",
+        "election_audit/section_table.py:1041"
+      ],
+      "claim": "The national section-table path sums every BWEB row without resolving repeated or competing choice records. Its readiness check accepts doubled votes, conflicting attendance and negative electorate tokens without reconciling the totals.",
+      "evidence": "At section_table.py:244: `CAST(sum(TRY_CAST(QT_VOTOS AS BIGINT)) FILTER (WHERE CD_TIPO_VOTAVEL = '1') AS BIGINT) AS nominal`; votes_sql likewise uses `sum(TRY_CAST(QT_VOTOS AS BIGINT))` grouped by section/type/number. At :1041: `result is not None and result[\"eligible\"] is not None and not result[\"unparsed_votes\"]` is the complete results-readiness predicate. Running `.venv/bin/python review-scratch/codex_p5_probe.py` produced: `duplicate retransmission {\"eligible\": 100, \"attendance\": 80, \"nominal\": 150, \"blank\": 6, \"null_votes\": 4, \"metadata_variants\": 0} results_state=ready`; `conflicting attendance {\"eligible\": 100, \"attendance\": null, ... \"metadata_variants\": 1} results_state=ready`; and `negative missing-value token {\"eligible\": -1, ...} results_state=ready`.",
+      "failure_scenario": "A section publishes candidate counts 45 and 30, blank 3 and null 2, with attendance 80. Repeating those four records produces 160 ballots and doubled candidate votes while attendance remains 80. The section is ready, its votes enter the published restricted vote tables, and harmonized units can be marked comparable.",
+      "falsification": "Run the saved probe. Add assertions that identical retransmissions retain 80 ballots, contradictory records become unavailable, and negative counts cannot become ready. To measure existing-release impact, an authorized operator would need to query duplicate section/type/number records and category/attendance discrepancies in the frozen BWEB inputs.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P5-02",
+      "severity": "critical",
+      "category": "reproducibility",
+      "title": "Section-table inputs can change while retaining the original provenance hashes",
+      "location": [
+        "election_audit/section_table.py:112",
+        "election_audit/section_table.py:186",
+        "election_audit/section_table.py:197"
+      ],
+      "claim": "Section-table input validation checks archive size but never compares its actual SHA-256 with the manifest digest. It records the manifest digest as provenance even when it processes different bytes.",
+      "evidence": "At :112–116: `if status != \"complete\" or not digest_: ...`; `if (root / path).stat().st_size != size: ...`; `found.append({\"path\": path, \"sha256\": digest_, \"bytes\": size, \"match\": match})`. At :186–188 the archive is opened and streamed directly; :197 returns the recorded path/hash/size. The saved probe replaced a valid ZIP containing 10 votes with an equal-sized valid ZIP containing 90 votes, preserving the original manifest. Output: `valid altered ZIP loaded nominal=90 provenance_claims_original_hash=True actual_hash_matches_pin=False`.",
+      "failure_scenario": "After acquisition verification, a BWEB archive is replaced by a valid equal-sized archive with changed counts and valid ZIP CRCs. Section-table processing accepts the replacement and publishes derived values while claiming the original archive's SHA-256.",
+      "falsification": "Run `.venv/bin/python review-scratch/codex_p5_probe.py`. The valid altered ZIP must be rejected before CSV processing. Check that the hashes recorded in the final binding describe the bytes actually consumed.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P5-03",
+      "severity": "critical",
+      "category": "bug",
+      "title": "Normalized round comparison counts one principal repeatedly across snapshots",
+      "location": [
+        "election_audit/electoral_results.py:223",
+        "election_audit/electoral_results.py:687",
+        "election_audit/electoral_results.py:735"
+      ],
+      "claim": "The overlap check treats different snapshots of the same principal as disjoint populations, but round aggregation combines those memberships by election. Consequently, valid canonical results from two snapshots can count the same electorate and votes twice in one round.",
+      "evidence": "At :223–227 the disjointness key is `(policy[\"harmonization_policy\"], member[\"snapshot_id\"], member[\"principal_section_id\"])`. At :687–691 memberships are appended to `groups[election]`. At :735–750 every membership supplies a result and `sum(r[\"totals\"][field] for r in present)` aggregates them. The saved probe supplied two individually reconciled runoff snapshots of the same principal, plus one first-round result. Output: `duplicate principal across snapshots {\"availability\": \"comparable\", \"electorate_difference\": 20, \"whole_principals\": [1, 2]}`.",
+      "failure_scenario": "Both rounds have the same principal with 20 electors. A normalized harmonized population includes its first-round snapshot and two runoff observations. The comparison reports runoff electorate 40, an electorate increase of 20 and doubled runoff candidate totals, with availability comparable.",
+      "falsification": "Run the saved probe. Require rejection of repeated election/principal populations across snapshots, or select one coherent snapshot per round before aggregation. The synthetic comparison must not report an electorate increase.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P5-04",
+      "severity": "high",
+      "category": "vacuous-check",
+      "title": "Unknown and malformed compositions become apparently complete principal-only populations",
+      "location": [
+        "election_audit/section_table.py:264",
+        "election_audit/section_table.py:952",
+        "election_audit/section_table.py:975"
+      ],
+      "claim": "Composition parsing falls back to the principal alone, but marks composition unknown only when the original token is Python None. Explicit unknown tokens and malformed compositions therefore become composition=bweb and can yield ready covariates despite omitted members.",
+      "evidence": "At :264–271: `members = verified_member_sections(...)`; `except ValueError: members, errors = [], errors + 1`; `if not members: members = [section]`; `rows.append((uf, municipality, zone, section, member, raw is None))`. At :952: `row[\"composition\"] = \"unknown\" if unknown_composition or result is None else \"bweb\"`. At :975–982 profile completeness tests only the fallback member list. Probe output: `composition #NE# errors= 0 members= [('0070', '0070', False)]` and `composition propagated #NE# composition=bweb profile_state=ready`; malformed `bad/composition` likewise propagated as bweb/ready despite errors=1.",
+      "failure_scenario": "A principal has aggregated members, but its composition token is unknown or malformed. The build retains only the principal, sums only its profile and marks that partial profile ready. Missing membership can also split the cross-round unit incorrectly. The documented aggregate error count does not communicate this per-section false availability, and explicit unknown tokens are not counted as errors at all.",
+      "falsification": "Run the saved probe for #NE# and malformed composition. Assert composition remains unknown and profile/crosswalk completeness is unavailable until membership is established; retaining the certain principal must not imply a complete population.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P5-05",
+      "severity": "high",
+      "category": "unstated-assumption",
+      "title": "Cross-round comparability does not require matching registered-section populations",
+      "location": [
+        "election_audit/section_table.py:1157",
+        "election_audit/section_table.py:1164"
+      ],
+      "claim": "The section-table crosswalk marks a connected component comparable whenever both rounds contain ready principals, without checking whether its registered members are represented in both rounds. It therefore assumes population continuity even when the supplied compositions explicitly lose a member.",
+      "evidence": "At :1157–1165: `if not unit[\"principals_r1\"] or not unit[\"principals_r2\"]: kind = \"one_round_only\"`; otherwise identical single principal keys produce `same_principal`; `unit[\"comparable\"] = kind != \"one_round_only\" and all(sections[(r, *k)][\"results_state\"] == \"ready\" ...)`. The saved probe used round-1 principal 0070 with members [0070,0071] and round-2 principal 0070 with member [0070]. Output: `lost round-2 member {\"members_json\": \"[\\\"0070\\\", \\\"0071\\\"]\", \"principals_r1_json\": \"[\\\"0070\\\"]\", \"principals_r2_json\": \"[\\\"0070\\\"]\", \"kind\": \"same_principal\", \"comparable\": true}`.",
+      "failure_scenario": "Section 0071 contributes voters to principal 0070 in round 1 and is absent from the round-2 population. Both principal results are ready. The unit is still comparable and classified same_principal, although one round's totals cover an additional registered section. A missing or transferred population can then appear as a turnout or vote-share change.",
+      "falsification": "Run the saved probe and require per-round member coverage to agree, or require explicit evidence resolving the difference before comparability. An authorized audit of existing units would compare the union of represented members separately for each round.",
+      "confidence": "high",
+      "speculative": false
+    },
+    {
+      "local_id": "codex-P5-06",
+      "severity": "medium",
+      "category": "vacuous-check",
+      "title": "Missing final-totalization status disappears from the non-final count",
+      "location": [
+        "election_audit/results_hierarchy.py:174",
+        "election_audit/results_hierarchy.py:246"
+      ],
+      "claim": "A unified result file without tf is accepted and stored with a null totalization status. SQL excludes that null from unified_not_final, allowing the summary to report zero non-final files despite an unknown status.",
+      "evidence": "At :174 the stored status is `value.get(\"tf\")`. At :246–248: `SELECT count(*) FROM files WHERE kind='unified' AND totalization_final!='s'`. The saved probe fetched the synthetic hierarchy through an injected offline getter, removing tf from one municipal result. Output: `missing totalization final status unified_not_final=0`.",
+      "failure_scenario": "An otherwise valid municipal EA20 body lacks its final-totalization field. Fetch finishes successfully and reports unified_not_final=0, making an incomplete status ledger indistinguishable from an entirely final hierarchy through that summary.",
+      "falsification": "Run the saved probe. A missing tf must either reject the body or contribute to a separately reported unknown/non-final count. Test null alongside the existing explicit tf='n' test.",
+      "confidence": "high",
+      "speculative": false
+    }
+  ],
+  "responses": []
+}

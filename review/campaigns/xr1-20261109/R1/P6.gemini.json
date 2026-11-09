@@ -1,0 +1,89 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [
+    {
+      "category": "leakage",
+      "claim": "select_sample filters exclusions strictly by geographic section key and ignores content SHA-256 hashes, allowing logs identical to withheld protected observations to be sampled and opened in development benchmarks.",
+      "confidence": "high",
+      "evidence": "election_audit/national_benchmark.py:200-206:\n```python\nif excluded is not None:\n    db.execute(\n        \"CREATE TEMP TABLE excluded(uf TEXT,municipality TEXT,zone TEXT,section TEXT,PRIMARY KEY(uf,municipality,zone,section))\"\n    )\n    db.executemany(\n        \"INSERT OR IGNORE INTO excluded VALUES(?,?,?,?)\", excluded[\"section_keys\"]\n    )\n    eligible = \"(SELECT r.* FROM ranked r WHERE NOT EXISTS(SELECT 1 FROM excluded e WHERE e.uf=r.uf AND e.municipality=r.municipality AND e.zone=r.zone AND e.section=r.section))\"\n```\nProbe output:\n`ALIAS {\"excluded_section\": \"0002\", \"selected_sections\": [\"0001\"], \"processed_protected_sha\": true, \"events\": 1}`",
+      "failure_scenario": "A log object is shared between protected section 0002 and non-excluded section 0001 (e.g. reused urn or duplicated log across sections). Because only section 0002 is listed in exclusions['section_keys'], select_sample treats section 0001 as eligible. run_compact_sample then opens, parses, and benchmarks the protected content body, violating the invariant that protected test population bodies must remain unopened.",
+      "falsification": "Run select_sample on a profile containing two sections with identical content hash where one section is in exclusions.json. Verify if the shared content SHA-256 is selected in sample['units'].",
+      "local_id": "gemini-P6-01",
+      "location": [
+        "election_audit/national_benchmark.py:200-206"
+      ],
+      "severity": "critical",
+      "speculative": false,
+      "title": "national_benchmark.select_sample fails to exclude content aliases of protected observations"
+    },
+    {
+      "category": "bug",
+      "claim": "publish_release reserves analytical output allowance in work.sqlite before writing Parquet parts without rolling back or releasing the reservation on error, permanently blocking retries with IntegrityError or false budget exhaustion.",
+      "confidence": "high",
+      "evidence": "election_audit/national_summary_release.py:149-156:\n```python\nbudget.execute(\n    \"UPDATE metadata SET value=CAST(value AS INTEGER)+? WHERE key='released_bytes'\",\n    (allowance,),\n)\nbudget.execute(\n    \"INSERT INTO analysis_reservations VALUES(?,?,NULL,'reserved')\",\n    (str(output), allowance),\n)\nbudget.commit()\n```\nelection_audit/national_summary_release.py:481-484:\n```python\nexcept BaseException:\n    # Retain unpublished diagnostics; no success manifest/destination exists.\n    raise\n```\nProbe execution:\n`FIRST OSError synthetic interruption during export`\n`RETRY OSError Combined recovery/analysis output budget exhausted`",
+      "failure_scenario": "If publication fails midway (e.g., disk full, SIGTERM, crash in Parquet writer), released_bytes remains incremented and analysis_reservations retains an unfinalized 'reserved' record for output. Retrying publish_release either fails due to allowance < 1024**2 or crashes with sqlite3.IntegrityError: UNIQUE constraint failed: analysis_reservations.output.",
+      "falsification": "Simulate an exception inside ParquetWriter during publish_release, catch it, and attempt to call publish_release again on the same store and output path.",
+      "local_id": "gemini-P6-02",
+      "location": [
+        "election_audit/national_summary_release.py:149-156",
+        "election_audit/national_summary_release.py:481-484"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Failed or interrupted analytical release publication permanently breaks retry in national_summary_release"
+    },
+    {
+      "category": "bug",
+      "claim": "publish_release computes release ID solely from input shard names, parse ID, resource config, and release format string, omitting mart generator logic, code versions, and library versions.",
+      "confidence": "high",
+      "evidence": "election_audit/publication.py:345-358:\n```python\ninputs = {\n    \"version\": VERSION,\n    \"shards\": [p.name for p in shards],\n    \"parse_id\": next(iter(parse_ids)),\n    \"config\": asdict(config),\n}\nkey = digest(inputs)\ntarget = parent / key\nif target.exists():\n    inspect_release(target)\n    _point_current(store, key)\n    return target\n```\nProbe output:\n`IDENTITY {\"same_release_id\": true, \"different_mart_digest\": true, \"first_valid\": \"passed\", \"second_valid\": \"passed\", \"old_release_reused_after_rule_change\": true}`",
+      "failure_scenario": "A bug fix or methodological update is applied to operational_marts.py (e.g. changing coverage rules or late voting thresholds). Because inputs does not incorporate the code hash, publishing to an existing warehouse reuses the old release. In a fresh warehouse, the new release receives the identical release ID as the old release despite having differing tables and logical digests.",
+      "falsification": "Publish a release from a reconstruction shard. Modify an operational mart generation rule in operational_marts.py and publish to a new store. Compare the generated release IDs and table logical SHA-256 digests.",
+      "local_id": "gemini-P6-03",
+      "location": [
+        "election_audit/publication.py:345-358"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Release ID digest ignores mart generation logic and code versions, causing stale reuse and identical IDs for divergent releases"
+    },
+    {
+      "category": "threat-to-validity",
+      "claim": "publication.publish_release sets cross_shard_overlap to len(shards) > 1, causing late_voting to inject a blocker and redact all classifiable voting cycle metrics to None across every session whenever data is partitioned into multiple shards.",
+      "confidence": "high",
+      "evidence": "election_audit/publication.py:479:\n```python\nmaterialize_marts(connection, context, objects, shards, cross_shard_overlap=len(shards) > 1)\n```\nelection_audit/operational_marts.py:168-169:\n```python\nif cross_shard_overlap:\n    blockers.append(\"cross_shard_overlap_unresolved\")\n```\nelection_audit/operational_marts.py:251-264:\n```python\n\"classifiable_completed_cycles\": classifiable if eligible else None,\n\"completed_cycles_after17\": after if eligible else None,\n\"after17_share\": after / classifiable if eligible and classifiable else None,\n\"readiness\": \"unavailable\" if blockers else \"partial\" if unknown else \"ready\",\n```",
+      "failure_scenario": "A release built from two disjoint groups of sections (e.g., two distinct UFs with no replacement urns) has len(shards) == 2. All sessions in late_voting have classifiable_completed_cycles, completed_cycles_after17, and after17_share forced to None, whereas building the identical data as a single shard populates valid numeric values.",
+      "falsification": "Build a release from two objects in one shard vs two shards. Compare the late_voting mart rows to observe whether numbers become None purely as a function of shard count.",
+      "local_id": "gemini-P6-04",
+      "location": [
+        "election_audit/publication.py:479",
+        "election_audit/operational_marts.py:168-169",
+        "election_audit/operational_marts.py:251-264"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Multi-shard partitioning indiscriminately marks all late_voting sessions as unclassifiable regardless of actual overlap"
+    },
+    {
+      "category": "privacy",
+      "claim": "pilot.py extracts fields[0][:10] without validating that the field represents a date, allowing sensitive non-date tokens from malformed or non-standard 6-field log lines to escape into public pilot-results.json while claiming free_text_exported=False.",
+      "confidence": "high",
+      "evidence": "election_audit/pilot.py:210-215:\n```python\nfor line in raw.splitlines():\n    fields = line.decode(\"latin-1\").split(\"\\t\")\n    if len(fields) != 6:\n        counters[\"malformed_shape\"] += 1\n        continue\n    dates[fields[0][:10]] += 1\n```\nelection_audit/pilot.py:236-239:\n```python\n\"naive_device_dates\": dict(dates),\n\"free_text_exported\": False,\n```\nProbe output:\n`PRIVACY {\"naive_device_dates\": {\"ID12345678\": 1, \"25/10/2026\": 1}, \"free_text_exported\": false, \"saved\": true}`",
+      "failure_scenario": "A non-standard or malformed log record with 6 tab-delimited fields contains an operator ID or token in the first column instead of a timestamp. The token prefix is captured in naive_device_dates and published to pilot-results.json despite the assertion that free_text_exported is False.",
+      "falsification": "Process an archive containing a line with 6 fields where field 0 is an operator token with safe_message_review. Verify that the token string appears in naive_device_dates in the returned dictionary.",
+      "local_id": "gemini-P6-05",
+      "location": [
+        "election_audit/pilot.py:210-215",
+        "election_audit/pilot.py:236-239"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "pilot.py safe_message_review extracts arbitrary unvalidated string prefixes into naive_device_dates"
+    }
+  ],
+  "packet": "P6",
+  "responses": [],
+  "reviewer": "gemini",
+  "round": "R1",
+  "summary": "Independent review for Packet P6 (national processing, releases, and reproduction). Identified 5 findings across the processing and release stack: (1) critical leakage in national_benchmark.select_sample bypassing content exclusions for identical content aliases; (2) high-severity failure in national_summary_release where interrupted analytical publication permanently corrupts quota reservations in work.sqlite and prevents retry; (3) high-severity release identity flaw where publish_release ignores mart generation rules and code versions, causing stale reuse and identical release IDs for differing outputs; (4) medium-severity threat to validity where multi-shard partitioning indiscriminately suppresses all classifiable metrics in late_voting; and (5) medium-severity privacy leak in pilot.py safe_message_review which extracts raw string slices into naive_device_dates without date format validation while claiming free_text_exported=False."
+}

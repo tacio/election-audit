@@ -1,0 +1,111 @@
+{
+  "commit": "1801029bdc0434a94ddf6670a1014f2d284df452",
+  "findings": [
+    {
+      "category": "bug",
+      "claim": "When a completion event occurs without an active authorization, pending cycle state is not reset, allowing manual request and interruption flags to leak into and contaminate the subsequent voter's authorization method and duration readiness.",
+      "confidence": "high",
+      "evidence": "election_audit/semantic_pass.py:733-740:\n        elif kind == \"completion\":\n            if pending and pending[\"authorized\"]:\n                self._finish_cycle(\"completed\")\n                self.segment_completions += 1\n                session[\"_completions\"].append(reading)\n                session[\"completions_by_reading_hour\"][(reading % 86400) // 3600] += 1\n            else:\n                session[\"orphan_completions\"] += 1\n\nelection_audit/operational_review.py:560-563:\n            elif kind == \"completion\":\n                if pending and pending[\"authorized\"]:\n                    finish_cycle(\"completed\", event)\n                else:\n                    counts[\"orphan_completions\"] += 1\n\nProbe: .venv/bin/python review-scratch/gemini_p2_probes.py GeminiP2Tests.test_finding_01_orphan_completion_state_leakage\nOutput: OK (biometric voter recorded as cycles_completed_manual: 1, cycles_completed_biometric: 0)",
+      "failure_scenario": "A manual request is initiated and poll-worker authorization occurs, but an orphan completion event arrives before the voter is enabled. orphan_completions increments, but pending remains open with manual_request=True and operator=True. When the next voter authenticates via biometrics and completes their vote, pending['method'] is overwritten as 'manual', reporting cycles_completed_manual: 1 and cycles_completed_biometric: 0.",
+      "falsification": "Run a unit test injecting an orphan completion between a manual request and a biometric vote cycle; verify whether pending is reset to None or if the biometric vote is recorded under cycles_completed_biometric.",
+      "local_id": "gemini-P2-01",
+      "location": [
+        "election_audit/semantic_pass.py:739",
+        "election_audit/operational_review.py:562"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Dangling pending cycle state after un-authorized completion corrupts subsequent voter authorization method"
+    },
+    {
+      "category": "bug",
+      "claim": "Voting cycle tracking strictly requires the reading timestamp to fall on election day on every event; any voting or closing events occurring after midnight (00:00:00) leave in-flight cycles unresolved, drop subsequent votes, ignore session closing, and yield negative active durations in section_table.",
+      "confidence": "high",
+      "evidence": "election_audit/semantic_pass.py:564, 683-690:\n        on_day = self.election_seconds <= reading < self.election_seconds + 86400\n...\n        active = (\n            session is not None\n            and session[\"session_kind\"] == \"official_vota\"\n            and self.software\n            and on_day\n            and application == \"VOTA\"\n        )\n        if not active:\n            return\n\nelection_audit/section_table.py:538-539:\ndef _seconds(reading: str) -> int:\n    \"\"\"Seconds of day for an ISO reading (sessions never cross midnight once on-day).\"\"\"\n    return int(reading[11:13]) * 3600 + int(reading[14:16]) * 60 + int(reading[17:19])\n\nProbe: .venv/bin/python review-scratch/gemini_p2_probes.py GeminiP2Tests.test_finding_02_midnight_rollover_vote_loss\nOutput: OK (Cycle 2 unresolved, Cycle 3 dropped completely, closing_reading None)",
+      "failure_scenario": "Queues or delays cause voting to extend past midnight into Monday. A cycle authorized at 23:59:50 and completed at 00:00:10 has its completion discarded because on_day is False, finalizing the cycle as unresolved at stream end. A subsequent vote at 00:05:00 is ignored completely. Urn closing at 00:10:00 is skipped, leaving closing_reading None, and section_table._seconds() computes negative active duration across midnight.",
+      "falsification": "Process an official session containing events after 23:59:59 on election day; check whether post-midnight votes are tallied as completed official cycles or dropped from the session.",
+      "local_id": "gemini-P2-02",
+      "location": [
+        "election_audit/semantic_pass.py:564",
+        "election_audit/semantic_pass.py:686",
+        "election_audit/operational_review.py:488",
+        "election_audit/section_table.py:538"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "Strict election-day reading check drops votes, leaves cycles unresolved, and ignores closing across midnight"
+    },
+    {
+      "category": "vacuous-check",
+      "claim": "The parser checks an exact string match for supported_software before activating vote processing; an urn running a patched or regional build string is marked official_vota with status 'complete' and error None, but silently drops 100% of vote cycles.",
+      "confidence": "high",
+      "evidence": "election_audit/semantic_pass.py:680-688:\n        if kind == \"supported_software\" and session is not None:\n            self.software, session[\"software_supported\"] = True, True\n        active = (\n            session is not None\n            and session[\"session_kind\"] == \"official_vota\"\n            and self.software\n            and on_day\n            and application == \"VOTA\"\n        )\n        if not active:\n            return\n\nProbe: .venv/bin/python review-scratch/gemini_p2_probes.py GeminiP2Tests.test_finding_03_software_version_silent_zero\nOutput: OK (session_kind=official_vota, software_supported=False, cycles_completed_biometric=0)",
+      "failure_scenario": "An urn runs a hotfix build 'Versão da aplicação: 10.23.0.1 - Praia da Barra do Cahy'. The session begins as official_vota because GAP and VOTA round start markers match. Because the software string does not exactly equal the pinned 10.23.0.0 template, self.software remains False. All voting events are skipped, objects.parquet reports status 'complete' with error None and 1 official session, but all vote cycles are silently zeroed.",
+      "falsification": "Process a log with software version 10.23.0.1 and valid vote cycles; check if the pipeline fails, flags an error, or silently outputs an official session with 0 completed votes.",
+      "local_id": "gemini-P2-03",
+      "location": [
+        "election_audit/semantic_pass.py:681",
+        "election_audit/semantic_pass.py:685",
+        "election_audit/operational_review.py:153",
+        "election_audit/operational_review.py:487"
+      ],
+      "severity": "critical",
+      "speculative": false,
+      "title": "Exact string check on application software version silently zeroes official session vote cycles"
+    },
+    {
+      "category": "threat-to-validity",
+      "claim": "The publication manifest binds rules_sha256 to real-log-rules.json, but for 2026 the session start, official round, supported software, and operator authorization markers are hardcoded in operational_review.py rather than in the rules file, decoupling execution from the recorded hash.",
+      "confidence": "high",
+      "evidence": "election_audit/operational_review.py:42-52:\n# The 2026 rules predate per-year templates; their markers stay here so the reviewed\n# 2026 rules file, and every binding that hashes it, is unchanged.\nTEMPLATES_2026 = {\n    \"official_round\": {\n        \"1\": \"Iniciando aplicação - ELEIÇÃO OFICIAL PRIMEIRO TURNO - 1º turno\",\n        \"2\": \"Iniciando aplicação - ELEIÇÃO OFICIAL SEGUNDO TURNO - 2º turno\",\n    },\n    \"session_start\": {\"1\": \"Iniciando aplicação - 1º turno\", \"2\": \"Iniciando aplicação - 2º turno\"},\n    \"supported_software\": \"Versão da aplicação: 10.23.0.0 - Praia da Barra do Cahy\",\n    \"operator_authorized\": r\"Mesário [0-9]{1,32} habilitou o eleitor\",\n}\n\nelection_audit/semantic_pass.py:1002-1003:\ndef _rules_sha(year: int) -> str:\n    return hashlib.sha256(json.dumps(rules_for(year), sort_keys=True).encode()).hexdigest()",
+      "failure_scenario": "A maintainer alters TEMPLATES_2026 in operational_review.py (e.g. changing the operator authorization regex or software name). When semantic-pass run executes, _rules_sha(2026) hashes real-log-rules.json, which does not contain TEMPLATES_2026, and produces the unchanged hash. Downstream verifiers comparing rules_sha256 cannot detect that operational session and authorization rules were altered.",
+      "falsification": "Verify that templates is absent from election_audit/resources/real-log-rules.json, and check whether changing TEMPLATES_2026 in operational_review.py alters _rules_sha(2026).",
+      "local_id": "gemini-P2-04",
+      "location": [
+        "election_audit/operational_review.py:44",
+        "election_audit/semantic_pass.py:1003",
+        "election_audit/resources/real-log-rules.json:1"
+      ],
+      "severity": "high",
+      "speculative": false,
+      "title": "2026 operational templates hardcoded in Python decouple execution from rules_sha256 publication binding"
+    },
+    {
+      "category": "bug",
+      "claim": "operational_review identifies copy candidates using strict equality on cumulative stream events and whole-stream fingerprints; when memory copies end at different lines, copy candidate detection returns zero candidates.",
+      "confidence": "high",
+      "evidence": "election_audit/operational_review.py:578-581:\n        db.execute(\n            \"INSERT INTO copy_candidate SELECT a.stream,b.stream,a.fingerprint FROM stream_fingerprint a JOIN stream_fingerprint b ON a.fingerprint=b.fingerprint AND a.events=b.events WHERE a.stream<b.stream AND a.events>=2\"\n        )\n        duplicate_count = db.execute(\"SELECT count(*) FROM copy_candidate\").fetchone()[0]\n\nProbe: .venv/bin/python review-scratch/gemini_p2_probes.py GeminiP2Tests.test_finding_05_copy_candidate_equality_misses_truncated_streams\nOutput: OK (candidates count is 0 when one stream has 1 extra event)",
+      "failure_scenario": "An urn package contains an internal memory copy (MI) and an external memory copy (ME). The ME copy ends a few lines earlier due to power-down sequence differences (as observed in O16). Because a.events != b.events and the stream-level fingerprints differ, the SQL join fails to match them, and operational_review reports copy_candidates: 0.",
+      "falsification": "Run review_object on an archive containing two streams where stream 2 is a strict prefix of stream 1; check whether review.sqlite records any copy_candidate row.",
+      "local_id": "gemini-P2-05",
+      "location": [
+        "election_audit/operational_review.py:579",
+        "election_audit/operational_review.py:673"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Stream fingerprint equality in operational_review fails to detect truncated memory copy candidates"
+    },
+    {
+      "category": "threat-to-validity",
+      "claim": "classify() only maps VOTA start messages matching official round start strings; a training or test application started in VOTA without a GAP restart returns unknown, leaving the official session active and allowing test votes to be counted as official completed votes.",
+      "confidence": "high",
+      "evidence": "election_audit/operational_review.py:151-160:\n    if message in starts:\n        return \"session_start\", starts[message]\n    if message == software:\n        return \"supported_software\", None\n...\n    return \"unknown\", None\n\nelection_audit/semantic_pass.py:565-568:\n        if kind == \"session_start\":\n            self._finish_session(\"application_restart\")\n\nProbe: .venv/bin/python review-scratch/gemini_p2_probes.py GeminiP2Tests.test_finding_06_non_round_vota_start_counted_as_official\nOutput: OK (1 official vote + 1 training vote -> 2 completed biometric votes in official session)",
+      "failure_scenario": "An urn performs official voting followed by a training or post-closing simulation in VOTA on election day without an intervening GAP restart. VOTA's 'Iniciando aplicação - Treinamento' is treated as 'unknown', so _finish_session is never called. Standard voting messages within the simulation are tallied directly into the official session's completed cycle counts.",
+      "falsification": "Feed a log where an official session is followed by VOTA: 'Iniciando aplicação - Treinamento' and a vote cycle; verify whether the session is closed or if the test vote increments cycles_completed_*.",
+      "local_id": "gemini-P2-06",
+      "location": [
+        "election_audit/operational_review.py:151",
+        "election_audit/semantic_pass.py:565"
+      ],
+      "severity": "medium",
+      "speculative": false,
+      "title": "Unmapped VOTA start messages leave official session open, counting subsequent test votes as official"
+    }
+  ],
+  "packet": "P2",
+  "responses": [],
+  "reviewer": "gemini",
+  "round": "R1",
+  "summary": "Review of Campaign xr1-20261109 Round R1 Packet P2 (parsing and log semantics). Conducted adversarial audit of archive_parsing.py, reconstruction.py, operational_review.py, semantic_pass.py, sa_logs.py, round1_prefix.py, and real-log-rules*.json. Identified 6 findings: (1) state leakage in semantic_pass and operational_review where orphan completions fail to clear pending cycle state, corrupting subsequent voter authorization methods; (2) strict calendar-day enforcement dropping in-flight and subsequent vote cycles across midnight rollover; (3) exact software version string matching causing official sessions to silently drop 100% of vote cycles without error on variant builds; (4) 2026 operational templates hardcoded in Python code rather than in real-log-rules.json, decoupling execution from the published rules_sha256 binding; (5) copy_candidate stream fingerprint equality failing to detect truncated memory copies ending at different line counts; and (6) unmapped VOTA session start messages failing to close official sessions, allowing training votes to be tallied as official votes."
+}
