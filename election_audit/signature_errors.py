@@ -21,8 +21,12 @@ blocks of each section's log:
   voter's cycle in flight, whose completion line follows the error, as read in the two such
   logs of 2026.
 
-Errors outside a session (start-up) have no session to continue: they are counted, with the
-votes the urn recorded afterwards in the block and in later official blocks of the stream.
+- E3: after any error, no vote cycle (beyond the one in flight after a signing error) is
+  completed in the urn's stream before GAP starts an application again, which repeats the
+  start-up checks. The markers do not show restarts (a block is a context, not a boot), so
+  each object holding an error is reread from its staged copy to find them.
+
+Votes later in the block and in later official blocks are counted as ``votes_later``.
 Copies of one block in both memories count once (device, block start, template, rank in
 block), keeping the largest counts. Errors in other contexts (preparation, tests, the other
 round's blocks) are counted in the summary only.
@@ -42,12 +46,15 @@ from election_audit import integrity_checks as ic
 from election_audit.national_migration import atomic, sha
 from election_audit.types import JSON, Row
 
-VERSION = "integrity-signature-errors-v1"
+VERSION = "integrity-signature-errors-v2"  # v2: restart evidence read from the logs (E3)
 SEMANTIC_VERSION = "session-aggregates-v5"
 RULES = {
     "E1": "no vote cycle completed in the same session after a verification error",
     "E2": "at most one vote cycle (the one in flight) completed in the same session after a "
     "signing error",
+    "E3": "after an error, no vote cycle (one in flight after a signing error) completed in "
+    "its urn's stream before GAP started an application again, which repeats the start-up "
+    "checks",
 }
 VERIFICATION = re.compile(r"verifica|valida")
 MARKER_SQL = """
@@ -78,7 +85,10 @@ SECTION_SCHEMA = pa.schema(
         ("signing_errors", pa.int32()),
         ("votes_same_session_after_verification", pa.int32()),  # max over errors
         ("votes_same_session_after_signing", pa.int32()),  # max over errors
-        ("votes_after_restart", pa.int32()),  # max over errors
+        ("votes_later", pa.int32()),  # max over errors: rest of the block and later blocks
+        ("votes_without_restart_after_verification", pa.int32()),  # max over errors
+        ("votes_without_restart_after_signing", pa.int32()),  # max over errors
+        ("restart_unavailable", pa.int32()),  # errors whose object could not be reread
         ("inconsistent_counts", pa.int32()),
         ("failed_json", pa.string()),
     ]
@@ -95,7 +105,9 @@ ERROR_SCHEMA = pa.schema(
         ("in_session", pa.bool_()),
         ("votes_before", pa.int32()),  # earlier in the block
         ("votes_same_session", pa.int32()),  # null outside a session
-        ("votes_after_restart", pa.int32()),
+        ("votes_later", pa.int32()),
+        ("votes_without_restart", pa.int32()),  # before the stream's next GAP start
+        ("restart_line", pa.int64()),  # that GAP start's line; null when none follows
     ]
 )
 
@@ -142,9 +154,59 @@ def error_counts(m: Row, sessions: Sequence[Row], round_number: int) -> Row:
         "in_session": m["session_ordinal"] is not None,
         "votes_before": m["completions_before"],
         "votes_same_session": same,
-        "votes_after_restart": after_block - (same or 0) + later,
+        "votes_later": after_block - (same or 0) + later,
+        "votes_without_restart": m.get("votes_without_restart"),
+        "restart_line": m.get("restart_line"),
         "inconsistent": after_block < 0 or (same is not None and same < 0),
     }
+
+
+def restart_evidence(source: bytes, errors: Sequence[Row]) -> dict[tuple[int, int], Row]:
+    """Per error (stream, line): votes completed before its stream's next GAP start, and its line.
+
+    Lines and streams are numbered as the semantic pass numbers them (every line counts; a
+    stream is a run of well-formed lines with one member path and device), so a marker's line
+    finds its place. A GAP application start makes the urn repeat its start-up checks; votes
+    completed before one were cast without them (xr1-20261109-P4-03).
+    """
+    from election_audit.operational_review import RULES as LOG_RULES
+    from election_audit.operational_review import classify
+    from election_audit.semantic_pass import log_members, reading_seconds
+
+    events: dict[int, list[tuple[int, str]]] = defaultdict(list)
+    total, stream, key = 0, -1, None
+    for segments, body in log_members(source):
+        parts = body.split(b"\n")
+        last = parts.pop()
+        for line in [x + b"\n" for x in parts] + ([last] if last else []):
+            total += 1
+            fields = line.decode("latin-1").rstrip("\r\n").split("\t")
+            if len(fields) != 6 or reading_seconds(fields[0]) is None:
+                continue
+            if (segments, fields[2]) != key:
+                key, stream = (segments, fields[2]), stream + 1
+            application, message = fields[3], fields[4]
+            if application == "GAP" and message.startswith("Iniciando aplicação"):
+                events[stream].append((total, "restart"))
+            elif application == "VOTA" and classify(application, message, LOG_RULES)[0] == (
+                "completion"
+            ):
+                events[stream].append((total, "completion"))
+    found = {}
+    for e in errors:
+        votes, restart = 0, None
+        for number, kind in events.get(e["stream_ordinal"], ()):
+            if number <= e["line"]:
+                continue
+            if kind == "restart":
+                restart = number
+                break
+            votes += 1
+        found[(e["stream_ordinal"], e["line"])] = {
+            "votes_without_restart": votes,
+            "restart_line": restart,
+        }
+    return found
 
 
 def section_rules(markers: Sequence[Row], sessions: Sequence[Row], round_number: int) -> JSON:
@@ -160,7 +222,8 @@ def section_rules(markers: Sequence[Row], sessions: Sequence[Row], round_number:
         if kept is None:
             distinct[key] = counts
             continue
-        for name in ("votes_same_session", "votes_after_restart"):  # a shorter copy counts less
+        for name in ("votes_same_session", "votes_later", "votes_without_restart"):
+            # a shorter copy counts less
             if (counts[name] or 0) > (kept[name] or 0):
                 kept[name] = counts[name]
         kept["inconsistent"] = kept["inconsistent"] or counts["inconsistent"]
@@ -172,11 +235,15 @@ def section_rules(markers: Sequence[Row], sessions: Sequence[Row], round_number:
 
     same_verification = most("verification", "votes_same_session")
     same_signing = most("signing", "votes_same_session")
+    unrestarted_verification = most("verification", "votes_without_restart")
+    unrestarted_signing = most("signing", "votes_without_restart")
     failed = []
     if same_verification:
         failed.append("E1")
     if same_signing and same_signing > 1:
         failed.append("E2")
+    if unrestarted_verification or (unrestarted_signing and unrestarted_signing > 1):
+        failed.append("E3")
     return {
         "errors": errors,
         "row": {
@@ -184,7 +251,10 @@ def section_rules(markers: Sequence[Row], sessions: Sequence[Row], round_number:
             "signing_errors": sum(e["class"] == "signing" for e in errors),
             "votes_same_session_after_verification": same_verification,
             "votes_same_session_after_signing": same_signing,
-            "votes_after_restart": most(None, "votes_after_restart"),
+            "votes_later": most(None, "votes_later"),
+            "votes_without_restart_after_verification": unrestarted_verification,
+            "votes_without_restart_after_signing": unrestarted_signing,
+            "restart_unavailable": sum(e["votes_without_restart"] is None for e in errors),
             "inconsistent_counts": sum(e["inconsistent"] for e in errors),
             "failed_json": json.dumps(failed, separators=(",", ":")),
         },
@@ -228,6 +298,8 @@ def run_signature_errors(
         "copies": "an error copied across memories of one urn (same device, block start, "
         "template and rank in block) counts once, with its largest counts",
         "protected": "sections without a semantic-pass object are unavailable, never read",
+        "restart": "objects holding an official-round error are reread from the staged copy, "
+        "checked against their certified hash, to find the stream's next GAP start",
     }
     output.mkdir(parents=True)
     atomic(output / "binding.json", binding)
@@ -243,6 +315,30 @@ def run_signature_errors(
     by_object: dict[str, list[Row]] = defaultdict(list)
     for m in markers:
         by_object[m["object_sha256"]].append(m)
+    from election_audit.round1_prefix import _staged_root, read_object
+
+    staged, _ = _staged_root(semantic.parent)
+    paths = {
+        o["object_sha256"]: o["path"]
+        for o in pq.read_table(
+            semantic / "objects.parquet", columns=["object_sha256", "path"]
+        ).to_pylist()
+        if o["object_sha256"] in by_object
+    }
+    context = f"official_round_{round_number}"
+    reread = Counter()
+    for digest, found in by_object.items():
+        wanted = [m for m in found if m["context"] == context]
+        if not wanted:
+            continue
+        try:
+            evidence = restart_evidence(read_object(staged, paths[digest], digest), wanted)
+        except OSError, KeyError, ValueError:  # the object stays unavailable, never zero
+            reread["unavailable"] += 1
+            continue
+        reread["read"] += 1
+        for m in wanted:
+            m.update(evidence[(m["stream_ordinal"], m["line"])])
     sessions_by_object: dict[str, list[Row]] = defaultdict(list)
     for s in _query(
         semantic,
@@ -308,9 +404,18 @@ def run_signature_errors(
                 f"{e['class']}:{'session' if e['in_session'] else 'startup'}" for e in error_rows
             )
         ),
-        "errors_followed_by_votes_after_restart": dict(
-            Counter(e["class"] for e in error_rows if e["votes_after_restart"])
+        "errors_followed_by_later_votes": dict(
+            Counter(e["class"] for e in error_rows if e["votes_later"])
         ),
+        "votes_without_restart": dict(
+            Counter(
+                f"{e['class']}:{e['votes_without_restart']}"
+                for e in error_rows
+                if e["votes_without_restart"] is not None
+            )
+        ),
+        "errors_restart_unavailable": sum(e["votes_without_restart"] is None for e in error_rows),
+        "objects_reread": dict(reread),
         "votes_same_session": dict(
             Counter(
                 f"{e['class']}:{e['votes_same_session']}"

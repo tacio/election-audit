@@ -760,7 +760,8 @@ class LogRuleTests(unittest.TestCase):
                 end_reading="2026-10-24T09:10:00",
             ),
         ]
-        self.assertEqual(clock_rules(broken, "2026-10-25"), ["R3", "R4", "R5", "R6"])
+        # By clock the last session is the 11:00 one, which never closed.
+        self.assertEqual(clock_rules(broken, "2026-10-25"), ["R2", "R3", "R4", "R5", "R6"])
         last_open = [
             self.session(),
             self.session(
@@ -771,6 +772,18 @@ class LogRuleTests(unittest.TestCase):
             ),
         ]
         self.assertEqual(clock_rules(last_open, "2026-10-25"), ["R2"])
+        # xr1-20261109-P0-04: the replacement urn's stream is stored first; its later,
+        # unclosed session is still the last one.
+        replaced = [
+            self.session(
+                stream_ordinal=0,
+                start_reading="2026-10-25T13:00:00",
+                end_reading="2026-10-25T17:10:00",
+                closing_reading=None,
+            ),
+            self.session(stream_ordinal=1, end_reading="2026-10-25T12:30:00"),
+        ]
+        self.assertEqual(clock_rules(replaced, "2026-10-25"), ["R2"])
 
     def test_memory_copies_of_a_session_count_once(self) -> None:
         import pyarrow as pa

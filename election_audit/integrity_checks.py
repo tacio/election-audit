@@ -2149,7 +2149,7 @@ def run_correspondence(
 # --------------------------------------------------------------------------- I5–I7: logs
 
 
-LOGS_VERSION = "integrity-logs-v2"
+LOGS_VERSION = "integrity-logs-v3"  # v3: I7 last session by clock; round-1 files hashed
 CLOCK_RULES = {
     "R1": "at least one official voting session of the round",
     "R2": "the last official session has a closing reading",
@@ -2322,7 +2322,12 @@ def clock_rules(sessions: Sequence[Row], election_date: str) -> list[str]:
     failed = []
     if not sessions:
         return ["R1"]
-    ordered = sorted(sessions, key=lambda s: (s["stream_ordinal"], s["session_ordinal"]))
+    # The last session by urn clock, not by archive order: a replacement urn's stream may be
+    # stored before the replaced urn's (xr1-20261109-P0-04).
+    ordered = sorted(
+        sessions,
+        key=lambda s: (s["start_reading"] or "", s["stream_ordinal"], s["session_ordinal"]),
+    )
     if ordered[-1]["closing_reading"] is None:
         failed.append("R2")
     if any(s["reading_backsteps"] for s in ordered):
@@ -2366,8 +2371,12 @@ def run_logs(
     first = None
     if semantic_round1 is not None:
         first = Path(semantic_round1).expanduser().absolute() / "release"
-        if round_number != 2 or json.loads((first / "manifest.json").read_text())["round"] != 1:
+        first_manifest = json.loads((first / "manifest.json").read_text())
+        if round_number != 2 or first_manifest["round"] != 1:
             raise ValueError("I6 compares a round-2 release with a round-1 release")
+        for name, entry in first_manifest["files"].items():  # xr1-20261109-P4-02
+            if entry["sha256"] != sha(first / name):
+                raise ValueError(f"Round-1 semantic release file changed: {name}")
     binding = {
         "version": LOGS_VERSION,
         "round": round_number,
