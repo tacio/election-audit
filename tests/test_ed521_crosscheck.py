@@ -108,6 +108,17 @@ class CrossCheckTests(unittest.TestCase):
         )
         self.assertEqual(result["matches"], {"ecpy+strict": 2, "strict": 1})
         self.assertEqual([v["matches"] for v in result["vectors"]][1], ["strict"])
+        self.assertEqual(result["ours_failures"], [])
+        self.assertEqual(result["vectors"][1]["ed521rs_ecpy"], True)  # measured, not copied
+        # xr1-20261109-P3-03: a label our verifiers disagree with is now caught.
+        files["edge-cases.json"][1]["strict"] = True
+        (vectors / "edge-cases.json").write_text(json.dumps({"vectors": files["edge-cases.json"]}))
+        wrong = self.cc.run_vectors(
+            self.cc.load_reference(self.reference("agree", AGREEING)), vectors
+        )
+        self.assertEqual(
+            [f["verifier"] for f in wrong["ours_failures"]], ["python", "ed521rs_strict"]
+        )
 
     def test_the_reference_file_is_pinned(self) -> None:
         path = self.reference("agree", AGREEING)

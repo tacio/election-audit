@@ -55,7 +55,7 @@ if TYPE_CHECKING:
 type Verifier = Callable[[bytes, bytes], bool]
 type Entries = Mapping[tuple[str, int], int]
 
-VERSION = "integrity-sections-v4"  # v4: RDV contest blocks are summed
+VERSION = "integrity-sections-v5"  # v5: urn key order checked; I1 and PKI failures are issues
 SHARD_SECTIONS = 250
 MAX_SMALL = 8 * 1024**2  # BU, RDV and signature files are far smaller
 # TSE's official 2026 specifications (resources/tse-format-2026-official.json).
@@ -138,6 +138,7 @@ SECTION_SCHEMA = pa.schema(
         ("i1_lists_agree", pa.bool_()),
         ("i1_detail_json", pa.string()),
         ("i1_signature_math", pa.string()),  # verified | failed | not_verified
+        ("hw_key_small_order", pa.bool_()),  # Ed521 key of order 1, 2 or 4: never trusted
         ("i1_file_signatures_ok", pa.int32()),
         ("i1_file_signatures_failed", pa.int32()),
         # Ed521 signatures (self, files, BU chain) where ECPy's verdict, TSE's reference, differs
@@ -323,7 +324,11 @@ class Ed521Verifier:
     def __init__(self, key: bytes) -> None:
         import ed521rs
 
+        from election_audit import ed521
+
         self.key, self.keys = key, {}
+        # A small-order key verifies a fixed signature for every message: trust none.
+        self.small_order = ed521.small_order(key) is True
         for mode in ("strict", "ecpy"):
             try:
                 self.keys[mode] = ed521rs.VerifyingKey(key, mode=mode)
@@ -333,7 +338,7 @@ class Ed521Verifier:
 
     def _verify(self, mode: str, signature: bytes, message: bytes) -> bool:
         key = self.keys[mode]
-        return key is not None and key.verify(signature, message)
+        return key is not None and not self.small_order and key.verify(signature, message)
 
     def __call__(self, digest_: bytes, signature: bytes) -> bool:
         message = hashlib.sha512(digest_).digest()
@@ -429,6 +434,7 @@ def check_signatures(
         day = datetime.fromisoformat(election_date).replace(tzinfo=UTC)
         valid = certificate_.not_valid_before_utc <= day <= certificate_.not_valid_after_utc
     row.update(
+        hw_key_small_order=verify.small_order if isinstance(verify, Ed521Verifier) else None,
         i1_signature_math=math,
         i1_file_signatures_ok=file_ok if verify else None,
         i1_file_signatures_failed=file_failed if verify else None,
@@ -544,6 +550,37 @@ def _key_of(identification: JSON) -> tuple[str, str, str]:
     )
 
 
+def signature_issues(row: Row, base: Row) -> list[Row]:
+    """I1 file, signature, key and certificate failures, one issue row each (xr1 P0-05).
+
+    The summary counts these statuses too; the issue rows put the failing sections in
+    discrepancies.jsonl beside the other checks. An expired issuing CA is not listed per
+    section: it is one documented fact (observation T2) about every urn that CA certified.
+    """
+    found: list[tuple[str, Any]] = []
+    if row.get("vsc_status") != "decoded":
+        found.append(("vsc", row.get("vsc_status")))
+    else:
+        for field, kind in (
+            ("i1_hash_mismatches", "file_hash_mismatch"),
+            ("i1_published_unlisted", "file_unlisted"),
+            ("i1_file_signatures_failed", "file_signature"),
+        ):
+            if row.get(field):
+                found.append((kind, row[field]))
+        if row.get("i1_signature_math") != "verified":
+            found.append(("self_signature", row.get("i1_signature_math")))
+        if row.get("hw_key_small_order"):
+            found.append(("key_small_order", True))
+        if row.get("cert_valid_at_election") is False:
+            found.append(("certificate_not_valid_at_election", False))
+        if row.get("pki_issuer_signature") not in (None, "verified"):
+            found.append(("certificate_issuer", row["pki_issuer_signature"]))
+        if row.get("pki_revoked"):
+            found.append(("certificate_revoked", True))
+    return [{"check": "I1", "kind": kind, **base, "value": value} for kind, value in found]
+
+
 def check_section(
     item: Row,
     blobs: Mapping[str, bytes],
@@ -577,6 +614,7 @@ def check_section(
             row.update(vsc_status="error", vsc_error=f"{type(exc).__name__}: {exc}"[:300])
     else:
         row["vsc_status"] = "missing"
+    issues.extend(signature_issues(row, base))
     bu = rdv = None
     if "bu" in blobs:
         try:
@@ -2556,6 +2594,13 @@ def integrity_check_main(argv: Argv = None) -> int:
     cross.add_argument("--uf", action="append", help="Restrict to UF (repeatable; lower case).")
     cross.add_argument("--limit", type=int, help="Process at most this many sections.")
     cross.add_argument("--resume", action="store_true", help="Resume the same pass.")
+    vec = sub.add_parser(
+        "ed521-vectors", help="The ed521rs vectors through our verifiers and DataUrnas-BR's."
+    )
+    vec.add_argument("--reference", required=True, help="DataUrnas-BR's parsers/ed521.py.")
+    vec.add_argument("--reference-label", required=True, help="Its source, e.g. repo@commit.")
+    vec.add_argument("--vectors", required=True, help="ed521rs test-vector directory.")
+    vec.add_argument("--output", required=True, help="New output directory.")
     zer = sub.add_parser("zeresima", help="Z1-Z5: the zerésima in every log against the votes.")
     zer.add_argument("--sections", required=True, help="Section-pass output root (same round).")
     zer.add_argument("--semantic", required=True, help="Semantic-pass v5 root (same round).")
@@ -2627,6 +2672,20 @@ def integrity_check_main(argv: Argv = None) -> int:
             args.sections, args.semantic, args.output, memory_limit=args.memory_limit
         )
         print(json.dumps(result["summary"]))
+        return 0
+    if args.command == "ed521-vectors":
+        from election_audit.ed521_crosscheck import run_vector_check
+
+        print(
+            json.dumps(
+                run_vector_check(
+                    args.output,
+                    reference=args.reference,
+                    vectors=args.vectors,
+                    reference_label=args.reference_label,
+                )
+            )
+        )
         return 0
     if args.command == "ed521-crosscheck":
         from election_audit.ed521_crosscheck import run_crosscheck

@@ -155,6 +155,17 @@ def decode(data: bytes) -> Point | None:
     return x, y, 1, x * y % P
 
 
+def small_order(data: bytes) -> bool | None:
+    """True when the encoded point has order 1, 2 or 4 ([4]P = O); None when it does not decode.
+
+    The verification equation does not reject such public keys, and under one a fixed
+    signature verifies for every message (xr1-20261109-P3-04). RFC 8032 decoding and ECPy both
+    accept them, so callers that cannot vouch for a key must check it (E-521's cofactor is 4).
+    """
+    point = decode(data)
+    return None if point is None else _equal(_double(_double(point)), _IDENTITY)
+
+
 def _h(data: bytes, phflag: int = 0, context: bytes = b"") -> int:
     prefix = b"SigEd521" + bytes([phflag, len(context)]) + context
     return int.from_bytes(hashlib.shake_256(prefix + data).digest(2 * SIZE), "little")

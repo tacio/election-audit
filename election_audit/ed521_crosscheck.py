@@ -35,7 +35,7 @@ from election_audit.national_migration import atomic, sha
 from election_audit.semantic_pass import verified_bulk_archives
 from election_audit.types import JSON, Row
 
-VERSION = "ed521-crosscheck-v1"
+VERSION = "ed521-crosscheck-v2"  # v2: vectors run through our verifiers, not their labels
 VECTOR_FILES = ("edge-cases.json", "ecpy.json", "tse-2026.json")
 
 type Reference = Callable[[bytes, bytes, bytes], bool]
@@ -58,8 +58,18 @@ def load_reference(path: Path, expected_sha256: str | None = None) -> Reference:
 
 
 def run_vectors(reference: Reference, vectors: Path) -> JSON:
-    """The reference's verdict on each vector, beside the verdicts the vector records."""
-    rows, counts = [], Counter()
+    """Every verifier's measured verdict on each vector, beside the verdicts the vector records.
+
+    Ours are run, not read from the labels (xr1-20261109-P3-03): the pure-Python reference and
+    ``ed521rs`` in strict mode must give the strict label, ``ed521rs`` in ECPy mode the ECPy
+    label. ``failures`` lists every vector where one of ours does not; DataUrnas-BR's verdict
+    is reported by the mode it matches, as before.
+    """
+    import ed521rs
+
+    from election_audit import ed521
+
+    rows, counts, failures = [], Counter(), []
     for name in VECTOR_FILES:
         for v in json.loads((vectors / name).read_bytes())["vectors"]:
             key, message, signature = (bytes.fromhex(v[k]) for k in ("key", "message", "signature"))
@@ -67,6 +77,21 @@ def run_vectors(reference: Reference, vectors: Path) -> JSON:
             expected = {m: v[m] for m in ("strict", "ecpy", "valid") if m in v}
             if "valid" in expected:  # real or published signatures: one verdict for every mode
                 expected = {"strict": expected["valid"], "ecpy": expected["valid"]}
+            ours = {
+                "python": ed521.verify(key, signature, message),
+                "ed521rs_strict": ed521rs.verify(key, signature, message, mode="strict"),
+                "ed521rs_ecpy": ed521rs.verify(key, signature, message, mode="ecpy"),
+            }
+            wrong = [
+                verifier
+                for verifier, mode in (
+                    ("python", "strict"),
+                    ("ed521rs_strict", "strict"),
+                    ("ed521rs_ecpy", "ecpy"),
+                )
+                if ours[verifier] != expected[mode]
+            ]
+            failures += [{"file": name, "id": v["id"], "verifier": w} for w in wrong]
             matches = sorted(m for m, verdict in expected.items() if verdict == theirs)
             counts["+".join(matches) or "neither"] += 1
             rows.append(
@@ -74,12 +99,45 @@ def run_vectors(reference: Reference, vectors: Path) -> JSON:
                     "file": name,
                     "id": v["id"],
                     "dataurnas": theirs,
+                    **ours,
+                    "small_order_key": ed521.small_order(key),
                     "strict": expected["strict"],
                     "ecpy": expected["ecpy"],
                     "matches": matches,
                 }
             )
-    return {"vectors": rows, "matches": dict(sorted(counts.items()))}
+    return {
+        "vectors": rows,
+        "matches": dict(sorted(counts.items())),
+        "ours_failures": failures,
+    }
+
+
+def run_vector_check(
+    output: str | Path, *, reference: str | Path, vectors: str | Path, reference_label: str
+) -> JSON:
+    """The vectors alone, into a new output: our three verifiers and DataUrnas-BR's."""
+    output = Path(output).expanduser().absolute()
+    reference = Path(reference).expanduser().absolute()
+    vectors = Path(vectors).expanduser().absolute()
+    if output.exists():
+        raise FileExistsError(f"Output must be new: {output}")
+    binding = {
+        "version": VERSION,
+        "ours": {k: v for k, v in ic.ed521_implementation().items() if k != "backend"},
+        "reference": {"path": str(reference), "sha256": sha(reference), "label": reference_label},
+        "vectors": {name: sha(vectors / name) for name in VECTOR_FILES},
+        "vectors_root": str(vectors),
+    }
+    result = run_vectors(load_reference(reference, binding["reference"]["sha256"]), vectors)
+    output.mkdir(parents=True)
+    atomic(output / "binding.json", binding)
+    atomic(output / "vectors.json", result)
+    return {
+        "vectors": len(result["vectors"]),
+        "ours_failures": len(result["ours_failures"]),
+        "dataurnas_matches": result["matches"],
+    }
 
 
 def _init_worker(reference: str, expected_sha256: str) -> None:

@@ -898,3 +898,85 @@ class LogRuleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SmallOrderKeyTests(unittest.TestCase):
+    """xr1-20261109-P3-04: a small-order key verifies a fixed signature for every message."""
+
+    def setUp(self) -> None:
+        from election_audit import ed521
+
+        self.ed521 = ed521
+        self.identity = ed521.encode((0, 1, 1, 0))
+        self.forged = ed521.encode(ed521.BASE) + (1).to_bytes(ed521.SIZE, "little")
+
+    def test_points_of_order_one_two_and_four_are_small(self) -> None:
+        order_two = self.ed521.encode((0, self.ed521.P - 1, 1, 0))
+        self.assertTrue(self.ed521.small_order(self.identity))
+        self.assertTrue(self.ed521.small_order(order_two))
+        self.assertFalse(self.ed521.small_order(self.ed521.encode(self.ed521.BASE)))
+        self.assertIsNone(self.ed521.small_order(b"\xff" * self.ed521.SIZE))
+        # The equation alone accepts the forgery, which is why the key must be checked.
+        self.assertTrue(self.ed521.verify(self.identity, self.forged, b"any message"))
+
+    @unittest.skipUnless(importlib.util.find_spec("ed521rs"), "verification extra is not installed")
+    def test_the_urn_verifier_trusts_no_signature_under_a_small_order_key(self) -> None:
+        import hashlib
+
+        from election_audit.integrity_checks import Ed521Verifier
+
+        verifier = Ed521Verifier(self.identity)
+        self.assertTrue(verifier.small_order)
+        for digest in (b"\x00" * 64, b"\x01" * 64):
+            # The verifier hashes the digest again; the forgery holds for any message.
+            self.assertTrue(
+                self.ed521.verify(self.identity, self.forged, hashlib.sha512(digest).digest())
+            )
+            self.assertFalse(verifier(digest, self.forged))
+
+
+@unittest.skipUnless(importlib.util.find_spec("asn1tools"), "verification extra is not installed")
+class SignatureIssueTests(unittest.TestCase):
+    """xr1-20261109-P0-05: I1 and certificate failures become issue rows."""
+
+    def test_each_failure_is_one_issue_and_a_clean_row_has_none(self) -> None:
+        from election_audit.integrity_checks import signature_issues
+
+        base = {"uf": "ac", "municipality": "01007", "zone": "0001", "section": "0010"}
+        clean = {
+            "vsc_status": "decoded",
+            "i1_hash_mismatches": 0,
+            "i1_published_unlisted": 0,
+            "i1_file_signatures_failed": 0,
+            "i1_signature_math": "verified",
+            "hw_key_small_order": False,
+            "cert_valid_at_election": True,
+            "pki_issuer_signature": "verified",
+            "pki_revoked": False,
+            "pki_ca_valid_at_election": False,  # an expired CA is not a per-section issue
+        }
+        self.assertEqual(signature_issues(clean, base), [])
+        bad = clean | {
+            "i1_hash_mismatches": 1,
+            "i1_file_signatures_failed": 2,
+            "i1_signature_math": "failed",
+            "hw_key_small_order": True,
+            "pki_issuer_signature": "unknown_issuer",
+            "pki_revoked": True,
+        }
+        kinds = [i["kind"] for i in signature_issues(bad, base)]
+        self.assertEqual(
+            kinds,
+            [
+                "file_hash_mismatch",
+                "file_signature",
+                "self_signature",
+                "key_small_order",
+                "certificate_issuer",
+                "certificate_revoked",
+            ],
+        )
+        missing = signature_issues({"vsc_status": "missing"}, base)
+        self.assertEqual(
+            [(i["check"], i["kind"], i["value"]) for i in missing], [("I1", "vsc", "missing")]
+        )
