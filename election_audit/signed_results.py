@@ -307,10 +307,9 @@ def republication(payload: bytes, snapshot: bytes) -> bool:
         day = re.fullmatch(r"(\d\d)/(\d\d)/(\d{4})", str(data.get("dg", "")))
         if not day or not re.fullmatch(r"\d\d:\d\d:\d\d", str(data.get("hg", ""))):
             return None
-        try:
-            return f"{day[3]}{day[2]}{day[1]}", str(data["hg"]), int(data.get("idg"))
-        except TypeError, ValueError:
+        if not re.fullmatch(r"\d+", str(data.get("idg", ""))):
             return None
+        return f"{day[3]}{day[2]}{day[1]}", str(data["hg"]), int(str(data["idg"]))
 
     later, earlier = when(ours), when(theirs)
     return (
