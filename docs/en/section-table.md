@@ -1,6 +1,6 @@
 # Section feature table v4 (Phases 22 and 20b)
 
-Document-ID: EA-SECTION-TABLE · Revision: 4 · Language: en
+Document-ID: EA-SECTION-TABLE · Revision: 5 · Language: en
 
 [Português](../pt-BR/section-table.md) · [Implementation index](implementation-index.md)
 
@@ -145,14 +145,14 @@ A unit is `comparable` when every principal in both rounds has ready results.
 
 ```sh
 just section-table build --year 2026 \
-  --bweb-root ~/data/election-audit-stage/inputs/resultados-2026-boletim-de-urna \
-  --electorate-root ~/data/election-audit-stage/inputs/eleitorado-2026 \
-  --semantic-r1 ~/data/election-audit-stage/phase20b-sessions/v4-national-r1-20261107 \
-  --semantic-r2 ~/data/election-audit-stage/phase20b-sessions/v4-national-r2-20261107 \
-  --integrity-r1 "$(cat ~/data/election-audit-stage/phase20b-sessions/integrity-v4c-r1.json)" \
-  --integrity-r2 "$(cat ~/data/election-audit-stage/phase20b-sessions/integrity-v4c-r2.json)" \
+  --bweb-root $EA_STAGE/inputs/resultados-2026-boletim-de-urna \
+  --electorate-root $EA_STAGE/inputs/eleitorado-2026 \
+  --semantic-r1 $EA_STAGE/phase20b-sessions/v4-national-r1-20261107 \
+  --semantic-r2 $EA_STAGE/phase20b-sessions/v4-national-r2-20261107 \
+  --integrity-r1 "$(cat $EA_STAGE/phase20b-sessions/integrity-v4c-r1.json)" \
+  --integrity-r2 "$(cat $EA_STAGE/phase20b-sessions/integrity-v4c-r2.json)" \
   --exclusions data/national/phase11-protection-2026-10-31/exclusions.json \
-  --output ~/data/election-audit-stage/phase20b-sessions/table-2026-v4-20261108c
+  --output $EA_STAGE/phase20b-sessions/table-2026-v4-20261108c
 ```
 
 `--integrity-r1`/`--integrity-r2` take a JSON object with the Phase 20 roots of the
@@ -187,7 +187,7 @@ round 2), which confirms that urn clocks run on local time.
 ## National results
 
 Version 4, built on 8 November 2026 in
-`~/data/election-audit-stage/phase20b-sessions/table-2026-v4-20261108c/` (on the
+`$EA_STAGE/phase20b-sessions/table-2026-v4-20261108c/` (on the
 Phase 20b integrity sections v4 and logs v3) and `table-2022-v4-20261108b/` (counts
 only; results and operational values stay unread):
 
@@ -203,7 +203,7 @@ only; results and operational values stay unread):
 | Clock `backstep` / `overlap` / `no_close_rule` | 34 / 24 / 0 | 9 / 7 / 0 | 23 / 60 / 0 | 4 / 15 / 0 |
 | Log model agrees / differs with the BU | 498560 / 8 | 498577 / 0 | — | — |
 
-Compared with version 3 (`~/data/election-audit-stage/phase22/table-2026-v3-20261107/`
+Compared with version 3 (`$EA_STAGE/phase22/table-2026-v3-20261107/`
 and `table-2022-v3-20261106/`), only fields derived from the logs change. In 3069
 sections (2026) and 1993 (2022) the round now has an official session: urns left on
 overnight or restarted mid-day ([semantic pass](semantic-pass.md#version-4-phase-20b)).

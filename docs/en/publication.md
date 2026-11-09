@@ -1,6 +1,6 @@
 # Operational publication and initial reports
 
-Document-ID: EA-PUBLICATION · Revision: 3 · Language: en
+Document-ID: EA-PUBLICATION · Revision: 4 · Language: en
 
 [Português](../pt-BR/publication.md) · [Implementation index](implementation-index.md)
 
@@ -18,13 +18,13 @@ more disjoint reconstruction shards. No BU import, candidate attribution, model
 fitting or fraud labels are produced.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just build /path/to/snapshot --input-kind snapshot --store /ssd/audit --parser-workers 4
-rtk proxy env UV_OFFLINE=1 just build /path/to/parse --input-kind parse --store /ssd/audit
-rtk proxy env UV_OFFLINE=1 just build /path/to/reconstruction --store /ssd/audit
-rtk proxy env UV_OFFLINE=1 just validate /ssd/audit
-rtk proxy env UV_OFFLINE=1 just query /ssd/audit --sql 'SELECT completion_state, count(*) FROM anonymous_cycle GROUP BY completion_state'
-rtk proxy env UV_OFFLINE=1 just report /ssd/audit --output /ssd/reports
-rtk proxy env UV_OFFLINE=1 just report /ssd/audit --output /ssd/reports --language pt-BR
+env UV_OFFLINE=1 just build /path/to/snapshot --input-kind snapshot --store /ssd/audit --parser-workers 4
+env UV_OFFLINE=1 just build /path/to/parse --input-kind parse --store /ssd/audit
+env UV_OFFLINE=1 just build /path/to/reconstruction --store /ssd/audit
+env UV_OFFLINE=1 just validate /ssd/audit
+env UV_OFFLINE=1 just query /ssd/audit --sql 'SELECT completion_state, count(*) FROM anonymous_cycle GROUP BY completion_state'
+env UV_OFFLINE=1 just report /ssd/audit --output /ssd/reports
+env UV_OFFLINE=1 just report /ssd/audit --output /ssd/reports --language pt-BR
 ```
 
 `build --evidence FILE` supplies reviewed reconstruction assertions for snapshot

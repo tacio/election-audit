@@ -1,6 +1,6 @@
 # Análise sintática de arquivos congelados
 
-Document-ID: EA-ARCHIVE-PARSING · Revision: 2 · Language: pt-BR
+Document-ID: EA-ARCHIVE-PARSING · Revision: 3 · Language: pt-BR
 
 [English](../en/archive-parsing.md) · [Índice de implementação](implementation-index.md)
 
@@ -16,8 +16,8 @@ mesmas proteções e classes de mensagem. Um subconjunto de UFs é cobertura nac
 parcial, e amostras de seções conservam o denominador congelado da UF inteira.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just parse /path/to/derived/SNAPSHOT_DIGEST --store /path/to/parsed
-rtk proxy env UV_OFFLINE=1 just parse --help
+env UV_OFFLINE=1 just parse /path/to/derived/SNAPSHOT_DIGEST --store /path/to/parsed
+env UV_OFFLINE=1 just parse --help
 ```
 
 O comando imprime o diretório de publicação concluído. `--store` deve ficar fora
@@ -148,7 +148,7 @@ passaram as 15 fixtures do analisador e todos os 83 testes do repositório; a aj
 da receita também passou.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 UV_CACHE_DIR=/tmp/election-audit-uv-cache uv run --locked python -m unittest discover -s tests -p test_archive_parsing.py -v
-rtk proxy env UV_OFFLINE=1 just check
-rtk proxy env UV_OFFLINE=1 just parse --help
+env UV_OFFLINE=1 UV_CACHE_DIR=/tmp/election-audit-uv-cache uv run --locked python -m unittest discover -s tests -p test_archive_parsing.py -v
+env UV_OFFLINE=1 just check
+env UV_OFFLINE=1 just parse --help
 ```

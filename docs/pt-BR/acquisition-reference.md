@@ -1,6 +1,6 @@
 # Logs da eleição presidencial de 2026 do TSE
 
-Document-ID: EA-ACQUISITION-REFERENCE · Revision: 10 · Language: pt-BR
+Document-ID: EA-ACQUISITION-REFERENCE · Revision: 11 · Language: pt-BR
 
 [English](../en/acquisition-reference.md)
 
@@ -147,8 +147,8 @@ e execute:
 
 ```sh
 python3 scripts/download_tse_logs.py \
-  --output /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/raw/2026/turno-2 \
-  --manifest /home/tacio/code/personal/research/election-audit/.local-state/tse-2026.sqlite \
+  --output $EA_DATA/raw/2026/turno-2 \
+  --manifest .local-state/tse-2026.sqlite \
   --missing-only --workers 32 --rps 40
 ```
 
@@ -184,14 +184,14 @@ rotacional, leia em ordem física, nunca em ordem de seção (URL do manifesto).
 
 ```sh
 just stage-sources benchmark \
-  --certificate /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/2026/migration-2026-11-01/certificate-r2.json \
-  --manifest /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/2026/migration-2026-11-01/manifest-r2.sqlite \
-  --output ~/data/election-audit-stage/benchmarks/20261103-r2-url/results.json \
+  --certificate $EA_DATA/2026/migration-2026-11-01/certificate-r2.json \
+  --manifest $EA_DATA/2026/migration-2026-11-01/manifest-r2.sqlite \
+  --output $EA_STAGE/benchmarks/20261103-r2-url/results.json \
   --window 2000 --orders url path physical --seed 7
 just stage-sources copy \
-  --certificate /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/2026/migration-2026-11-01/certificate-r2.json \
-  --manifest /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/2026/migration-2026-11-01/manifest-r2.sqlite \
-  --destination ~/data/election-audit-stage/2026/turno-2 \
+  --certificate $EA_DATA/2026/migration-2026-11-01/certificate-r2.json \
+  --manifest $EA_DATA/2026/migration-2026-11-01/manifest-r2.sqlite \
+  --destination $EA_STAGE/2026/turno-2 \
   --order physical --floor-gib 100
 ```
 
@@ -221,10 +221,10 @@ entradas pequenas para o SSD.
 ```sh
 just bulk-download fetch \
   --dataset resultados-2026-arquivos-transmitidos-para-totalizacao \
-  --output /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot
+  --output $EA_DATA/bulk/2026-arqurnatot
 just bulk-download fetch --dataset resultados-2026-boletim-de-urna \
-  --output ~/data/election-audit-stage/inputs/resultados-2026-boletim-de-urna --reserve-gib 100
-just bulk-download verify --output /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot
+  --output $EA_STAGE/inputs/resultados-2026-boletim-de-urna --reserve-gib 100
+just bulk-download verify --output $EA_DATA/bulk/2026-arqurnatot
 ```
 
 #### Relatórios de totalização mudam com o tempo
@@ -256,8 +256,8 @@ ETag, Last-Modified e o carimbo de geração do próprio arquivo (`dg`, `hg`, `i
 `--resume` continua uma coleta interrompida sob o mesmo vínculo.
 
 ```sh
-just results-hierarchy fetch --round 1 --output ~/data/election-audit-stage/results-hierarchy/ea20-r1-20261104
-just results-hierarchy fetch --round 2 --output ~/data/election-audit-stage/results-hierarchy/ea20-r2-20261104
+just results-hierarchy fetch --round 1 --output $EA_STAGE/results-hierarchy/ea20-r1-20261104
+just results-hierarchy fetch --round 2 --output $EA_STAGE/results-hierarchy/ea20-r2-20261104
 ```
 
 Os retratos de 2026-11-04 têm 5815 arquivos por turno, todo arquivo unificado final
@@ -282,7 +282,7 @@ bytes fica `missing`.
 
 ```sh
 just integrity-docs ingest --downloads ~/Downloads \
-  --output ~/data/election-audit-stage/inputs/integrity-tests-2026-sample-20261104
+  --output $EA_STAGE/inputs/integrity-tests-2026-sample-20261104
 ```
 
 A amostra de 2026-11-04 cobre dez tribunais (SP, AC, AL, DF, ES, PR, MG, RJ, BA,

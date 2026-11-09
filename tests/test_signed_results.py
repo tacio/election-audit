@@ -11,6 +11,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 URL = "https://resultados.tse.jus.br/oficial/ele2026/6258/dados/br/br-c0001-e006258-u.json"
 BODY = b'{ "ele" : "6258", "t" : "2", "dg" : "25/10/2026", "hg" : "23:27:02", "idg" : "1" }'
@@ -79,6 +80,12 @@ class SignedResultsTests(unittest.TestCase):
         }
         self.key_file = self.base / "key.json"
         self.key_file.write_text(json.dumps({"jwk": jwk, "certificates": pem, "source": "test"}))
+        pin = patch.dict(
+            self.sr.PINNED_KEY_FILES,
+            {hashlib.sha256(self.key_file.read_bytes()).hexdigest(): "test key"},
+        )
+        pin.start()
+        self.addCleanup(pin.stop)
         # A finished EA20 snapshot holding one unified file.
         self.ea20 = self.base / "ea20"
         (self.ea20 / "objects").mkdir(parents=True)
@@ -118,6 +125,13 @@ class SignedResultsTests(unittest.TestCase):
         self.assertEqual(result["summary"]["signature"], {"verified": 1})
         self.assertEqual(result["summary"]["negative_control"], {"refused": 1})
         self.assertTrue(all(result["key"]["checks"].values()))
+
+    def test_an_unpinned_key_file_is_refused(self) -> None:
+        # xr1-20261109-P3-06: the chain check trusts the root the key file names.
+        other = self.base / "other-key.json"
+        other.write_text(self.key_file.read_text() + " ")
+        with self.assertRaisesRegex(ValueError, "not a pinned TSE key"):
+            self.sr.check_key(other, "2026-10-25")
 
     def test_each_rule_fails_on_its_own_case(self) -> None:
         forged = self.jws(BODY)[:-4] + b"AAAA"

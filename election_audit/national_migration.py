@@ -23,6 +23,9 @@ type Stat = tuple[int, int, int, int, int]
 type Report = Callable[..., None]
 
 
+HDD_RESERVE_BYTES = 20 * 1024**3  # free space kept on the copy's volume
+
+
 def sha(path: str | Path) -> str:
     h = hashlib.sha256()
     with Path(path).open("rb") as stream:
@@ -403,7 +406,7 @@ def execute(plan_path: str | Path) -> None:
                     Path(item["new_root"]).stat().st_dev != anchor.stat().st_dev
                 ):
                     raise RuntimeError("Copied source mount changed")
-                if os.statvfs(anchor).f_bavail * os.statvfs(anchor).f_frsize < 20 * 1024**3:
+                if os.statvfs(anchor).f_bavail * os.statvfs(anchor).f_frsize < HDD_RESERVE_BYTES:
                     raise RuntimeError("HDD reserve breached")
 
         guard()

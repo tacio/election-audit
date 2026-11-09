@@ -1,6 +1,6 @@
 # Statistical analysis foundation
 
-Document-ID: EA-ANALYSIS · Revision: 3 · Language: en
+Document-ID: EA-ANALYSIS · Revision: 4 · Language: en
 
 [Português](../pt-BR/analysis.md) · [Index](implementation-index.md) · [Electoral parent](electoral-results.md)
 
@@ -24,11 +24,11 @@ Use a local explicit configuration, at most 8 MiB. The optional candidate_a/cand
 ```
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just analyze /ssd/audit/releases/PARENT_DIGEST --bundle /ssd/design/analysis.json --store /ssd/audit
-rtk proxy env UV_OFFLINE=1 just validate /ssd/audit
-rtk proxy env UV_OFFLINE=1 just query /ssd/audit --sql 'SELECT partition_id, payload FROM partition_plan'
-rtk proxy env UV_OFFLINE=1 just query /ssd/audit --sql 'SELECT feature_id, count(*) FROM training_features GROUP BY feature_id'
-rtk proxy env UV_OFFLINE=1 just report /ssd/audit --output /ssd/reports --language both
+env UV_OFFLINE=1 just analyze /ssd/audit/releases/PARENT_DIGEST --bundle /ssd/design/analysis.json --store /ssd/audit
+env UV_OFFLINE=1 just validate /ssd/audit
+env UV_OFFLINE=1 just query /ssd/audit --sql 'SELECT partition_id, payload FROM partition_plan'
+env UV_OFFLINE=1 just query /ssd/audit --sql 'SELECT feature_id, count(*) FROM training_features GROUP BY feature_id'
+env UV_OFFLINE=1 just report /ssd/audit --output /ssd/reports --language both
 ```
 
 `analysis.publish_analysis(parent, bundle, store, config=None)` uses the existing lock, resource limits, staging/fsync/rename/current-pointer transaction and relative checked parent chain. Parent operational facts are reused, never copied or rewritten. The long `audit_features` ledger streams bounded batches from SQL. Compact link populations, evidence catalogues and inherited/current analysis records are bounded by max_events; this is a foundation, not a national streaming model trainer. Failed publication leaves the previous current artifact intact; identical calls resume. Preserve the full relative parent chain on relocation.

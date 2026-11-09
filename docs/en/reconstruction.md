@@ -1,6 +1,6 @@
 # Operational reconstruction
 
-Document-ID: EA-RECONSTRUCTION · Revision: 2 · Language: en
+Document-ID: EA-RECONSTRUCTION · Revision: 3 · Language: en
 
 [Português](../pt-BR/reconstruction.md) · [Implementation index](implementation-index.md)
 
@@ -14,9 +14,9 @@ cycle and clock stayed unresolved; reviewed real-message rules are the separate
 Phase 13 adapter `real-operational-v1` (`operational_review`). The existing three-class structural parser stays `jez-structural-v1`.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just reconstruct /path/to/parsed/parses/PARSE_DIGEST --store /path/to/operations
-rtk proxy env UV_OFFLINE=1 just reconstruct --help
-rtk proxy env UV_OFFLINE=1 just reconstruct /path/to/parsed/parses/PARSE_DIGEST --store /path/to/operations --object-sha256 OBJECT_SHA256 --max-events 100000
+env UV_OFFLINE=1 just reconstruct /path/to/parsed/parses/PARSE_DIGEST --store /path/to/operations
+env UV_OFFLINE=1 just reconstruct --help
+env UV_OFFLINE=1 just reconstruct /path/to/parsed/parses/PARSE_DIGEST --store /path/to/operations --object-sha256 OBJECT_SHA256 --max-events 100000
 ```
 
 ## Automatic observations and reviewed assertions
@@ -205,6 +205,6 @@ a new evidenced reconstruction and replacement of the affected publication.
 No DuckDB/Parquet publishing, electoral imports, fitting or fraud labels occur.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 UV_CACHE_DIR=/tmp/election-audit-uv-cache uv run --locked python -m unittest discover -s tests -p test_reconstruction.py -v
-rtk proxy env UV_OFFLINE=1 just check
+env UV_OFFLINE=1 UV_CACHE_DIR=/tmp/election-audit-uv-cache uv run --locked python -m unittest discover -s tests -p test_reconstruction.py -v
+env UV_OFFLINE=1 just check
 ```

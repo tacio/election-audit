@@ -175,12 +175,25 @@ def fetch(
 # --------------------------------------------------------------------------- verification
 
 
+# The trust anchor: key files extracted from TSE's JWS manual (appendix B), by SHA-256. The
+# chain check below accepts the root the file names, so the file itself must be pinned
+# (xr1-20261109-P3-06).
+PINNED_KEY_FILES = {
+    "d702115854fdfa70fe663f3a190dcca09c04835c37b40f69c5c1d2dc52fb1229": (
+        "manual-verificacao-jws.pdf of 2026-09-16 (SHA-256 db1145145e982836…), appendix B, "
+        "extracted by tse-jws-key-20261108/build_key.py"
+    ),
+}
+
+
 def check_key(key_file: Path, election_date: str) -> tuple[Any, JSON]:
     """The pinned Ed25519 key, after checking it against its certificates."""
     from cryptography import x509
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
+    if sha(key_file) not in PINNED_KEY_FILES:
+        raise ValueError(f"Key file is not a pinned TSE key: {key_file}")
     pinned = json.loads(key_file.read_bytes())
     jwk = pinned["jwk"]
     if (jwk.get("kty"), jwk.get("crv"), jwk.get("alg")) != ("OKP", "Ed25519", "EdDSA"):

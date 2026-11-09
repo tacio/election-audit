@@ -1,6 +1,6 @@
 # Cross-model review
 
-Document-ID: EA-CROSS-REVIEW · Revision: 2 · Language: en
+Document-ID: EA-CROSS-REVIEW · Revision: 3 · Language: en
 
 [Português](../pt-BR/cross-model-review.md) · [Implementation index](implementation-index.md)
 
@@ -44,7 +44,7 @@ Two mechanisms enforce these boundaries:
 - **Reads.** Neither sandbox blocks reads outside the clone. The read boundary is
   therefore set by instruction and checked afterwards:
   - the runner keeps each session's full event stream under
-    `~/data/election-audit-stage/review/<campaign>/`;
+    `$EA_STAGE/review/<campaign>/`;
   - it lists every command or tool call that names a staged path, `.local-state`,
     `~/data`, this repository's own path, or a network tool;
   - these go in `boundary_flags` in `runs.jsonl`.
@@ -270,5 +270,5 @@ boundary flags. The campaign report says so.
 | `review/packets/P*.md` | Packets |
 | `review/finding.schema.json` | Output schema, enforced by both CLIs |
 | `review/campaigns/<campaign>/` | Campaign record: pinned commit, `runs.jsonl`, reports per round, `ledger.jsonl`, `report.md` |
-| `~/data/election-audit-stage/review/<campaign>/` | Full transcripts (not in git) |
+| `$EA_STAGE/review/<campaign>/` | Full transcripts (not in git) |
 | `~/.cache/election-audit-review/` | Disposable clones |

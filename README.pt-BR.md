@@ -1,6 +1,6 @@
 # Auditoria eleitoral — eleição presidencial brasileira de 2026
 
-Document-ID: EA-ONBOARDING · Revision: 12 · Language: pt-BR
+Document-ID: EA-ONBOARDING · Revision: 13 · Language: pt-BR
 
 [English](README.md)
 
@@ -30,14 +30,20 @@ completo, os locais dos artefatos e o mapa de interfaces. Comece por ele.
 
 ## Instalação e verificações
 
-Instale uv, just e rtk. Python 3.14, DuckDB, PyArrow e Ruff estão fixados no
+Instale uv e just (o rtk, um filtro de saída que economiza tokens para agentes de IA,
+é opcional: as receitas só o usam quando instalado). Linux é a plataforma suportada; o
+Windows nativo não roda o pipeline (use o WSL2) e o macOS não foi testado, como
+`just doctor` informa. Python 3.14, DuckDB, PyArrow e Ruff estão fixados no
 lockfile. As receitas usam `/tmp/election-audit-uv-cache`; a instalação offline
-exige esse cache preenchido. As verificações nunca baixam dados eleitorais.
+exige esse cache preenchido. As verificações nunca baixam dados eleitorais. Os testes
+exercitam a proteção de disco da publicação com a reserva e o limite de spill
+padrão, então a verificação completa precisa de cerca de 18 GiB livres no diretório
+temporário (`TMPDIR`); a demonstração precisa de 2 GiB.
 
 ```sh
-rtk proxy just setup
-rtk proxy just doctor
-rtk proxy env UV_OFFLINE=1 just check
+just setup
+just doctor
+env UV_OFFLINE=1 just check
 ```
 
 ## Teste offline
@@ -49,10 +55,10 @@ operacional → eleitoral → partição → ledger com os dois relatórios. Tod
 de saída precisa ser novo.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just demo --output data/my-demo
-rtk proxy env UV_OFFLINE=1 just review-bundle data/my-demo --output data/my-review
-rtk proxy env UV_OFFLINE=1 just review-bundle data/my-review --verify
-rtk proxy env UV_OFFLINE=1 just reproduce data/my-review --output data/my-reproduction
+env UV_OFFLINE=1 just demo --output data/my-demo
+env UV_OFFLINE=1 just review-bundle data/my-demo --output data/my-review
+env UV_OFFLINE=1 just review-bundle data/my-review --verify
+env UV_OFFLINE=1 just reproduce data/my-review --output data/my-reproduction
 ```
 
 Um pacote de revisão contém os originais selecionados congelados, a cadeia relativa
@@ -88,19 +94,19 @@ limitados em vez de materializar todos os eventos; veja
 Cada comando documenta a si mesmo:
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just snapshot --help
-rtk proxy env UV_OFFLINE=1 just parse --help
-rtk proxy env UV_OFFLINE=1 just reconstruct --help
-rtk proxy env UV_OFFLINE=1 just build --help
-rtk proxy env UV_OFFLINE=1 just import-results --help
-rtk proxy env UV_OFFLINE=1 just analyze --help
-rtk proxy env UV_OFFLINE=1 just validate --help
-rtk proxy env UV_OFFLINE=1 just query --help
-rtk proxy env UV_OFFLINE=1 just report --help
-rtk proxy env UV_OFFLINE=1 just backfill --help
-rtk proxy env UV_OFFLINE=1 just docs-command-check
-rtk proxy just resume --help
-rtk proxy just inspect --help
+env UV_OFFLINE=1 just snapshot --help
+env UV_OFFLINE=1 just parse --help
+env UV_OFFLINE=1 just reconstruct --help
+env UV_OFFLINE=1 just build --help
+env UV_OFFLINE=1 just import-results --help
+env UV_OFFLINE=1 just analyze --help
+env UV_OFFLINE=1 just validate --help
+env UV_OFFLINE=1 just query --help
+env UV_OFFLINE=1 just report --help
+env UV_OFFLINE=1 just backfill --help
+env UV_OFFLINE=1 just docs-command-check
+just resume --help
+just inspect --help
 ```
 
 ## Notebooks
@@ -111,8 +117,8 @@ explícito com checksum. Resultados de pesquisa protegidos ficam ocultos até ex
 uma avaliação final validada. O conjunto de dados atual cobre só o AC.
 
 ```sh
-rtk proxy uv sync --locked --extra dashboard
-rtk proxy just dashboard --dataset data/dashboard-ac-2026-10-30/dataset.json
+uv sync --locked --extra dashboard
+just dashboard --dataset data/dashboard-ac-2026-10-30/dataset.json
 ```
 
 ## Documentação

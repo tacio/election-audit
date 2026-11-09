@@ -1,6 +1,6 @@
 # Transparency and operational observations
 
-Document-ID: EA-OBSERVATIONS · Revision: 11 · Language: en
+Document-ID: EA-OBSERVATIONS · Revision: 12 · Language: en
 
 [Português](../pt-BR/observations.md) · [Implementation index](implementation-index.md)
 
@@ -64,7 +64,7 @@ its date.
 
 ## Sources
 
-The frozen inputs named above are under `~/data/election-audit-stage/inputs/`:
+The frozen inputs named above are under `$EA_STAGE/inputs/`:
 
 | Directory | Content |
 | --- | --- |

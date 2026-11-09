@@ -25,7 +25,25 @@ def doctor() -> int:
         path = shutil.which(executable)
         print(f"{executable}: {path or 'MISSING'}")
         ready = ready and path is not None
+    print(f"rtk (optional): {shutil.which('rtk') or 'absent'}")
+    ready = platform_support(sys.platform) and ready
     return 0 if ready else 1
+
+
+def platform_support(name: str) -> bool:
+    """Print what this platform can run; False where the pipeline cannot import (xr1 P8-03).
+
+    The stages import the Unix modules fcntl and resource, and the national stages read
+    /proc for memory accounting, so only Linux runs everything.
+    """
+    if name.startswith("linux"):
+        print(f"Platform: {name} (supported)")
+        return True
+    if name == "darwin":
+        print(f"Platform: {name} (untested; the national stages read /proc and will fail)")
+        return True
+    print(f"Platform: {name} (UNSUPPORTED: needs the Unix modules fcntl and resource; use WSL2)")
+    return False
 
 
 def main(argv: Argv = None) -> int | None:

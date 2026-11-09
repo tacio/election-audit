@@ -1,6 +1,6 @@
 # Passada semântica em fluxo (Fase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 7 · Language: pt-BR
+Document-ID: EA-SEMANTIC-PASS · Revision: 8 · Language: pt-BR
 
 [English](../en/semantic-pass.md) · [Índice de implementação](implementation-index.md)
 
@@ -61,13 +61,13 @@ concluídos); a passada levou 12.8 s e 19.5 s contra 268.2 s e 412.3 s do adapta
 
 ```sh
 just semantic-pass equivalence \
-  --staged-root ~/data/election-audit-stage/2026/turno-2 --round 2 \
-  --output ~/data/election-audit-stage/phase21/equivalence-r2-ac-200 \
+  --staged-root $EA_STAGE/2026/turno-2 --round 2 \
+  --output $EA_STAGE/phase21/equivalence-r2-ac-200 \
   --exclusions data/national/phase11-protection-2026-10-31/exclusions.json \
   --uf ac --sample 200 --seed 2103
 just semantic-pass run \
-  --staged-root ~/data/election-audit-stage/2026/turno-2 --round 2 \
-  --output ~/data/election-audit-stage/phase21/national-r2-20261103 \
+  --staged-root $EA_STAGE/2026/turno-2 --round 2 \
+  --output $EA_STAGE/phase21/national-r2-20261103 \
   --exclusions data/national/phase11-protection-2026-10-31/exclusions.json \
   --workers 6
 ```
@@ -126,7 +126,7 @@ erros por objeto. O tempo ativo exclui duas suspensões da máquina.
 Aceitação, por execução: todo shard de sessões tem as nove colunas, e toda coluna
 em comum com a versão anterior (2026 v1, 2022 v2) é igual em todas as linhas de
 sessões, segmentos e objetos, nos dois sentidos. As raízes são
-`~/data/election-audit-stage/phase22/v3-national-r{1,2}-20261105/` e
+`$EA_STAGE/phase22/v3-national-r{1,2}-20261105/` e
 `v3-national-2022-r{1,2}-20261105/`. Cada execução tem uma só versão de software
 nas sessões oficiais (`10.23.0.0 - Praia da Barra do Cahy` em 2026,
 `8.26.0.0 - Onça-pintada` em 2022). Algumas sessões não têm linha de versão: 1 no
@@ -158,7 +158,7 @@ adaptador passou em 200 de 200 objetos do AC sorteados em cada ano e turno (2026
 | 2022 | 2 | 471983 | 3570943 | 5726472 | 1284 | 835 | 2:52:30 | 63535 s | 1,08 GB | 830 MB |
 
 As quatro rodaram em 7–8 de novembro de 2026 com 6 workers e sem erros de objeto, em
-`~/data/election-audit-stage/phase20b-sessions/v4-national-r{1,2}-20261107/` e
+`$EA_STAGE/phase20b-sessions/v4-national-r{1,2}-20261107/` e
 `v4-national-2022-r{1,2}-20261107/`. A memória de pico é a do maior processo. Cada
 equivalência por amostra levou de 3:10 a 5:41, quase tudo no adaptador. As seções sem
 sessão oficial do turno caem de 1636 e 1449 para 12 e 4 em 2026, e de 1013 e 1007
@@ -192,7 +192,7 @@ As verificações de [zerésima](integrity-checks.md#zerésima) e de
 | 2 | 498581 | 10312157 | 850 | 3:34:03 | 75786 s | 1,06 GB | 922 MB |
 
 Os dois rodaram em 9 de novembro de 2026 com 6 workers e sem erros de objeto, em
-`~/data/election-audit-stage/phase20b-zeresima/v5-national-r{1,2}-20261108/`. Suas
+`$EA_STAGE/phase20b-zeresima/v5-national-r{1,2}-20261108/`. Suas
 tabelas de sessões, segmentos, objetos e vocabulário são iguais às da versão 4 linha a
 linha (`EXCEPT ALL` nos dois sentidos, zero linhas). Os logs do segundo turno trazem o
 histórico do 1º turno, então o release do 2º turno tem os marcadores dos dois turnos;
@@ -217,13 +217,13 @@ seção em `sa_sections.parquet`.
 
 ```sh
 just sa-logs fetch \
-  --staged-root ~/data/election-audit-stage/2026/turno-1 --round 1 \
-  --output ~/data/election-audit-stage/sa-logs/fetch-r1-20261104 \
-  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot
+  --staged-root $EA_STAGE/2026/turno-1 --round 1 \
+  --output $EA_STAGE/sa-logs/fetch-r1-20261104 \
+  --bulk-root $EA_DATA/bulk/2026-arqurnatot
 just sa-logs summarize \
-  --input ~/data/election-audit-stage/sa-logs/fetch-r1-20261104 \
-  --input ~/data/election-audit-stage/sa-logs/fetch-r2-20261104 \
-  --output ~/data/election-audit-stage/sa-logs/summary-20261104 \
+  --input $EA_STAGE/sa-logs/fetch-r1-20261104 \
+  --input $EA_STAGE/sa-logs/fetch-r2-20261104 \
+  --output $EA_STAGE/sa-logs/summary-20261104 \
   --exclusions data/national/phase11-protection-2026-10-31/exclusions.json
 ```
 
@@ -292,14 +292,14 @@ levou 10.4 s e 16.4 s contra 203.2 s e 319.6 s do adaptador.
 
 ```sh
 just semantic-pass equivalence \
-  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2022-arqurnatot \
+  --bulk-root $EA_DATA/bulk/2022-arqurnatot \
   --year 2022 --round 2 \
-  --output ~/data/election-audit-stage/phase21/equivalence-2022-r2-ac-200 \
+  --output $EA_STAGE/phase21/equivalence-2022-r2-ac-200 \
   --uf ac --sample 200 --seed 2103
 just semantic-pass run \
-  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2022-arqurnatot \
+  --bulk-root $EA_DATA/bulk/2022-arqurnatot \
   --year 2022 --round 2 \
-  --output ~/data/election-audit-stage/phase21/national-2022-r2-v2-20261104 \
+  --output $EA_STAGE/phase21/national-2022-r2-v2-20261104 \
   --workers 6
 ```
 

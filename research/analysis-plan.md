@@ -1,6 +1,6 @@
 # Statistical audit of the 2026 presidential election: study protocol
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 10 · Language: en
+Document-ID: EA-ANALYSIS-PLAN · Revision: 11 · Language: en
 
 [Português](analysis-plan.pt-BR.md) · [Completion plan](completion-plan.md) · [Related work](related-work.md)
 
@@ -58,7 +58,7 @@ writing it. As of this revision:
   counts mix rounds and are not runoff measures.
 - **Inspection registries:** every location listed in
   `data/phase15/inspection.sqlite`, `data/national/phase11-protection-2026-10-31/`,
-  `~/data/election-audit-stage/inspection/phase20b-national-20261109.sqlite` (the 7824 polling places of the 12016 sections whose integrity rows were
+  `$EA_STAGE/inspection/phase20b-national-20261109.sqlite` (the 7824 polling places of the 12016 sections whose integrity rows were
   seen in Phases 20 and 20b, registered on 9 November 2026)
   and the Phase 11 tranche registries is development data.
 - **National semantic pass (Phase 21):** per-session aggregates of every eligible log

@@ -1,6 +1,6 @@
 # Processamento nacional orientado a features
 
-Document-ID: EA-FEATURE-PIPELINE · Revision: 4 · Language: pt-BR
+Document-ID: EA-FEATURE-PIPELINE · Revision: 5 · Language: pt-BR
 
 ## Decisão e escopo científico
 
@@ -75,9 +75,9 @@ sua máquina em vez de editar arquivos congelados.
 Prepare um trabalho manual com a CLI real e orçamentos explícitos:
 
 ```bash
-rtk proxy .venv/bin/python -B -m election_audit.national_parallel prepare --scope-workload work/scope --output work/summary-config --store /path/to/derived/summary --memory-gib 4 --cpu-fraction 0.5 --workers 2 --batch-objects 32 --prefetch 1 --hdd-reserve-gib 20 --ssd-reserve-gib 10 --scratch-gib 8 --output-gib 256 --future-gib 256
-rtk proxy .venv/bin/python -B work/summary-config/run_frozen.py run --max-objects 112
-rtk proxy .venv/bin/python -B work/summary-config/run_frozen.py status
+.venv/bin/python -B -m election_audit.national_parallel prepare --scope-workload work/scope --output work/summary-config --store /path/to/derived/summary --memory-gib 4 --cpu-fraction 0.5 --workers 2 --batch-objects 32 --prefetch 1 --hdd-reserve-gib 20 --ssd-reserve-gib 10 --scratch-gib 8 --output-gib 256 --future-gib 256
+.venv/bin/python -B work/summary-config/run_frozen.py run --max-objects 112
+.venv/bin/python -B work/summary-config/run_frozen.py status
 ```
 
 Quando disponível, use um cgroup de usuário em torno do launcher congelado; afinidade
@@ -201,14 +201,14 @@ Se necessário, prepare somente os metadados do escopo antes do primeiro trabalh
 isso não abre corpos de logs nem materializa eventos:
 
 ```bash
-rtk proxy .venv/bin/python -B -c "from election_audit.national_workload import initialise; initialise('work/scope')"
+.venv/bin/python -B -c "from election_audit.national_workload import initialise; initialise('work/scope')"
 ```
 
 Inicie o trabalho elegível completo com cgroup compartilhado de usuário e finalização
 analítica automática após a conclusão do produtor:
 
 ```bash
-rtk proxy .venv/bin/python -B -m election_audit.national_parallel launch work/summary-config --unit election-audit-summary --analysis-output /path/to/derived/analysis-release
+.venv/bin/python -B -m election_audit.national_parallel launch work/summary-config --unit election-audit-summary --analysis-output /path/to/derived/analysis-release
 ```
 
 O launcher cria um slice restrito de usuário com tetos de CPU/RAM da configuração,
@@ -218,7 +218,7 @@ pode publicar um dataset imutável do prefixo confirmado; o lock impede corrida 
 publicação e ingestão no orçamento combinado:
 
 ```bash
-rtk proxy .venv/bin/python -B work/summary-config/run_frozen.py export --output /path/to/derived/partial-analysis --target-mib 128
+.venv/bin/python -B work/summary-config/run_frozen.py export --output /path/to/derived/partial-analysis --target-mib 128
 ```
 
 A publicação reserva cota durável, valida checksums, escreve/fsync partes tipadas e
@@ -248,7 +248,7 @@ membros, aliases protegidos, pins e desempenho repetido com ruído. Execute no m
 slice de usuário com recursos limitados quando disponível:
 
 ```bash
-rtk proxy .venv/bin/python -B -m election_audit.national_summary_tuning work/tuning-config.json
+.venv/bin/python -B -m election_audit.national_summary_tuning work/tuning-config.json
 ```
 
 Leia `recommended.json` e aplique trabalhadores/grupos pelas flags `prepare --workers`

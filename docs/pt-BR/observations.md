@@ -1,6 +1,6 @@
 # Observações de transparência e de operação
 
-Document-ID: EA-OBSERVATIONS · Revision: 11 · Language: pt-BR
+Document-ID: EA-OBSERVATIONS · Revision: 12 · Language: pt-BR
 
 [English](../en/observations.md) · [Índice de implementação](implementation-index.md)
 
@@ -65,7 +65,7 @@ acrescentada como resolução, com sua data.
 
 ## Fontes
 
-As entradas congeladas citadas acima ficam em `~/data/election-audit-stage/inputs/`:
+As entradas congeladas citadas acima ficam em `$EA_STAGE/inputs/`:
 
 | Diretório | Conteúdo |
 | --- | --- |

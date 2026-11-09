@@ -46,3 +46,18 @@ class CliTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 main(["inspect", "--invalid"])
         self.assertIs(sys.argv, original)
+
+
+class PlatformTests(unittest.TestCase):
+    def test_doctor_refuses_platforms_without_the_unix_modules(self) -> None:
+        # xr1-20261109-P8-03: native Windows cannot import fcntl or resource.
+        import contextlib
+        import io
+
+        from election_audit.cli import platform_support
+
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertTrue(platform_support("linux"))
+            self.assertTrue(platform_support("darwin"))
+            self.assertFalse(platform_support("win32"))
+        self.assertIn("UNSUPPORTED", out.getvalue())

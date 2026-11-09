@@ -1,6 +1,6 @@
 # Fundação de análise estatística
 
-Document-ID: EA-ANALYSIS · Revision: 3 · Language: pt-BR
+Document-ID: EA-ANALYSIS · Revision: 4 · Language: pt-BR
 
 [English](../en/analysis.md) · [Índice](implementation-index.md) · [Pai eleitoral](electoral-results.md)
 
@@ -24,11 +24,11 @@ Use configuração local explícita, com até 8 MiB. Os campos opcionais candida
 ```
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just analyze /ssd/audit/releases/PARENT_DIGEST --bundle /ssd/design/analysis.json --store /ssd/audit
-rtk proxy env UV_OFFLINE=1 just validate /ssd/audit
-rtk proxy env UV_OFFLINE=1 just query /ssd/audit --sql 'SELECT partition_id, payload FROM partition_plan'
-rtk proxy env UV_OFFLINE=1 just query /ssd/audit --sql 'SELECT feature_id, count(*) FROM training_features GROUP BY feature_id'
-rtk proxy env UV_OFFLINE=1 just report /ssd/audit --output /ssd/reports --language both
+env UV_OFFLINE=1 just analyze /ssd/audit/releases/PARENT_DIGEST --bundle /ssd/design/analysis.json --store /ssd/audit
+env UV_OFFLINE=1 just validate /ssd/audit
+env UV_OFFLINE=1 just query /ssd/audit --sql 'SELECT partition_id, payload FROM partition_plan'
+env UV_OFFLINE=1 just query /ssd/audit --sql 'SELECT feature_id, count(*) FROM training_features GROUP BY feature_id'
+env UV_OFFLINE=1 just report /ssd/audit --output /ssd/reports --language both
 ```
 
 `analysis.publish_analysis(parent, bundle, store, config=None)` usa bloqueio, limites de recursos, transação de staging/fsync/rename/ponteiro atual e cadeia relativa de pais verificada existentes. Fatos operacionais do pai são reutilizados, sem cópia ou reescrita. O registro longo `audit_features` transmite lotes limitados de SQL. Populações compactas de vínculos, catálogos de evidências e registros analíticos herdados/atuais são limitados por max_events; esta é uma fundação, não treinamento nacional de modelos em fluxo. Falha de publicação preserva o artefato atual anterior; chamadas idênticas retomam. Preserve toda a cadeia relativa de pais ao mover.

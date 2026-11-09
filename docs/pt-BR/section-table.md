@@ -1,6 +1,6 @@
 # Tabela de atributos por seção v4 (Fases 22 e 20b)
 
-Document-ID: EA-SECTION-TABLE · Revision: 4 · Language: pt-BR
+Document-ID: EA-SECTION-TABLE · Revision: 5 · Language: pt-BR
 
 [English](../en/section-table.md) · [Índice de implementação](implementation-index.md)
 
@@ -149,14 +149,14 @@ unidade e turno.
 
 ```sh
 just section-table build --year 2026 \
-  --bweb-root ~/data/election-audit-stage/inputs/resultados-2026-boletim-de-urna \
-  --electorate-root ~/data/election-audit-stage/inputs/eleitorado-2026 \
-  --semantic-r1 ~/data/election-audit-stage/phase20b-sessions/v4-national-r1-20261107 \
-  --semantic-r2 ~/data/election-audit-stage/phase20b-sessions/v4-national-r2-20261107 \
-  --integrity-r1 "$(cat ~/data/election-audit-stage/phase20b-sessions/integrity-v4c-r1.json)" \
-  --integrity-r2 "$(cat ~/data/election-audit-stage/phase20b-sessions/integrity-v4c-r2.json)" \
+  --bweb-root $EA_STAGE/inputs/resultados-2026-boletim-de-urna \
+  --electorate-root $EA_STAGE/inputs/eleitorado-2026 \
+  --semantic-r1 $EA_STAGE/phase20b-sessions/v4-national-r1-20261107 \
+  --semantic-r2 $EA_STAGE/phase20b-sessions/v4-national-r2-20261107 \
+  --integrity-r1 "$(cat $EA_STAGE/phase20b-sessions/integrity-v4c-r1.json)" \
+  --integrity-r2 "$(cat $EA_STAGE/phase20b-sessions/integrity-v4c-r2.json)" \
   --exclusions data/national/phase11-protection-2026-10-31/exclusions.json \
-  --output ~/data/election-audit-stage/phase20b-sessions/table-2026-v4-20261108c
+  --output $EA_STAGE/phase20b-sessions/table-2026-v4-20261108c
 ```
 
 `--integrity-r1`/`--integrity-r2` recebem um objeto JSON com as raízes da Fase 20 do
@@ -193,7 +193,7 @@ marcam a hora local.
 ## Resultados nacionais
 
 Versão 4, construída em 8 de novembro de 2026 em
-`~/data/election-audit-stage/phase20b-sessions/table-2026-v4-20261108c/` (sobre as
+`$EA_STAGE/phase20b-sessions/table-2026-v4-20261108c/` (sobre as
 seções de integridade v4 e os logs v3 da Fase 20b) e `table-2022-v4-20261108b/` (só
 contagens; resultados e valores operacionais ficam sem leitura):
 
@@ -209,7 +209,7 @@ contagens; resultados e valores operacionais ficam sem leitura):
 | Relógio `backstep` / `overlap` / `no_close_rule` | 34 / 24 / 0 | 9 / 7 / 0 | 23 / 60 / 0 | 4 / 15 / 0 |
 | Modelo do log concorda / difere do BU | 498560 / 8 | 498577 / 0 | — | — |
 
-Em relação à versão 3 (`~/data/election-audit-stage/phase22/table-2026-v3-20261107/`
+Em relação à versão 3 (`$EA_STAGE/phase22/table-2026-v3-20261107/`
 e `table-2022-v3-20261106/`), só mudam campos derivados dos logs. Em 3069 seções
 (2026) e 1993 (2022) o turno agora tem sessão oficial: urnas deixadas ligadas durante
 a noite ou reiniciadas no meio do dia ([passada semântica](semantic-pass.md#versão-4-fase-20b)).

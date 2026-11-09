@@ -1,6 +1,6 @@
 # Dicionário do esquema
 
-Document-ID: EA-SCHEMA-DICTIONARY · Revision: 2 · Language: pt-BR
+Document-ID: EA-SCHEMA-DICTIONARY · Revision: 3 · Language: pt-BR
 
 [English](../en/schema-dictionary.md)
 
@@ -86,5 +86,5 @@ contabilidade. A publicação posterior deve executar as verificações relacion
 semânticas das convenções.
 
 ```sh
-rtk proxy env UV_CACHE_DIR=/tmp/election-audit-uv-cache UV_OFFLINE=1 uv run --locked python -m election_audit.contracts
+env UV_CACHE_DIR=/tmp/election-audit-uv-cache UV_OFFLINE=1 uv run --locked python -m election_audit.contracts
 ```

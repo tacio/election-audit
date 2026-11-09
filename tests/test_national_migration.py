@@ -21,6 +21,15 @@ from election_audit.national_storage import process_compact_original, resolve_or
 from election_audit.national_workload import _reuse
 
 
+def mount_of(path: Path) -> str:
+    """The mount point holding path; temporary directories may be on their own filesystem
+    (tmpfs /tmp, a separate volume), so fixtures never assume / (xr1-20261109-P8-02)."""
+    path = path.resolve()
+    while not path.is_mount():
+        path = path.parent
+    return str(path)
+
+
 class MigrationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
@@ -69,8 +78,11 @@ class MigrationTests(unittest.TestCase):
             "manifest": str(self.manifest),
             "old_root": str(self.old),
             "new_root": str(self.new),
-            "mount": "/",
+            "mount": mount_of(self.new.parent),
         }
+        reserve = patch.object(migration, "HDD_RESERVE_BYTES", 0)  # fixtures write kilobytes
+        reserve.start()
+        self.addCleanup(reserve.stop)
         self.env = patch.dict(os.environ)
         self.env.start()
         self.addCleanup(self.env.stop)
@@ -309,7 +321,7 @@ class MigrationTests(unittest.TestCase):
             "workspace": str(fixture.root / "overnight"),
             "migration_state": str(self.state),
             "migration_plan": str(self.root / "migration-plan.json"),
-            "anchor": "/",
+            "anchor": mount_of(fixture.root),
             "old_workload": str(fixture.config),
             "safe_comparison": str(comparison),
             "tuning_comparison": str(comparison),

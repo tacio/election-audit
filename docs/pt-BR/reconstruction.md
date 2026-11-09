@@ -1,6 +1,6 @@
 # Reconstrução operacional
 
-Document-ID: EA-RECONSTRUCTION · Revision: 2 · Language: pt-BR
+Document-ID: EA-RECONSTRUCTION · Revision: 3 · Language: pt-BR
 
 [English](../en/reconstruction.md) · [Índice de implementação](implementation-index.md)
 
@@ -16,9 +16,9 @@ separado da Fase 13, `real-operational-v1` (`operational_review`). O
 analisador estrutural de três classes permanece `jez-structural-v1`.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just reconstruct /path/to/parsed/parses/PARSE_DIGEST --store /path/to/operations
-rtk proxy env UV_OFFLINE=1 just reconstruct --help
-rtk proxy env UV_OFFLINE=1 just reconstruct /path/to/parsed/parses/PARSE_DIGEST --store /path/to/operations --object-sha256 OBJECT_SHA256 --max-events 100000
+env UV_OFFLINE=1 just reconstruct /path/to/parsed/parses/PARSE_DIGEST --store /path/to/operations
+env UV_OFFLINE=1 just reconstruct --help
+env UV_OFFLINE=1 just reconstruct /path/to/parsed/parses/PARSE_DIGEST --store /path/to/operations --object-sha256 OBJECT_SHA256 --max-events 100000
 ```
 
 ## Observações automáticas e afirmações revisadas
@@ -220,6 +220,6 @@ evidenciada e substituição da publicação afetada. Não há publicação Duck
 importações eleitorais, ajuste de modelos ou rótulos de fraude.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 UV_CACHE_DIR=/tmp/election-audit-uv-cache uv run --locked python -m unittest discover -s tests -p test_reconstruction.py -v
-rtk proxy env UV_OFFLINE=1 just check
+env UV_OFFLINE=1 UV_CACHE_DIR=/tmp/election-audit-uv-cache uv run --locked python -m unittest discover -s tests -p test_reconstruction.py -v
+env UV_OFFLINE=1 just check
 ```

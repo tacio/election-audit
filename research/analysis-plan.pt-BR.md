@@ -1,6 +1,6 @@
 # Auditoria estatística da eleição presidencial de 2026: protocolo do estudo
 
-Document-ID: EA-ANALYSIS-PLAN · Revision: 10 · Language: pt-BR
+Document-ID: EA-ANALYSIS-PLAN · Revision: 11 · Language: pt-BR
 
 [English](analysis-plan.md) · [Plano de conclusão](completion-plan.pt-BR.md) · [Trabalhos relacionados](related-work.pt-BR.md)
 
@@ -62,7 +62,7 @@ escrevê-lo. Nesta revisão:
   turno.
 - **Registros de inspeção:** todo local listado em
   `data/phase15/inspection.sqlite`, `data/national/phase11-protection-2026-10-31/`,
-  `~/data/election-audit-stage/inspection/phase20b-national-20261109.sqlite` (os 7824 locais de votação das 12016 seções cujas linhas de integridade
+  `$EA_STAGE/inspection/phase20b-national-20261109.sqlite` (os 7824 locais de votação das 12016 seções cujas linhas de integridade
   foram vistas nas Fases 20 e 20b, registrados em 9 de novembro de 2026) e nos
   registros de lotes da Fase 11 é dado de desenvolvimento.
 - **Passada semântica nacional (Fase 21):** agregados por sessão de todo log elegível

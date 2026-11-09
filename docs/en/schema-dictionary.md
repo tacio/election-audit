@@ -1,6 +1,6 @@
 # Schema dictionary
 
-Document-ID: EA-SCHEMA-DICTIONARY · Revision: 2 · Language: en
+Document-ID: EA-SCHEMA-DICTIONARY · Revision: 3 · Language: en
 
 [Português](../pt-BR/schema-dictionary.md)
 
@@ -83,5 +83,5 @@ foreign rows, nonnegative counts, canonical eligibility or accounting. Later
 publication must run the relational/semantic checks in the conventions.
 
 ```sh
-rtk proxy env UV_CACHE_DIR=/tmp/election-audit-uv-cache UV_OFFLINE=1 uv run --locked python -m election_audit.contracts
+env UV_CACHE_DIR=/tmp/election-audit-uv-cache UV_OFFLINE=1 uv run --locked python -m election_audit.contracts
 ```

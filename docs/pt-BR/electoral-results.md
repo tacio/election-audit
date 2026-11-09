@@ -1,6 +1,6 @@
 # Importações eleitorais e publicações derivadas
 
-Document-ID: EA-ELECTORAL-RESULTS · Revision: 3 · Language: pt-BR
+Document-ID: EA-ELECTORAL-RESULTS · Revision: 4 · Language: pt-BR
 
 [English](../en/electoral-results.md) · [Índice](implementation-index.md) · [Publicação](publication.md)
 
@@ -55,8 +55,8 @@ verificado. Snapshots anteriores mantêm seus indicadores. Outras UFs/categorias
 edições do dicionário exigem revisão.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 uv run --locked python -m election_audit.official_bu --bundle data/official-bu/ac-runoff-2026-10-30/bundle.json --output data/official-bu/ac-runoff-2026-10-30/validation-recheck.json
-rtk proxy env UV_OFFLINE=1 just import-results data/phase9/pilot/warehouse/releases/64eafb496f230a6634f3eade0c49cbacd7845d95a1ac73d7a2bbc76070cc998a --bundle data/official-bu/ac-runoff-2026-10-30/bundle.json --store data/official-bu/ac-runoff-2026-10-30/warehouse --max-events 200000
+env UV_OFFLINE=1 uv run --locked python -m election_audit.official_bu --bundle data/official-bu/ac-runoff-2026-10-30/bundle.json --output data/official-bu/ac-runoff-2026-10-30/validation-recheck.json
+env UV_OFFLINE=1 just import-results data/phase9/pilot/warehouse/releases/64eafb496f230a6634f3eade0c49cbacd7845d95a1ac73d7a2bbc76070cc998a --bundle data/official-bu/ac-runoff-2026-10-30/bundle.json --store data/official-bu/ac-runoff-2026-10-30/warehouse --max-events 200000
 ```
 
 Importações normalizadas explícitas já são utilizáveis. Um pacote local lista apenas
@@ -117,11 +117,11 @@ fica como string vazia. População explicitamente nacional inclui exterior (ZZ)
 sua lista declarada nunca é inferida dos registros disponíveis.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just import-results /ssd/audit/releases/PARENT_DIGEST --bundle /ssd/normalized/bundle.json --store /ssd/audit
-rtk proxy env UV_OFFLINE=1 just validate /ssd/audit
-rtk proxy env UV_OFFLINE=1 just query /ssd/audit --sql 'SELECT selection_state, count(*) FROM canonical_result GROUP BY selection_state'
-rtk proxy env UV_OFFLINE=1 just query /ssd/audit --sql "SELECT result_version_id, json_extract_string(payload, '$.state') FROM result_reconciliation"
-rtk proxy env UV_OFFLINE=1 just report /ssd/audit --output /ssd/reports
+env UV_OFFLINE=1 just import-results /ssd/audit/releases/PARENT_DIGEST --bundle /ssd/normalized/bundle.json --store /ssd/audit
+env UV_OFFLINE=1 just validate /ssd/audit
+env UV_OFFLINE=1 just query /ssd/audit --sql 'SELECT selection_state, count(*) FROM canonical_result GROUP BY selection_state'
+env UV_OFFLINE=1 just query /ssd/audit --sql "SELECT result_version_id, json_extract_string(payload, '$.state') FROM result_reconciliation"
+env UV_OFFLINE=1 just report /ssd/audit --output /ssd/reports
 ```
 
 `publish_derivative(parent, bundle, store, config=None)` usa configuração existente

@@ -1,6 +1,6 @@
 # Streaming semantic pass (Phase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 7 · Language: en
+Document-ID: EA-SEMANTIC-PASS · Revision: 8 · Language: en
 
 [Português](../pt-BR/semantic-pass.md) · [Implementation index](implementation-index.md)
 
@@ -58,13 +58,13 @@ sampled AC objects per round (45003 and 39466 completed cycles); the pass took
 
 ```sh
 just semantic-pass equivalence \
-  --staged-root ~/data/election-audit-stage/2026/turno-2 --round 2 \
-  --output ~/data/election-audit-stage/phase21/equivalence-r2-ac-200 \
+  --staged-root $EA_STAGE/2026/turno-2 --round 2 \
+  --output $EA_STAGE/phase21/equivalence-r2-ac-200 \
   --exclusions data/national/phase11-protection-2026-10-31/exclusions.json \
   --uf ac --sample 200 --seed 2103
 just semantic-pass run \
-  --staged-root ~/data/election-audit-stage/2026/turno-2 --round 2 \
-  --output ~/data/election-audit-stage/phase21/national-r2-20261103 \
+  --staged-root $EA_STAGE/2026/turno-2 --round 2 \
+  --output $EA_STAGE/phase21/national-r2-20261103 \
   --exclusions data/national/phase11-protection-2026-10-31/exclusions.json \
   --workers 6
 ```
@@ -122,7 +122,7 @@ errors. Active time excludes two machine suspends.
 Acceptance, per run: every session shard has the nine columns, and every column
 shared with the earlier release (2026 v1, 2022 v2) is equal in every session,
 segment and object row, both ways. The roots are
-`~/data/election-audit-stage/phase22/v3-national-r{1,2}-20261105/` and
+`$EA_STAGE/phase22/v3-national-r{1,2}-20261105/` and
 `v3-national-2022-r{1,2}-20261105/`. Each run has a single software version among
 official sessions (`10.23.0.0 - Praia da Barra do Cahy` in 2026,
 `8.26.0.0 - Onça-pintada` in 2022). A few sessions have no version line: 1 in
@@ -154,7 +154,7 @@ cycles; 2022: 43707 and 40360).
 | 2022 | 2 | 471983 | 3570943 | 5726472 | 1284 | 835 | 2:52:30 | 63535 s | 1.08 GB | 830 MB |
 
 All four ran on 7–8 November 2026 with 6 workers and no object errors, into
-`~/data/election-audit-stage/phase20b-sessions/v4-national-r{1,2}-20261107/` and
+`$EA_STAGE/phase20b-sessions/v4-national-r{1,2}-20261107/` and
 `v4-national-2022-r{1,2}-20261107/`. Peak memory is the largest single process. Each
 sample equivalence took 3:10 to 5:41, almost all of it in the adapter. Sections with
 no official session of the round fall from 1636 and 1449 to 12 and 4 in 2026, and
@@ -187,7 +187,7 @@ The [zerésima](integrity-checks.md#zerésima) and
 | 2 | 498581 | 10312157 | 850 | 3:34:03 | 75786 s | 1.06 GB | 922 MB |
 
 Both ran on 9 November 2026 with 6 workers and no object errors, into
-`~/data/election-audit-stage/phase20b-zeresima/v5-national-r{1,2}-20261108/`. Their
+`$EA_STAGE/phase20b-zeresima/v5-national-r{1,2}-20261108/`. Their
 sessions, segments, objects and vocabulary tables equal version 4 row for row
 (`EXCEPT ALL` both ways, zero rows). Runoff logs carry the round-1 history, so the
 round-2 release holds both rounds' markers; checks select blocks by context.
@@ -210,13 +210,13 @@ row per section to `sa_sections.parquet`.
 
 ```sh
 just sa-logs fetch \
-  --staged-root ~/data/election-audit-stage/2026/turno-1 --round 1 \
-  --output ~/data/election-audit-stage/sa-logs/fetch-r1-20261104 \
-  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot
+  --staged-root $EA_STAGE/2026/turno-1 --round 1 \
+  --output $EA_STAGE/sa-logs/fetch-r1-20261104 \
+  --bulk-root $EA_DATA/bulk/2026-arqurnatot
 just sa-logs summarize \
-  --input ~/data/election-audit-stage/sa-logs/fetch-r1-20261104 \
-  --input ~/data/election-audit-stage/sa-logs/fetch-r2-20261104 \
-  --output ~/data/election-audit-stage/sa-logs/summary-20261104 \
+  --input $EA_STAGE/sa-logs/fetch-r1-20261104 \
+  --input $EA_STAGE/sa-logs/fetch-r2-20261104 \
+  --output $EA_STAGE/sa-logs/summary-20261104 \
   --exclusions data/national/phase11-protection-2026-10-31/exclusions.json
 ```
 
@@ -283,14 +283,14 @@ objects per round (43707 and 40220 completed cycles); the pass took 10.4 s and
 
 ```sh
 just semantic-pass equivalence \
-  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2022-arqurnatot \
+  --bulk-root $EA_DATA/bulk/2022-arqurnatot \
   --year 2022 --round 2 \
-  --output ~/data/election-audit-stage/phase21/equivalence-2022-r2-ac-200 \
+  --output $EA_STAGE/phase21/equivalence-2022-r2-ac-200 \
   --uf ac --sample 200 --seed 2103
 just semantic-pass run \
-  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2022-arqurnatot \
+  --bulk-root $EA_DATA/bulk/2022-arqurnatot \
   --year 2022 --round 2 \
-  --output ~/data/election-audit-stage/phase21/national-2022-r2-v2-20261104 \
+  --output $EA_STAGE/phase21/national-2022-r2-v2-20261104 \
   --workers 6
 ```
 

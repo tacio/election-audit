@@ -204,10 +204,15 @@ def describe_run(
     return descriptor
 
 
+# The synthetic demo writes about 12 MiB; the national reserve (10 GiB) and spill cap (8 GiB)
+# would refuse it on small disks (xr1-20261109-P8-07). It needs 2 GiB free.
+DEMO_RESOURCES = {"spill_bytes": 1024**3, "reserve_bytes": 1024**3}
+
+
 def demo(output: str | Path) -> JSON:
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
-    config = ResourceConfig()
+    config = ResourceConfig(**DEMO_RESOURCES)
     started = time.monotonic()
     raw = synthetic_source(output / "synthetic-source")
     snapshot = create_snapshot(

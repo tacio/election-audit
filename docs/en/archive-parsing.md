@@ -1,6 +1,6 @@
 # Frozen archive parsing
 
-Document-ID: EA-ARCHIVE-PARSING · Revision: 2 · Language: en
+Document-ID: EA-ARCHIVE-PARSING · Revision: 3 · Language: en
 
 [Português](../pt-BR/archive-parsing.md) · [Implementation index](implementation-index.md)
 
@@ -15,8 +15,8 @@ guards and message classes. A UF subset is partial national coverage, and sectio
 samples retain the frozen whole-UF denominator.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just parse /path/to/derived/SNAPSHOT_DIGEST --store /path/to/parsed
-rtk proxy env UV_OFFLINE=1 just parse --help
+env UV_OFFLINE=1 just parse /path/to/derived/SNAPSHOT_DIGEST --store /path/to/parsed
+env UV_OFFLINE=1 just parse --help
 ```
 
 The command prints a completed publication directory. `--store` must be outside
@@ -134,7 +134,7 @@ Phase 4 acceptance all 15 parser fixtures and all 83 repository tests passed; re
 help also passed.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 UV_CACHE_DIR=/tmp/election-audit-uv-cache uv run --locked python -m unittest discover -s tests -p test_archive_parsing.py -v
-rtk proxy env UV_OFFLINE=1 just check
-rtk proxy env UV_OFFLINE=1 just parse --help
+env UV_OFFLINE=1 UV_CACHE_DIR=/tmp/election-audit-uv-cache uv run --locked python -m unittest discover -s tests -p test_archive_parsing.py -v
+env UV_OFFLINE=1 just check
+env UV_OFFLINE=1 just parse --help
 ```

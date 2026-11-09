@@ -1,6 +1,6 @@
 # Frozen snapshots and coverage
 
-Document-ID: EA-SNAPSHOTS · Revision: 2 · Language: en
+Document-ID: EA-SNAPSHOTS · Revision: 3 · Language: en
 
 [Português](../pt-BR/snapshots.md) · [Implementation index](implementation-index.md)
 
@@ -26,8 +26,8 @@ Members outside the asset selection remain in coverage as `not_selected`, with
 The following paths and section are illustrative, not a live-corpus command run.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just snapshot --source /path/to/raw --store /path/to/derived --ufs ac --section ac/01120/0001/0001 --reserve-gib 10
-rtk proxy env UV_OFFLINE=1 just snapshot-inspect /path/to/derived/SNAPSHOT_DIGEST --verify-objects
+env UV_OFFLINE=1 just snapshot --source /path/to/raw --store /path/to/derived --ufs ac --section ac/01120/0001/0001 --reserve-gib 10
+env UV_OFFLINE=1 just snapshot-inspect /path/to/derived/SNAPSHOT_DIGEST --verify-objects
 ```
 
 Repeat `--section UF/MUNICIPALITY/ZONE/SECTION` for more assets; codes must have

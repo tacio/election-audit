@@ -1,6 +1,6 @@
 # Tier 1 integrity checks (Phase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 11 · Language: en
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 12 · Language: en
 
 [Português](../pt-BR/integrity-checks.md) · [Implementation index](implementation-index.md)
 
@@ -38,26 +38,26 @@ binding, a summary and file hashes.
 
 ```sh
 just integrity-check sections \
-  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot \
-  --round 2 --output ~/data/election-audit-stage/phase20/national-r2-sections-v1-20261105 \
+  --bulk-root $EA_DATA/bulk/2026-arqurnatot \
+  --round 2 --output $EA_STAGE/phase20/national-r2-sections-v1-20261105 \
   --workers 6
 just integrity-check bweb \
-  --sections ~/data/election-audit-stage/phase20/national-r2-sections-v1-20261105 \
-  --bweb-root ~/data/election-audit-stage/inputs/resultados-2026-boletim-de-urna \
-  --output ~/data/election-audit-stage/phase20/national-r2-bweb-v1-20261105
+  --sections $EA_STAGE/phase20/national-r2-sections-v1-20261105 \
+  --bweb-root $EA_STAGE/inputs/resultados-2026-boletim-de-urna \
+  --output $EA_STAGE/phase20/national-r2-bweb-v1-20261105
 just integrity-check hierarchy \
-  --bweb-root ~/data/election-audit-stage/inputs/resultados-2026-boletim-de-urna \
-  --ea20-root ~/data/election-audit-stage/results-hierarchy/ea20-r2-20261104 \
-  --round 2 --output ~/data/election-audit-stage/phase20/national-r2-hierarchy-v1-20261105
+  --bweb-root $EA_STAGE/inputs/resultados-2026-boletim-de-urna \
+  --ea20-root $EA_STAGE/results-hierarchy/ea20-r2-20261104 \
+  --round 2 --output $EA_STAGE/phase20/national-r2-hierarchy-v1-20261105
 just integrity-check correspondence \
-  --sections ~/data/election-audit-stage/phase20/national-r2-sections-v1-20261105 \
-  --ceft-root ~/data/election-audit-stage/inputs/resultados-2026-correspondencias-esperadas-e-efetivadas-2-turno \
-  --output ~/data/election-audit-stage/phase20/national-r2-correspondence-v1-20261105
+  --sections $EA_STAGE/phase20/national-r2-sections-v1-20261105 \
+  --ceft-root $EA_STAGE/inputs/resultados-2026-correspondencias-esperadas-e-efetivadas-2-turno \
+  --output $EA_STAGE/phase20/national-r2-correspondence-v1-20261105
 just integrity-check logs \
-  --sections ~/data/election-audit-stage/phase20/national-r2-sections-v1-20261105 \
-  --semantic ~/data/election-audit-stage/phase21/national-r2-20261103 \
-  --semantic-round1 ~/data/election-audit-stage/phase21/national-r1-20261103 \
-  --output ~/data/election-audit-stage/phase20/national-r2-logs-v1-20261105
+  --sections $EA_STAGE/phase20/national-r2-sections-v1-20261105 \
+  --semantic $EA_STAGE/phase21/national-r2-20261103 \
+  --semantic-round1 $EA_STAGE/phase21/national-r1-20261103 \
+  --output $EA_STAGE/phase20/national-r2-logs-v1-20261105
 ```
 
 ## What each check compares
@@ -164,7 +164,7 @@ On AC (both rounds, development data) and ZZ (round 1), before the national runs
 ## National results
 
 Runs of 5 November 2026, both rounds, 499207 sections each, into
-`~/data/election-audit-stage/phase20/national-r{1,2}-*-20261105/` (`sections-v1`,
+`$EA_STAGE/phase20/national-r{1,2}-*-20261105/` (`sections-v1`,
 `bweb-v1c`, `hierarchy-v1`, `correspondence-v1`, `logs-v1`). The section pass took
 64 and 59 minutes with six workers.
 
@@ -232,12 +232,12 @@ Runs of 5 November 2026, both rounds, 499207 sections each, into
 ## Phase 20b: signatures and certificates
 
 Runs of 6 November 2026 into
-`~/data/election-audit-stage/phase20/national-r{1,2}-sections-v3-20261106/`:
+`$EA_STAGE/phase20/national-r{1,2}-sections-v3-20261106/`:
 
 ```sh
 just integrity-check sections \
-  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot \
-  --round 1 --output ~/data/election-audit-stage/phase20/national-r1-sections-v3-20261106 \
+  --bulk-root $EA_DATA/bulk/2026-arqurnatot \
+  --round 1 --output $EA_STAGE/phase20/national-r1-sections-v3-20261106 \
   --workers 6
 ```
 
@@ -297,10 +297,10 @@ Run of 7 November 2026:
 
 ```sh
 just integrity-check prefix \
-  --logs ~/data/election-audit-stage/phase20/national-r2-logs-v1-20261105 \
-  --semantic ~/data/election-audit-stage/phase21/national-r2-20261103 \
-  --semantic-round1 ~/data/election-audit-stage/phase21/national-r1-20261103 \
-  --output ~/data/election-audit-stage/phase20b-i6/national-v1-20261107 --workers 6
+  --logs $EA_STAGE/phase20/national-r2-logs-v1-20261105 \
+  --semantic $EA_STAGE/phase21/national-r2-20261103 \
+  --semantic-round1 $EA_STAGE/phase21/national-r1-20261103 \
+  --output $EA_STAGE/phase20b-i6/national-v1-20261107 --workers 6
 ```
 
 | Round-1 block pairs | Pairs | Status |
@@ -361,14 +361,14 @@ rerun with session rules `sessions-v2` (`session-aggregates-v4`,
 the new passes (`logs-v2`, code `integrity-logs-v1`), and with memory copies of a
 session counted once (`logs-v3`, code `integrity-logs-v2`,
 [O16](observations.md#operations)). The final roots are
-`~/data/election-audit-stage/phase20/national-r{1,2}-logs-v3-20261108/`.
+`$EA_STAGE/phase20/national-r{1,2}-logs-v3-20261108/`.
 
 ```sh
 just integrity-check logs \
-  --sections ~/data/election-audit-stage/phase20/national-r2-sections-v4-20261107 \
-  --semantic ~/data/election-audit-stage/phase20b-sessions/v4-national-r2-20261107 \
-  --semantic-round1 ~/data/election-audit-stage/phase20b-sessions/v4-national-r1-20261107 \
-  --output ~/data/election-audit-stage/phase20/national-r2-logs-v3-20261108
+  --sections $EA_STAGE/phase20/national-r2-sections-v4-20261107 \
+  --semantic $EA_STAGE/phase20b-sessions/v4-national-r2-20261107 \
+  --semantic-round1 $EA_STAGE/phase20b-sessions/v4-national-r1-20261107 \
+  --output $EA_STAGE/phase20/national-r2-logs-v3-20261108
 ```
 
 | Check | Phase 20, round 1 | Phase 20b, round 1 | Phase 20, round 2 | Phase 20b, round 2 |
@@ -423,7 +423,7 @@ reports no divergence in either round, which agrees with I3 v4. Only these
 sections and DataUrnas-BR's national counts were read.
 
 **I6 rerun.** `integrity-check prefix` ran again on `logs-v2` and the v4 passes into
-`~/data/election-audit-stage/phase20b-i6/national-v2-20261107/` (same code,
+`$EA_STAGE/phase20b-i6/national-v2-20261107/` (same code,
 `integrity-round1-prefix-v1`). The new block limits change the pairs: 497032 block
 pairs, 496999 objects read, no object or rebuild error.
 
@@ -473,7 +473,7 @@ file and checks the printed totals against the counts they sum. Printed fields t
 have no BU field (`AGRE`, `ORLC`, `PROC`, `DTPL`, `VERC`) are not compared; any
 unparsed token is recorded.
 
-Inputs, frozen on 7 November 2026 in `~/data/election-audit-stage/inputs/`:
+Inputs, frozen on 7 November 2026 in `$EA_STAGE/inputs/`:
 
 - `i8-cmind-20261107`: the 120 BUs of CMInd's Totalização Paralela, from its public
   API (`/api/public-bu`, the endpoint its site calls without login), with the raw QR
@@ -492,10 +492,10 @@ selection is random, and both depend on who chose to scan.
 
 ```sh
 just integrity-check printed \
-  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot \
-  --cmind ~/data/election-audit-stage/inputs/i8-cmind-20261107 \
-  --arvor ~/data/election-audit-stage/inputs/i8-arvor-20261107 \
-  --output ~/data/election-audit-stage/phase20b-i8/v1-20261107
+  --bulk-root $EA_DATA/bulk/2026-arqurnatot \
+  --cmind $EA_STAGE/inputs/i8-cmind-20261107 \
+  --arvor $EA_STAGE/inputs/i8-arvor-20261107 \
+  --output $EA_STAGE/phase20b-i8/v1-20261107
 ```
 
 | Collection | Round | Copies | Equal |
@@ -535,18 +535,18 @@ every Ed521 verdict, on urn signatures and on the CA signature of each urn
 certificate, to DataUrnas-BR's own verifier, loaded unmodified from a pinned file.
 It also runs the 53 vectors of `ed521rs` (33 edge cases, 2 from ECPy, 18 from 2026
 urns) through both verifiers. Inputs, frozen in
-`~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/`: DataUrnas-BR's
+`$EA_STAGE/inputs/ed521-crosscheck-refs-20261108/`: DataUrnas-BR's
 `ed521.py` at commit `f5e8005` (SHA-256 `bff76f54…`) and the vectors of `ed521rs` at
 commit `e711763`.
 
 ```sh
 just integrity-check ed521-crosscheck \
-  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot \
+  --bulk-root $EA_DATA/bulk/2026-arqurnatot \
   --round 1 --workers 6 \
-  --reference ~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/dataurnas-ed521.py \
+  --reference $EA_STAGE/inputs/ed521-crosscheck-refs-20261108/dataurnas-ed521.py \
   --reference-label alissonlinneker/DataUrnas-BR@f5e80059526e511bea7d52aef6a1570de42c3789 \
-  --vectors ~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/vectors \
-  --output ~/data/election-audit-stage/phase20b-ed521/national-r1-20261108
+  --vectors $EA_STAGE/inputs/ed521-crosscheck-refs-20261108/vectors \
+  --output $EA_STAGE/phase20b-ed521/national-r1-20261108
 ```
 
 | Round | Sections | Urn signatures | CA signatures | Disagreements |
@@ -576,9 +576,9 @@ contingency urn takes over a section whose zerésima the replaced urn printed.
 
 ```sh
 just integrity-check zeresima \
-  --sections ~/data/election-audit-stage/phase20/national-r1-sections-v4-20261107 \
-  --semantic ~/data/election-audit-stage/phase20b-zeresima/v5-national-r1-20261108 \
-  --output ~/data/election-audit-stage/phase20b-zeresima/national-r1-zeresima-v2-20261109
+  --sections $EA_STAGE/phase20/national-r1-sections-v4-20261107 \
+  --semantic $EA_STAGE/phase20b-zeresima/v5-national-r1-20261108 \
+  --output $EA_STAGE/phase20b-zeresima/national-r1-zeresima-v2-20261109
 ```
 
 | Round | Sections read | Passed | Failed | Without official votes | Two or more urns with a zerésima | Protected or unavailable |
@@ -630,10 +630,10 @@ exports. The `leiame.pdf` in each archive (dated 2024) explains only the file na
 
 ```sh
 just integrity-check gedai \
-  --sections ~/data/election-audit-stage/phase20/national-r1-sections-v4-20261107 \
-  --gedai-root ~/data/election-audit-stage/inputs/resultados-2026-logs-do-sistema-de-preparacao-das-urnas-eletronicas-gedai-1-turno \
-  --gedai-root ~/data/election-audit-stage/inputs/resultados-2026-logs-do-sistema-de-preparacao-das-urnas-eletronicas-gedai-2-turno \
-  --output ~/data/election-audit-stage/phase20b-gedai/national-r1-gedai-v3-20261109
+  --sections $EA_STAGE/phase20/national-r1-sections-v4-20261107 \
+  --gedai-root $EA_STAGE/inputs/resultados-2026-logs-do-sistema-de-preparacao-das-urnas-eletronicas-gedai-1-turno \
+  --gedai-root $EA_STAGE/inputs/resultados-2026-logs-do-sistema-de-preparacao-das-urnas-eletronicas-gedai-2-turno \
+  --output $EA_STAGE/phase20b-gedai/national-r1-gedai-v3-20261109
 ```
 
 | Round | Section match | Contingency match | Zone unpublished (G1) | Zone unpublished (G3) | G1 failed | G3 failed | G2 failed |
@@ -680,15 +680,15 @@ the check compares names and results, not file contents:
 
 The lists were downloaded in a browser on 8 November 2026 (TSE refuses scripted
 requests, [T5](observations.md#transparency)) and frozen in
-`~/data/election-audit-stage/inputs/tse-www-20261108/` with their URLs; all four
+`$EA_STAGE/inputs/tse-www-20261108/` with their URLs; all four
 are byte-identical to DataUrnas-BR's copies of 27 October.
 
 ```sh
 just integrity-check hash-lists \
-  --semantic ~/data/election-audit-stage/phase20b-zeresima/v5-national-r1-20261108 \
-  --semantic ~/data/election-audit-stage/phase20b-zeresima/v5-national-r2-20261108 \
-  --lists ~/data/election-audit-stage/inputs/tse-www-20261108 \
-  --output ~/data/election-audit-stage/phase20b-hash-lists/national-v1-20261109
+  --semantic $EA_STAGE/phase20b-zeresima/v5-national-r1-20261108 \
+  --semantic $EA_STAGE/phase20b-zeresima/v5-national-r2-20261108 \
+  --lists $EA_STAGE/inputs/tse-www-20261108 \
+  --output $EA_STAGE/phase20b-hash-lists/national-v1-20261109
 ```
 
 - Of the 1456 (round, model, application, stage, path) rows, 1040 are data files
@@ -753,9 +753,9 @@ Copies of a block in both memories count once.
 
 ```sh
 just integrity-check signature-errors \
-  --sections ~/data/election-audit-stage/phase20/national-r1-sections-v4-20261107 \
-  --semantic ~/data/election-audit-stage/phase20b-zeresima/v5-national-r1-20261108 \
-  --output ~/data/election-audit-stage/phase20b-signature-errors/national-r1-signature-errors-v3-20261109
+  --sections $EA_STAGE/phase20/national-r1-sections-v4-20261107 \
+  --semantic $EA_STAGE/phase20b-zeresima/v5-national-r1-20261108 \
+  --output $EA_STAGE/phase20b-signature-errors/national-r1-signature-errors-v3-20261109
 ```
 
 | Round | Sections with errors | Verification errors (start-up / in session) | Signing errors (start-up / in session) | Errors followed by later votes | Recovered by sync (with votes before a restart) | Failed v2 / v3 |
@@ -820,13 +820,13 @@ lists refuses scripted requests (T5); the user downloaded both in a browser on
 
 ```sh
 just results-hierarchy fetch-signed \
-  --ea20-root ~/data/election-audit-stage/results-hierarchy/ea20-r1-20261104 \
-  --output ~/data/election-audit-stage/phase20b-jws/signed-r1-20261108
+  --ea20-root $EA_STAGE/results-hierarchy/ea20-r1-20261104 \
+  --output $EA_STAGE/phase20b-jws/signed-r1-20261108
 just integrity-check jws \
-  --signed-root ~/data/election-audit-stage/phase20b-jws/signed-r1-20261108 \
-  --key ~/data/election-audit-stage/inputs/tse-jws-key-20261108/key.json \
-  --crls ~/data/election-audit-stage/inputs/tse-jws-crls-20261109 \
-  --output ~/data/election-audit-stage/phase20b-jws/national-r1-jws-v2-20261109
+  --signed-root $EA_STAGE/phase20b-jws/signed-r1-20261108 \
+  --key $EA_STAGE/inputs/tse-jws-key-20261108/key.json \
+  --crls $EA_STAGE/inputs/tse-jws-crls-20261109 \
+  --output $EA_STAGE/phase20b-jws/national-r1-jws-v2-20261109
 ```
 
 In both rounds all 5786 files (Brazil, 28 UF files and 5757 municipalities) have
@@ -877,19 +877,19 @@ releases stay as they were.
 
 ```sh
 just integrity-check sections \
-  --bulk-root /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/bulk/2026-arqurnatot \
-  --round 1 --output ~/data/election-audit-stage/phase20/national-r1-sections-v5-20261109 \
+  --bulk-root $EA_DATA/bulk/2026-arqurnatot \
+  --round 1 --output $EA_STAGE/phase20/national-r1-sections-v5-20261109 \
   --workers 6
 just integrity-check ed521-vectors \
-  --reference ~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/dataurnas-ed521.py \
+  --reference $EA_STAGE/inputs/ed521-crosscheck-refs-20261108/dataurnas-ed521.py \
   --reference-label alissonlinneker/DataUrnas-BR@f5e80059526e511bea7d52aef6a1570de42c3789 \
-  --vectors ~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/vectors \
-  --output ~/data/election-audit-stage/phase20b-ed521/vectors-v2-20261109
+  --vectors $EA_STAGE/inputs/ed521-crosscheck-refs-20261108/vectors \
+  --output $EA_STAGE/phase20b-ed521/vectors-v2-20261109
 just integrity-check logs \
-  --sections ~/data/election-audit-stage/phase20/national-r2-sections-v4-20261107 \
-  --semantic ~/data/election-audit-stage/phase20b-sessions/v4-national-r2-20261107 \
-  --semantic-round1 ~/data/election-audit-stage/phase20b-sessions/v4-national-r1-20261107 \
-  --output ~/data/election-audit-stage/phase20/national-r2-logs-v4-20261109
+  --sections $EA_STAGE/phase20/national-r2-sections-v4-20261107 \
+  --semantic $EA_STAGE/phase20b-sessions/v4-national-r2-20261107 \
+  --semantic-round1 $EA_STAGE/phase20b-sessions/v4-national-r1-20261107 \
+  --output $EA_STAGE/phase20/national-r2-logs-v4-20261109
 ```
 
 Results:
@@ -919,7 +919,7 @@ Results:
   BWEB archives, all equal their recorded SHA-256.
 - Inspection: the sections of these reruns' rows, including the 31 E3 and 20 new R2
   sections whose logs were read, are registered as development data in
-  `~/data/election-audit-stage/inspection/xr1-r4-reruns-20261109.sqlite` (6551
+  `$EA_STAGE/inspection/xr1-r4-reruns-20261109.sqlite` (6551
   places, 31 s, 0.9 GB). Every one was already in the Phase 20b registry, so 7824 of
   94751 polling places remain development data.
 

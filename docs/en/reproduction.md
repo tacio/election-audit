@@ -1,18 +1,18 @@
 # Reproduction and peer review
 
-Document-ID: EA-REPRODUCTION · Revision: 6 · Language: en
+Document-ID: EA-REPRODUCTION · Revision: 7 · Language: en
 
 The offline demo is SYNTHETIC throughout: deterministic tiny ZIP originals exercise mixed device dates, exact copied history, replacement devices, manual request/cancellation, unresolved clocks and malformed nested content. Reviewed session/copy/semantic assertions are generated from exact preserved synthetic line hashes. Expected members 3, unique principals 2, normalized attending voters 10, eligible electors 20 and turnout 0.5 are known fixture numbers. They do not validate real electoral data. Unknown identity links remain unavailable; a registered exploration preserves its null result and complete history without fitting.
 
 Run from the repository with locked dependencies already installed/cached. Each demo, bundle and reproduction output must be a new directory. Full verification reads frozen hashes and releases; no downloader or live manifest is used by reproduction.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just demo --output data/my-demo
-rtk proxy env UV_OFFLINE=1 just review-bundle data/my-demo --output data/my-review
-rtk proxy env UV_OFFLINE=1 just review-bundle data/my-review --verify
-rtk proxy env UV_OFFLINE=1 just reproduce data/my-review --output data/my-reproduction
-rtk proxy env UV_OFFLINE=1 just docs-check
-rtk proxy env UV_OFFLINE=1 just docs-command-check
+env UV_OFFLINE=1 just demo --output data/my-demo
+env UV_OFFLINE=1 just review-bundle data/my-demo --output data/my-review
+env UV_OFFLINE=1 just review-bundle data/my-review --verify
+env UV_OFFLINE=1 just reproduce data/my-review --output data/my-reproduction
+env UV_OFFLINE=1 just docs-check
+env UV_OFFLINE=1 just docs-command-check
 ```
 
 `reproduction.json` preserves the source observation/snapshot identity, parse ID, bounded object groups, exact configuration paths, resources, stage validations and logical payload digests. Snapshot capture records actual local observation times; repeated fresh capture can have a different identity. Reproduction reuses those frozen bytes and times. It never fabricates observation timestamps. Synthetic source timestamps are fixture values explicitly marked as such.
@@ -21,7 +21,13 @@ Exact original physical and logical pins remain in each immutable release manife
 
 `review-bundle` exports complete relative release chains, copied frozen source objects and inventories, inputs, reports/SQL and exact whitelisted source trees: election_audit, scripts, tests, docs and research, plus pyproject.toml, uv.lock, .python-version, .gitignore, justfile and both READMEs. Live SQLite/WAL, .local-state, .git, .aws, .codex, .agents, .venv, raw source roots, caches and unrelated files are excluded. Symlinks in selected trees are rejected before copying. A complete file inventory with SHA-256 detects edits, removals and additions; a sidecar protects its wrapper against accidental corruption. This is integrity verification, not an authenticated signature: an adversary replacing manifest and sidecar together needs an external trusted digest to detect.
 
-Runtime/package versions and exact dependency lock are bundled; distributions/cache are not. Offline verification and reproduction use the installed pinned runtime. To run the exact bundled source, set the working directory to BUNDLE/source and use the already-installed Python interpreter with `-B` (or `PYTHONDONTWRITEBYTECODE=1`) so runtime bytecode does not alter the verified bundle, or install the bundled project from its lock with a populated offline cache. No network install or Git commit identity is claimed.
+Runtime/package versions and exact dependency lock are bundled; distributions/cache are not. Offline verification and reproduction use the installed pinned runtime. To run the exact bundled source, set the working directory to BUNDLE/source and use the already-installed Python interpreter with `-B` (or `PYTHONDONTWRITEBYTECODE=1`) so runtime bytecode does not alter the verified bundle, or install the bundled project from its lock with a populated offline cache. The environment must live outside the bundle: uv's default `.venv` inside BUNDLE/source would add files that verification rejects. No network install or Git commit identity is claimed.
+
+```sh
+cd BUNDLE/source
+UV_PROJECT_ENVIRONMENT=/path/outside/the/bundle/venv PYTHONDONTWRITEBYTECODE=1 uv sync --locked --offline
+UV_PROJECT_ENVIRONMENT=/path/outside/the/bundle/venv PYTHONDONTWRITEBYTECODE=1 uv run --locked --offline election-audit reproduce BUNDLE --output /new/reproduction
+```
 
 ```python
 from election_audit.reproduction import frozen_pipeline, review_bundle, reproduce
@@ -37,9 +43,9 @@ config = ResourceConfig()
 The real pilot selects one available principal in each of AC, AL, DF, ES and PR, spanning five macroregions within configured AC–RJ. It opens a query-only SQLite transaction including committed WAL and uses indexed URL ranges, at most 100000 current log mappings per UF. It records each pool count/hash/truncation, selected-UF pool rows, seed diagnostic-geographic-pilot-v1, exact index hashes, eligible principal pools, municipality/zone strata, ranks and exclusions. Index principals must self-map or have no aggregation target; selected files must exist with matching size and at most 64 MiB. Snapshot creation then hashes/copies only selected assets and UF indexes, retaining full-UF expected denominators. Selection and snapshot are separate live views: frozen selected checks, inventory and later reproduction are authoritative; later downloads cannot enter the frozen calculation.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just pilot --source /media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/raw/2026/turno-2 --output data/my-pilot
-rtk proxy env UV_OFFLINE=1 just review-bundle data/my-pilot --output data/my-pilot-review
-rtk proxy env UV_OFFLINE=1 just reproduce data/my-pilot-review --output data/my-pilot-reproduction
+env UV_OFFLINE=1 just pilot --source $EA_DATA/raw/2026/turno-2 --output data/my-pilot
+env UV_OFFLINE=1 just review-bundle data/my-pilot --output data/my-pilot-review
+env UV_OFFLINE=1 just reproduce data/my-pilot-review --output data/my-pilot-reproduction
 ```
 
 This is a diagnostic geographic design, not a probability-weighted or national estimate. Unsampled/unavailable UFs, outside-selection members and unknown denominators remain explicit. Real device dates do not independently attribute a round. Only three exact baseline message classes are decoded automatically; unknown text remains unknown, with safe original line/hash locators retained. No official session, clock, candidate attribution or new message adapter is inferred. Official BU validation is a separate electoral path (see the [electoral guide](electoral-results.md)) and never becomes operational validation.

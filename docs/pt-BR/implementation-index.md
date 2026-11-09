@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 42 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 43 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -72,7 +72,7 @@ a ordem de seção (URL do manifesto) lê a 1.9–3.5 MB/s, a ordem de caminho a
 41–61 MB/s e a ordem física (FIEMAP) a 73–92 MB/s.
 
 **Cópia para o SSD (3 de novembro): concluída nos dois turnos.** Todo objeto bruto
-foi copiado em ordem física para `~/data/election-audit-stage/2026/turno-1/` e
+foi copiado em ordem física para `$EA_STAGE/2026/turno-1/` e
 `turno-2/` (998412 e 998413 objetos, 53722200971 e 90643145031 bytes); cada corpo de
 origem foi conferido com o SHA-256 do manifesto certificado e depois cada corpo
 copiado foi recalculado no SSD. As cópias levaram 931 s e 1587 s (cerca de
@@ -89,7 +89,7 @@ arquivos por ano, todos os 56 por ano coincidindo com o `.sha512` publicado).
 Os 12 conjuntos
 de entradas pequenas (BWEB e resultados de 2026 e 2022, perfil do eleitorado e
 locais de votação, correspondências de mídias dos dois turnos de 2026 e 2022, logs
-GEDAI de 2026 dos dois turnos) estão completos em `~/data/election-audit-stage/inputs/`,
+GEDAI de 2026 dos dois turnos) estão completos em `$EA_STAGE/inputs/`,
 com todo `.sha512` publicado coincidindo. O CDN pode servir cópias antigas em cache
 para HEAD ou GET, então `bulk-download` revalida com um parâmetro descartável e
 continua exigindo ETag e tamanho coincidentes. Os relatórios de totalização são
@@ -119,7 +119,7 @@ assinatura. BU, RDV e arquivos de assinatura são decodificados com as especific
 oficiais de 2026 do TSE. Os certificados das urnas são conferidos contra as ACs
 publicadas `AC URNA`, `AC UE2020` e `AC UE2022` e suas listas de revogados. A nova
 execução nacional
-(`~/data/election-audit-stage/phase20/national-r{1,2}-sections-v3-20261106/`)
+(`$EA_STAGE/phase20/national-r{1,2}-sections-v3-20261106/`)
 verificou toda autoassinatura de hardware, 1996828 assinaturas de arquivos por turno
 e 997114 e 539817 assinaturas da cadeia do BU, sem falha; todo certificado de urna é
 assinado pela sua AC e nenhum está revogado. Em 14 e 3 seções outra urna assinou os
@@ -128,7 +128,7 @@ como versão 3 (`table-2026-v3-20261107/`, `table-2022-v3-20261106/`): onze
 municípios do Amazonas no horário do Acre estão fixados com suas fontes
 ([O12](observations.md#operação)) e nenhuma seção fica sem regra de encerramento.
 A releitura por prefixo do I6 (`integrity-check prefix`, 7 de novembro,
-`~/data/election-audit-stage/phase20b-i6/national-v1-20261107/`) releu 496793 logs
+`$EA_STAGE/phase20b-i6/national-v1-20261107/`) releu 496793 logs
 do segundo turno sem erro: todo último bloco aberto do 1º turno é prefixo exato da
 sua cópia no segundo turno (493125 seções agora totalmente iguais). Dos 113 pares de
 blocos que ainda diferem, 112 têm as mesmas linhas com limites de bloco diferentes,
@@ -137,7 +137,7 @@ cópias ([O14](observations.md#operação)); um, rj/60011/0008/0061, é uma dive
 real entre três cópias do dia de eleição de uma urna, e o log publicado do 1º turno é
 o que concorda com o BU ([O15](observations.md#operação)).
 O I8 (`integrity-check printed`, 7 de novembro,
-`~/data/election-audit-stage/phase20b-i8/v1-20261107/`) conferiu as 528 cópias
+`$EA_STAGE/phase20b-i8/v1-20261107/`) conferiu as 528 cópias
 impressas de BU lidas de QR codes pela Totalização Paralela do CMInd e pela
 Totalização paralela da Arvor (518 seções, 49 no 1º turno, 469 no segundo turno):
 toda cadeia de hashes está íntegra, toda assinatura e todo certificado de urna
@@ -190,7 +190,7 @@ por sessão. Ela rodou no país todo nos dois anos e turnos sem erros, e toda co
 em comum com as versões anteriores é igual em todas as linhas
 ([passada semântica](semantic-pass.md#versão-3-fase-22)). `section-table build`
 gravou 998496 linhas de seção em 499248 unidades harmonizadas para 2026 e 945386
-linhas em 472693 unidades para 2022, em `~/data/election-audit-stage/phase22/table-{2026,2022}-20261106/`.
+linhas em 472693 unidades para 2022, em `$EA_STAGE/phase22/table-{2026,2022}-20261106/`.
 Cópias de uma sessão na memória interna e na externa contam uma vez. Os relógios são
 julgados pelos horários legais de encerramento, com o Amazonas resolvido pelos
 encerramentos que as urnas imprimem. Toda unidade mantém a mesma seção principal nos
@@ -206,7 +206,7 @@ municípios no horário do Acre (tabelas versão 3, abaixo). Veja o
 objetos do AC amostrados (84469 ciclos concluídos). As execuções nacionais
 processaram 498580 objetos do primeiro turno e 498581 do segundo, sem erros
 (1704924 e 3393756 sessões), em
-`~/data/election-audit-stage/phase21/national-r{1,2}-20261103/`. O registro da
+`$EA_STAGE/phase21/national-r{1,2}-20261103/`. O registro da
 população reconcilia cada uma das 499207 seções por turno: 31 e 29 seções foram
 apuradas pelo Sistema de Apuração (SA) de contingência e não têm log da urna, uma
 seção de SP do segundo turno foi publicada sem log e 596 são excluídas. `sa-logs`
@@ -219,7 +219,7 @@ negativo), um leitor 7z só com a biblioteca padrão e regras de 2022 revisadas
 que recusa 2026. Ele coincidiu com o adaptador em 200 de 200 objetos do AC por
 turno e então processou 471859 e 471983 objetos sem erros (1805887 e 3570943
 sessões) em
-`~/data/election-audit-stage/phase21/national-2022-r{1,2}-v2-20261104/`. O registro
+`$EA_STAGE/phase21/national-2022-r{1,2}-v2-20261104/`. O registro
 de 2022 contabiliza cada seção dos arquivos (472024 e 472027). As análises comparam
 a habilitação biométrica com todas as outras (plano de análise rev. 3). Veja o
 [guia da passada semântica](semantic-pass.md#logs-de-2022) e o
@@ -227,7 +227,7 @@ a habilitação biométrica com todas as outras (plano de análise rev. 3). Veja
 
 **Fase 20 (verificações de integridade de nível 1): concluída para 2026, nos dois
 turnos.** `integrity-check` executou I1–I9 sobre as 499207 seções de cada turno em
-`~/data/election-audit-stage/phase20/national-r{1,2}-*-20261105/`. Todo arquivo
+`$EA_STAGE/phase20/national-r{1,2}-*-20261105/`. Todo arquivo
 publicado de BU, RDV e imagem coincide com as duas listas de hashes assinadas; as
 assinaturas ECDSA das urnas UE2013/UE2015 foram verificadas em 99985 e 99957 seções
 sem falha, enquanto as 399222 e 399250 seções Ed521 (UE2020/UE2022) não são
@@ -292,7 +292,7 @@ certificados raiz (protocolo 83529705172533) é devida até 25 de novembro de 20
 Arquivar o relatório
 consolidado do TCU sobre o teste de integridade quando for publicado (previsto até
 30 dias após o segundo turno). O
-[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 10) define as
+[protocolo do estudo](../../research/analysis-plan.pt-BR.md) (Revisão 11) define as
 afirmações, o mapa de ameaças e observáveis, as verificações de integridade I1–I9, os
 testes confirmatórios C1–C6, o estudo de poder e a política de dados; o
 [plano de conclusão](../../research/completion-plan.pt-BR.md) (Revisão 14) define as
@@ -374,32 +374,42 @@ com verificações aritméticas reais do AC (177 testes).
 
 ## Onde estão os resultados
 
-Caminhos em `data/` são relativos ao repositório e ignorados pelo Git. Caminhos
-absolutos ficam no volume de saída da máquina de referência
-`/media/tacio/f6fe5b1e-92b6-4376-9d25-bbca73160229/election-audit/`.
+Caminhos em `data/` são relativos ao repositório e ignorados pelo Git. Comandos e
+locais documentados usam duas raízes que cada máquina define para si:
+
+- `$EA_DATA`: o volume grande com as aquisições brutas, os arquivos em lote e as
+  saídas nacionais (na máquina de referência, um HDD externo montado em
+  `/media/<user>/<volume-uuid>/election-audit`);
+- `$EA_STAGE`: a área de trabalho rápida para cópias preparadas, entradas congeladas e
+  saídas da Fase 20 em diante (na máquina de referência, `~/data/election-audit-stage`
+  no SSD).
+
+O [guia de reprodução](reproduction.md#o-que-esperar-nos-dados-nacionais) dá o espaço
+que cada uma precisa. As entradas que o TSE só entrega a navegadores estão listadas,
+com seus hashes, em [entradas baixadas à mão](manual-inputs.md).
 
 | Artefato | Local |
 | --- | --- |
 | Originais brutos dos dois turnos (cópias de referência) | `raw/2026/turno-1/`, `raw/2026/turno-2/` no volume de saída |
 | Certificados de cópia, cópias certificadas dos manifestos (entradas da análise), ledgers de verificação | `2026/migration-2026-11-01/` no volume de saída |
-| Cópia verificada por hash dos dois turnos no SSD (leia estas nas passadas de logs), com certificados | `~/data/election-audit-stage/2026/turno-1/`, `~/data/election-audit-stage/2026/turno-2/` |
-| Benchmarks de ordem de leitura | `~/data/election-audit-stage/benchmarks/` |
-| Entradas pequenas da Fase 19 (BWEB, resultados, perfil do eleitorado, correspondências, GEDAI), cada uma com catálogo, manifesto e estado | `~/data/election-audit-stage/inputs/<dataset>/` |
+| Cópia verificada por hash dos dois turnos no SSD (leia estas nas passadas de logs), com certificados | `$EA_STAGE/2026/turno-1/`, `$EA_STAGE/2026/turno-2/` |
+| Benchmarks de ordem de leitura | `$EA_STAGE/benchmarks/` |
+| Entradas pequenas da Fase 19 (BWEB, resultados, perfil do eleitorado, correspondências, GEDAI), cada uma com catálogo, manifesto e estado | `$EA_STAGE/inputs/<dataset>/` |
 | Arquivos em massa de BU/RDV/log da Fase 19, 2026 e 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` no volume de saída |
-| Versões do `integrity-check` da Fase 20 (seções, BWEB, hierarquia, correspondências, logs), execuções de desenvolvimento do AC/ZZ | `~/data/election-audit-stage/phase20/` |
-| Releitura por prefixo do I6 da Fase 20b (versões nacionais v1 e v2, execução de desenvolvimento do AC) | `~/data/election-audit-stage/phase20b-i6/` |
-| Passadas semânticas v4 da Fase 20b (2026, 2022), amostras de equivalência do AC, tabelas por seção v4, logs e scripts das execuções | `~/data/election-audit-stage/phase20b-sessions/` |
-| Tabelas do DataUrnas-BR usadas na conciliação de I3/I5, congeladas no commit `f5e8005` | `~/data/election-audit-stage/inputs/dataurnas-br-f5e8005-20261108/` |
-| Comparação do Ed521 da Fase 20b; suas referências congeladas | `~/data/election-audit-stage/phase20b-ed521/`; `~/data/election-audit-stage/inputs/ed521-crosscheck-refs-20261108/` |
-| Passadas semânticas v5 e verificações de zerésima da Fase 20b; verificações do GEDAI; verificação das listas de hash; verificações de erros de assinatura; arquivos e verificações JWS | `~/data/election-audit-stage/phase20b-zeresima/`, `phase20b-gedai/`, `phase20b-hash-lists/`, `phase20b-signature-errors/`, `phase20b-jws/` |
-| Listas de hash e manual JWS do TSE (baixados num navegador); o arquivo da chave JWS | `~/data/election-audit-stage/inputs/tse-www-20261108/`, `tse-jws-key-20261108/` |
-| BUs impressos do I8 da Fase 20b; suas entradas congeladas (CMInd, Arvor, manual de QR do TSE) | `~/data/election-audit-stage/phase20b-i8/`; `~/data/election-audit-stage/inputs/i8-cmind-20261107/`, `i8-arvor-20261107/`, `i8-tse-qrbu-20261107/` |
-| Relatórios de equivalência, passada de desenvolvimento do AC, reprodução v2 do AC e passadas nacionais (2026 e 2022) da Fase 21 | `~/data/election-audit-stage/phase21/` |
-| Passadas semânticas v3, tabelas por seção (2026, 2022), execuções de desenvolvimento do AC e seleção das raízes da Fase 20, da Fase 22 | `~/data/election-audit-stage/phase22/` |
-| Pacote de formatos de 2026 do TSE (especificações, verificador de referência, certificados das ACs) e as cinco listas de revogados, congelados | `~/data/election-audit-stage/inputs/tse-format-docs-20261105/`, `~/data/election-audit-stage/inputs/tse-crls-20261105-complete/` |
-| Logs SA (apuração de contingência) por turno e seu resumo por seção | `~/data/election-audit-stage/sa-logs/` |
-| Resultados hierárquicos EA20 da eleição presidencial, dois turnos | `~/data/election-audit-stage/results-hierarchy/` |
-| Documentos do teste de integridade, amostra de dez tribunais, com arquivos de registros do navegador; os downloads originais do navegador | `~/data/election-audit-stage/inputs/integrity-tests-2026-sample-20261104/`; `~/data/election-audit-stage/integrity-downloads-20261104/` |
+| Versões do `integrity-check` da Fase 20 (seções, BWEB, hierarquia, correspondências, logs), execuções de desenvolvimento do AC/ZZ | `$EA_STAGE/phase20/` |
+| Releitura por prefixo do I6 da Fase 20b (versões nacionais v1 e v2, execução de desenvolvimento do AC) | `$EA_STAGE/phase20b-i6/` |
+| Passadas semânticas v4 da Fase 20b (2026, 2022), amostras de equivalência do AC, tabelas por seção v4, logs e scripts das execuções | `$EA_STAGE/phase20b-sessions/` |
+| Tabelas do DataUrnas-BR usadas na conciliação de I3/I5, congeladas no commit `f5e8005` | `$EA_STAGE/inputs/dataurnas-br-f5e8005-20261108/` |
+| Comparação do Ed521 da Fase 20b; suas referências congeladas | `$EA_STAGE/phase20b-ed521/`; `$EA_STAGE/inputs/ed521-crosscheck-refs-20261108/` |
+| Passadas semânticas v5 e verificações de zerésima da Fase 20b; verificações do GEDAI; verificação das listas de hash; verificações de erros de assinatura; arquivos e verificações JWS | `$EA_STAGE/phase20b-zeresima/`, `phase20b-gedai/`, `phase20b-hash-lists/`, `phase20b-signature-errors/`, `phase20b-jws/` |
+| Listas de hash e manual JWS do TSE (baixados num navegador); o arquivo da chave JWS | `$EA_STAGE/inputs/tse-www-20261108/`, `tse-jws-key-20261108/` |
+| BUs impressos do I8 da Fase 20b; suas entradas congeladas (CMInd, Arvor, manual de QR do TSE) | `$EA_STAGE/phase20b-i8/`; `$EA_STAGE/inputs/i8-cmind-20261107/`, `i8-arvor-20261107/`, `i8-tse-qrbu-20261107/` |
+| Relatórios de equivalência, passada de desenvolvimento do AC, reprodução v2 do AC e passadas nacionais (2026 e 2022) da Fase 21 | `$EA_STAGE/phase21/` |
+| Passadas semânticas v3, tabelas por seção (2026, 2022), execuções de desenvolvimento do AC e seleção das raízes da Fase 20, da Fase 22 | `$EA_STAGE/phase22/` |
+| Pacote de formatos de 2026 do TSE (especificações, verificador de referência, certificados das ACs) e as cinco listas de revogados, congelados | `$EA_STAGE/inputs/tse-format-docs-20261105/`, `$EA_STAGE/inputs/tse-crls-20261105-complete/` |
+| Logs SA (apuração de contingência) por turno e seu resumo por seção | `$EA_STAGE/sa-logs/` |
+| Resultados hierárquicos EA20 da eleição presidencial, dois turnos | `$EA_STAGE/results-hierarchy/` |
+| Documentos do teste de integridade, amostra de dez tribunais, com arquivos de registros do navegador; os downloads originais do navegador | `$EA_STAGE/inputs/integrity-tests-2026-sample-20261104/`; `$EA_STAGE/integrity-downloads-20261104/` |
 | Manifestos originais da coleta (vivos) | `.local-state/` |
 | Metadados da coleta no HDD antigo (cobertura, marcadores, manifesto obsoleto anterior à divisão) e o store por evento inicial da Fase 11 do AC, verificados por hash; os objetos brutos do HDD antigo duplicavam as cópias certificadas e foram liberados para exclusão em 3 de novembro de 2026 | `archive/old-hdd-2026-11-03/` no volume de saída |
 | Logs de execução e registros de lançamento da coleta | `data/phase10/` |

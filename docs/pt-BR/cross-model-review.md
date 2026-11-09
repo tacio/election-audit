@@ -1,6 +1,6 @@
 # Revisão cruzada entre modelos
 
-Document-ID: EA-CROSS-REVIEW · Revision: 2 · Language: pt-BR
+Document-ID: EA-CROSS-REVIEW · Revision: 3 · Language: pt-BR
 
 [English](../en/cross-model-review.md) · [Índice de implementação](implementation-index.md)
 
@@ -45,7 +45,7 @@ Dois mecanismos garantem esses limites:
 - **Leituras.** Nenhuma das sandboxes bloqueia leituras fora do clone. O limite de
   leitura é, portanto, dado por instrução e conferido depois:
   - o executor guarda o fluxo completo de eventos de cada sessão em
-    `~/data/election-audit-stage/review/<campaign>/`;
+    `$EA_STAGE/review/<campaign>/`;
   - ele lista todo comando ou chamada de ferramenta que cite um caminho do SSD,
     `.local-state`, `~/data`, o caminho deste repositório ou uma ferramenta de rede;
   - esses itens vão para `boundary_flags` em `runs.jsonl`.
@@ -277,5 +277,5 @@ quanto a sinalizações de limite. O relatório da campanha diz isso.
 | `review/packets/P*.md` | Pacotes |
 | `review/finding.schema.json` | Esquema da saída, imposto pelas duas CLIs |
 | `review/campaigns/<campaign>/` | Registro da campanha: commit fixado, `runs.jsonl`, relatórios por rodada, `ledger.jsonl`, `report.md` |
-| `~/data/election-audit-stage/review/<campaign>/` | Transcrições completas (fora do git) |
+| `$EA_STAGE/review/<campaign>/` | Transcrições completas (fora do git) |
 | `~/.cache/election-audit-review/` | Clones descartáveis |

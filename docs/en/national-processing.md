@@ -1,6 +1,6 @@
 # Bounded structural processing and hardware tuning
 
-Document-ID: EA-NATIONAL-PROCESSING · Revision: 6 · Language: en
+Document-ID: EA-NATIONAL-PROCESSING · Revision: 7 · Language: en
 
 [Português](../pt-BR/national-processing.md) · [Phase 11 evidence](handoffs/task-11.md)
 
@@ -18,14 +18,14 @@ does not change scientific eligibility or the research protocol.
 ## Setup and input
 
 Use Linux with `/proc`, Python 3.14 and the locked dependencies; DuckDB and PyArrow
-are already included. Install uv, just and rtk, then run these commands from the
+are already included. Install uv and just (rtk is optional), then run these commands from the
 repository root. An offline installation needs the dependencies cached already.
 No command here starts acquisition, a dashboard or model fitting.
 
 ```sh
-rtk proxy just setup
-rtk proxy .venv/bin/python -B -m election_audit.national_benchmark --help
-rtk proxy .venv/bin/python -B -m election_audit.national_tuning --help
+just setup
+.venv/bin/python -B -m election_audit.national_benchmark --help
+.venv/bin/python -B -m election_audit.national_tuning --help
 ```
 
 Create `data/my-national-sources.json` with your actual completed manifest, original
@@ -53,9 +53,9 @@ rounds before freezing any untouched test partition; unknown identity is not tes
 eligible. Prior pilots and existing protected partitions remain binding. If a frozen protocol already exists, pass `select --exclusions PATH` with its reviewed checksummed `structural-sample-exclusions-v1` registry: matching `round`, expanded protected/stress `section_keys`, and evidence pins. Exclude every section linked to each protected stable location, not merely one principal. Missing cross-round identity remains unavailable. The current repository review is recorded in `data/national/phase11-protection-2026-10-31/`; its overlap ledger must be propagated before a new scientific evaluation.
 
 ```sh
-rtk proxy .venv/bin/python -B -m election_audit.national_benchmark profile --config data/my-national-sources.json --output data/my-profile --scratch .local-state/my-scratch
-rtk proxy .venv/bin/python -B -m election_audit.national_benchmark select --profile data/my-profile --output data/my-sample --per-band 1
-rtk proxy env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -B -m election_audit.national_benchmark compact --sample data/my-sample --output data/my-baseline --store data/my-national-store --scratch .local-state/my-scratch --output-budget-gib 0.25 --batch-rows 2048 --memory-gib 4
+.venv/bin/python -B -m election_audit.national_benchmark profile --config data/my-national-sources.json --output data/my-profile --scratch .local-state/my-scratch
+.venv/bin/python -B -m election_audit.national_benchmark select --profile data/my-profile --output data/my-sample --per-band 1
+env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -B -m election_audit.national_benchmark compact --sample data/my-sample --output data/my-baseline --store data/my-national-store --scratch .local-state/my-scratch --output-budget-gib 0.25 --batch-rows 2048 --memory-gib 4
 ```
 
 The last command is a bounded baseline and the manual opt-out from tuning. A
@@ -73,9 +73,9 @@ by 8 MiB per batch. Processing stays at one worker; this version does not claim 
 optimize worker counts. Original reads and caches may be warm; caches are not evicted.
 
 ```sh
-rtk proxy .venv/bin/python -B -m election_audit.national_tuning prepare --sample data/my-sample --comparison data/my-baseline/benchmark.json --output data/my-tuning --store data/my-national-store --scratch .local-state/my-scratch --memory-gib 4 --output-mib 128 --seconds 900 --batches 2048 8192 32768
-rtk proxy .venv/bin/python -B -m election_audit.national_tuning run data/my-tuning
-rtk proxy env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -B -m election_audit.national_benchmark compact --sample data/my-sample --output data/my-tuned-report --store data/my-national-store --scratch .local-state/my-scratch --output-budget-gib 0.25 --tuning-config data/my-tuning/recommended.json
+.venv/bin/python -B -m election_audit.national_tuning prepare --sample data/my-sample --comparison data/my-baseline/benchmark.json --output data/my-tuning --store data/my-national-store --scratch .local-state/my-scratch --memory-gib 4 --output-mib 128 --seconds 900 --batches 2048 8192 32768
+.venv/bin/python -B -m election_audit.national_tuning run data/my-tuning
+env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -B -m election_audit.national_benchmark compact --sample data/my-sample --output data/my-tuned-report --store data/my-national-store --scratch .local-state/my-scratch --output-budget-gib 0.25 --tuning-config data/my-tuning/recommended.json
 ```
 
 The final command applies the recommendation to production processing. Existing
@@ -164,12 +164,12 @@ observation is excluded everywhere before opening bodies or cached originals.
 Absence from this list does not grant scientific or untouched-test eligibility.
 
 ```sh
-rtk proxy .venv/bin/python -B -m election_audit.national_workload --help
-rtk proxy .venv/bin/python -B -m election_audit.national_workload prepare --profile data/my-profile --exclusions data/my-exclusions.json --tuning-config data/my-tuning/recommended.json --output data/my-workload --store data/my-national-store/workload --scratch .local-state/my-scratch --reuse-store data/my-national-store --output-budget-gib 4 --future-budget-gib 4 --source-growth-gib 0
-rtk proxy .venv/bin/python -B data/my-workload/run_frozen.py preflight
-rtk proxy .venv/bin/python -B data/my-workload/run_frozen.py status
-rtk proxy env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -B data/my-workload/run_frozen.py run --max-objects 32
-rtk proxy env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -B data/my-workload/run_frozen.py run
+.venv/bin/python -B -m election_audit.national_workload --help
+.venv/bin/python -B -m election_audit.national_workload prepare --profile data/my-profile --exclusions data/my-exclusions.json --tuning-config data/my-tuning/recommended.json --output data/my-workload --store data/my-national-store/workload --scratch .local-state/my-scratch --reuse-store data/my-national-store --output-budget-gib 4 --future-budget-gib 4 --source-growth-gib 0
+.venv/bin/python -B data/my-workload/run_frozen.py preflight
+.venv/bin/python -B data/my-workload/run_frozen.py status
+env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -B data/my-workload/run_frozen.py run --max-objects 32
+env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -B data/my-workload/run_frozen.py run
 ```
 
 The example's 4 GiB output and 4 GiB future allowances deliberately bound work;

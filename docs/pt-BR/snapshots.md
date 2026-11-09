@@ -1,6 +1,6 @@
 # Snapshots congelados e cobertura
 
-Document-ID: EA-SNAPSHOTS · Revision: 2 · Language: pt-BR
+Document-ID: EA-SNAPSHOTS · Revision: 3 · Language: pt-BR
 
 [English](../en/snapshots.md) · [Índice de implementação](implementation-index.md)
 
@@ -26,8 +26,8 @@ com `outside_asset_selection`; agregação não expande automaticamente a amostr
 Caminhos e seção abaixo são ilustrativos; o comando não foi executado no acervo real.
 
 ```sh
-rtk proxy env UV_OFFLINE=1 just snapshot --source /path/to/raw --store /path/to/derived --ufs ac --section ac/01120/0001/0001 --reserve-gib 10
-rtk proxy env UV_OFFLINE=1 just snapshot-inspect /path/to/derived/SNAPSHOT_DIGEST --verify-objects
+env UV_OFFLINE=1 just snapshot --source /path/to/raw --store /path/to/derived --ufs ac --section ac/01120/0001/0001 --reserve-gib 10
+env UV_OFFLINE=1 just snapshot-inspect /path/to/derived/SNAPSHOT_DIGEST --verify-objects
 ```
 
 Repita `--section UF/MUNICIPALITY/ZONE/SECTION` para incluir arquivos; códigos têm
