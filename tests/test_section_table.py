@@ -263,3 +263,32 @@ class RowTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InputDigestTests(unittest.TestCase):
+    def test_an_input_with_its_size_but_not_its_digest_is_refused(self) -> None:
+        # xr1-20261109-P0-01: size alone does not pin the bytes that are read.
+        import hashlib
+        import re
+        import sqlite3
+        import tempfile
+        from pathlib import Path
+
+        from election_audit.section_table import _manifest_files
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "files").mkdir()
+            data = b"PK original bytes"
+            (root / "files" / "x.zip").write_bytes(data)
+            with sqlite3.connect(root / "manifest.sqlite") as db:
+                db.execute("CREATE TABLE files(path TEXT, sha256 TEXT, bytes INTEGER, status TEXT)")
+                db.execute(
+                    "INSERT INTO files VALUES(?,?,?,?)",
+                    ("files/x.zip", hashlib.sha256(data).hexdigest(), len(data), "complete"),
+                )
+            pattern = re.compile(r"files/(x)\.zip")
+            self.assertEqual(len(_manifest_files(root, pattern)), 1)
+            (root / "files" / "x.zip").write_bytes(b"PK changed  bytes")  # same size
+            with self.assertRaisesRegex(ValueError, "digest"):
+                _manifest_files(root, pattern)

@@ -536,3 +536,29 @@ class BulkPassTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StagedHashTests(unittest.TestCase):
+    def test_a_staged_object_that_changed_is_an_error_not_a_summary(self) -> None:
+        # xr1-20261109-P2-01: the parsed bytes are hashed, not trusted by their manifest entry.
+        import hashlib
+        import tempfile
+
+        from election_audit.semantic_pass import run_shard
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            body = jez(log_body(["O voto do eleitor foi computado"]))
+            (root / "a.jez").write_bytes(body)
+            (root / "b.jez").write_bytes(body + b"changed")
+            item = {"witnesses": [["ac", "01015", "0002", "0001"]], "package": "Totalizado"}
+            digest = hashlib.sha256(body).hexdigest()
+            items = [
+                {**item, "path": "a.jez", "sha256": digest},
+                {**item, "path": "b.jez", "sha256": digest},  # same pin, different bytes
+            ]
+            (root / "shards").mkdir()
+            run_shard((str(root), 2, str(root / "shards"), 0, items, None, 2026))
+            objects = pq.read_table(root / "shards" / "00000" / "objects.parquet").to_pylist()
+            self.assertEqual([o["status"] for o in objects], ["complete", "error"])
+            self.assertIn("certified hash", objects[1]["error"])

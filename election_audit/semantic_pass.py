@@ -937,7 +937,21 @@ def run_shard(
     for position, item in enumerate(items):
         if bodies is None:
             assert staged_root is not None  # staged shards carry their root
-            source, digest = Path(staged_root) / item["path"], item["sha256"]
+            # Parse the bytes whose hash is checked, never a path trusted by its manifest
+            # entry (xr1-20261109-P2-01); a changed object is an error row, not a summary.
+            source, digest = (Path(staged_root) / item["path"]).read_bytes(), item["sha256"]
+            if hashlib.sha256(source).hexdigest() != digest:
+                objects.append(
+                    {
+                        "object_sha256": digest,
+                        "path": item["path"],
+                        "witnesses_json": json.dumps(item["witnesses"], separators=(",", ":")),
+                        "package_status": item["package"],
+                        "status": "error",
+                        "error": "ValueError: staged object differs from its certified hash",
+                    }
+                )
+                continue
         else:  # bulk members arrive as bytes read in physical order by the parent
             source = bodies[position]
             digest = hashlib.sha256(source).hexdigest()

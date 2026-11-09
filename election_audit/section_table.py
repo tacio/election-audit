@@ -113,6 +113,10 @@ def _manifest_files(root: str | Path, pattern: re.Pattern[str]) -> list[Row]:
                 raise ValueError(f"Input file is not complete: {path}")
             if (root / path).stat().st_size != size:
                 raise ValueError(f"Input file size differs from its manifest: {path}")
+            if (
+                sha(root / path) != digest_
+            ):  # xr1-20261109-P0-01: the bytes read are the bytes pinned
+                raise ValueError(f"Input file differs from its manifest digest: {path}")
             found.append({"path": path, "sha256": digest_, "bytes": size, "match": match})
     return found
 
