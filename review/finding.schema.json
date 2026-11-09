@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "cross-model review report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reviewer", "packet", "round", "commit", "summary", "findings", "responses"],
+  "properties": {
+    "reviewer": {"type": "string"},
+    "packet": {"type": "string"},
+    "round": {"type": "string", "enum": ["R1", "R3", "R5"]},
+    "commit": {"type": "string"},
+    "summary": {"type": "string"},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "local_id", "severity", "category", "title", "location", "claim",
+          "evidence", "failure_scenario", "falsification", "confidence", "speculative"
+        ],
+        "properties": {
+          "local_id": {"type": "string"},
+          "severity": {"type": "string", "enum": ["critical", "high", "medium", "low", "note"]},
+          "category": {
+            "type": "string",
+            "enum": [
+              "bug", "vacuous-check", "bias", "unstated-assumption", "threat-to-validity",
+              "leakage", "privacy", "reproducibility", "doc-mismatch", "test-gap", "improvement"
+            ]
+          },
+          "title": {"type": "string"},
+          "location": {"type": "array", "items": {"type": "string"}},
+          "claim": {"type": "string"},
+          "evidence": {"type": "string"},
+          "failure_scenario": {"type": "string"},
+          "falsification": {"type": "string"},
+          "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+          "speculative": {"type": "boolean"}
+        }
+      }
+    },
+    "responses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["finding_id", "stance", "argument"],
+        "properties": {
+          "finding_id": {"type": "string"},
+          "stance": {
+            "type": "string",
+            "enum": ["accept-disposition", "contest", "agree", "disagree", "fixed", "not-fixed", "regressed"]
+          },
+          "argument": {"type": "string"}
+        }
+      }
+    }
+  }
+}

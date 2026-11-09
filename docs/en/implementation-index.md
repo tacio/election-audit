@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 39 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 40 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -249,15 +249,17 @@ No national electoral result, national margin, fitted national model or fraud
 label exists.
 
 **Checks.** The full offline gate `just check` passes (lock, format, lint,
-type check, contracts, docs, documented commands and all 437 tests). Every
+type check, contracts, docs, documented commands and all 442 tests). Every
 function in `election_audit/`, `scripts/` and `tests/` is annotated (ruff `ANN`)
 and `ty check` (pinned 0.0.94) reports no diagnostics; the conventions are in
 `CLAUDE.md`.
 
 ## Next step
 
-Start Phase 23 (development modelling, power study, protocol freeze) on development
-data only. Phase 20b is complete and its checks and gaps are registered in the
+Run the first [cross-model review](cross-model-review.md) campaign (`xr1`), in which
+Codex and Gemini challenge the code, the docs and the study protocol at a pinned commit,
+before Phase 23 starts. Then start Phase 23 (development modelling, power study,
+protocol freeze) on development data only. Phase 20b is complete and its checks and gaps are registered in the
 protocol ([handoff](handoffs/task-20b.md)); before the freeze, add TSE's reply on the
 root certificates and the TCU report to the protocol. TSE's reply to the root-certificate request (protocol
 83529705172533) is due by 25 November 2026. File the TCU consolidated integrity test
@@ -394,13 +396,14 @@ paths are on the reference machine's output volume
 | Operational reconstruction | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Phase 13), `semantic_pass` (`session-aggregates-v5`, session rules `sessions-v2`, Phases 21–22 and 20b; rules `real-log-rules.json` and `real-log-rules-2022.json`), `sa_logs` (`sa-log-summary-v1`); [reconstruction](reconstruction.md), [semantic pass](semantic-pass.md) |
 | Operational releases | `publication`, `operational_marts`, `release_tools`; [publication](publication.md) |
 | National structural processing | Summary path: `national_parallel`, `national_summary`, `national_summary_release`, `national_summary_tools`, `national_summary_tuning`, `national_resources`; [feature-oriented processing](feature-oriented-processing.md). Event-level path: `national_benchmark`, `national_tuning`, `national_workload`, `national`, `national_storage`, `national_relocation`, `national_migration`, `national_overnight`; [national processing](national-processing.md) |
-| Integrity checks | `integrity_checks` (`integrity-sections-v4`, `integrity-logs-v2`; signature layout `resources/assinatura-2026-observed.asn1`), `round1_prefix` (`integrity-round1-prefix-v1`, `integrity-check prefix`), `printed_bu` (`printed-bu-v1`, `integrity-check printed`), `ed521_crosscheck` (`ed521-crosscheck-v1`), `zeresima` (`integrity-zeresima-v2`), `gedai` (`integrity-gedai-v3`), `hash_lists` (`integrity-hash-lists-v1`), `signature_errors` (`integrity-signature-errors-v1`), `signed_results` (`signed-results-fetch-v1`, `integrity-jws-v1`; `results-hierarchy fetch-signed`); [integrity checks](integrity-checks.md) |
+| Integrity checks | `integrity_checks` (`integrity-sections-v4`, `integrity-logs-v2`; signature layout `resources/assinatura-2026-observed.asn1`), `round1_prefix` (`integrity-round1-prefix-v1`, `integrity-check prefix`), `printed_bu` (`printed-bu-v1`, `integrity-check printed`), `ed521_crosscheck` (`ed521-crosscheck-v1`), `zeresima` (`integrity-zeresima-v2`), `gedai` (`integrity-gedai-v3`), `hash_lists` (`integrity-hash-lists-v1`), `signature_errors` (`integrity-signature-errors-v1`), `signed_results` (`signed-results-fetch-v1`, `integrity-jws-v2`; `results-hierarchy fetch-signed`); [integrity checks](integrity-checks.md) |
 | Electoral imports and verification | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` and `electoral_verification` (Phase 12); [electoral results](electoral-results.md). `electoral_references` is an unwired, untested prototype for official reference sets |
 | Analysis foundation | `analysis`, `analysis_partitions`, `analysis_ledgers`, `analysis_reports`; [analysis](analysis.md) |
 | Section table | `section_table` (`section-features-v4`, Phases 22 and 20b); [section table](section-table.md), [observation register](observations.md) |
 | Research path | `features` (Phase 14), `research_protocol` and `research_evaluation` (Phase 15), `research_models` (Phase 16), `investigations` (Phase 17); see their handoffs |
 | Dashboard | `dashboard`, `dashboard_data`, `dashboard_ui`, `dashboard_development`, `election_audit/notebooks/` (Phase 18) |
 | Reproduction | `reproduction`, `pilot`, `walkthrough`; [reproduction](reproduction.md) (national run times and resources: [what to expect](reproduction.md#what-to-expect-on-the-national-data)), [backfill](backfill.md) |
+| Cross-model review | `scripts/cross_review.py` (`prepare`, `run`, `prompt`), `review/` (prompts, packets, schema, campaigns); [cross-model review](cross-model-review.md) |
 | Contracts | `election_audit/resources/contracts/schema.json` and `features.json`; `contracts.py`; [schema dictionary](schema-dictionary.md), [feature readiness](feature-readiness.md), [transformation conventions](transformation-conventions.md) |
 | Research documents | [study protocol](../../research/analysis-plan.md), [completion plan](../../research/completion-plan.md), [download sources](../../research/download-sources.md), [related work](../../research/related-work.md) |
 | Documentation checks | `scripts/check_docs.py` (pairs, revisions, links, fenced parity), `scripts/check_doc_commands.py` (flags via `--help`, SQL syntax) |

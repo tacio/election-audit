@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 39 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 40 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -265,13 +265,15 @@ nem rótulo de fraude.
 
 **Verificações.** A verificação offline completa `just check` passa (lock, formato,
 lint, verificação de tipos, contratos, documentos, comandos documentados e todos os
-437 testes). Toda função em `election_audit/`, `scripts/` e `tests/` tem anotações
+442 testes). Toda função em `election_audit/`, `scripts/` e `tests/` tem anotações
 de tipo (ruff `ANN`) e `ty check` (fixado em 0.0.94) não relata diagnósticos; as
 convenções estão em `CLAUDE.md`.
 
 ## Próximo passo
 
-Começar a Fase 23 (modelagem de desenvolvimento, estudo de poder, congelamento do
+Rodar a primeira campanha de [revisão cruzada entre modelos](cross-model-review.md)
+(`xr1`), na qual o Codex e o Gemini contestam o código, a documentação e o protocolo do
+estudo num commit fixado, antes de começar a Fase 23. Depois, começar a Fase 23 (modelagem de desenvolvimento, estudo de poder, congelamento do
 protocolo) só com dados de desenvolvimento. A Fase 20b está concluída e suas
 verificações e lacunas estão registradas no protocolo
 ([handoff](handoffs/task-20b.md)); antes do congelamento, acrescentar ao protocolo a
@@ -413,13 +415,14 @@ absolutos ficam no volume de saída da máquina de referência
 | Reconstrução operacional | `reconstruction` (`operational-v1`), `operational_review` (`real-operational-v1`, Fase 13), `semantic_pass` (`session-aggregates-v5`, regras de sessão `sessions-v2`, Fases 21–22 e 20b; regras `real-log-rules.json` e `real-log-rules-2022.json`), `sa_logs` (`sa-log-summary-v1`); [reconstrução](reconstruction.md), [passada semântica](semantic-pass.md) |
 | Releases operacionais | `publication`, `operational_marts`, `release_tools`; [publicação](publication.md) |
 | Processamento estrutural nacional | Caminho de resumos: `national_parallel`, `national_summary`, `national_summary_release`, `national_summary_tools`, `national_summary_tuning`, `national_resources`; [processamento orientado a features](feature-oriented-processing.md). Caminho em nível de evento: `national_benchmark`, `national_tuning`, `national_workload`, `national`, `national_storage`, `national_relocation`, `national_migration`, `national_overnight`; [processamento nacional](national-processing.md) |
-| Verificações de integridade | `integrity_checks` (`integrity-sections-v4`, `integrity-logs-v2`; formato de assinatura `resources/assinatura-2026-observed.asn1`), `round1_prefix` (`integrity-round1-prefix-v1`, `integrity-check prefix`), `printed_bu` (`printed-bu-v1`, `integrity-check printed`), `ed521_crosscheck` (`ed521-crosscheck-v1`), `zeresima` (`integrity-zeresima-v2`), `gedai` (`integrity-gedai-v3`), `hash_lists` (`integrity-hash-lists-v1`), `signature_errors` (`integrity-signature-errors-v1`), `signed_results` (`signed-results-fetch-v1`, `integrity-jws-v1`; `results-hierarchy fetch-signed`); [verificações de integridade](integrity-checks.md) |
+| Verificações de integridade | `integrity_checks` (`integrity-sections-v4`, `integrity-logs-v2`; formato de assinatura `resources/assinatura-2026-observed.asn1`), `round1_prefix` (`integrity-round1-prefix-v1`, `integrity-check prefix`), `printed_bu` (`printed-bu-v1`, `integrity-check printed`), `ed521_crosscheck` (`ed521-crosscheck-v1`), `zeresima` (`integrity-zeresima-v2`), `gedai` (`integrity-gedai-v3`), `hash_lists` (`integrity-hash-lists-v1`), `signature_errors` (`integrity-signature-errors-v1`), `signed_results` (`signed-results-fetch-v1`, `integrity-jws-v2`; `results-hierarchy fetch-signed`); [verificações de integridade](integrity-checks.md) |
 | Importação e verificação eleitoral | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` e `electoral_verification` (Fase 12); [resultados eleitorais](electoral-results.md). `electoral_references` é um protótipo sem integração na CLI e sem testes para conjuntos de referência oficiais |
 | Fundação analítica | `analysis`, `analysis_partitions`, `analysis_ledgers`, `analysis_reports`; [análise](analysis.md) |
 | Tabela por seção | `section_table` (`section-features-v4`, Fases 22 e 20b); [tabela por seção](section-table.md), [registro de observações](observations.md) |
 | Caminho de pesquisa | `features` (Fase 14), `research_protocol` e `research_evaluation` (Fase 15), `research_models` (Fase 16), `investigations` (Fase 17); veja seus handoffs |
 | Painel | `dashboard`, `dashboard_data`, `dashboard_ui`, `dashboard_development`, `election_audit/notebooks/` (Fase 18) |
 | Reprodução | `reproduction`, `pilot`, `walkthrough`; [reprodução](reproduction.md) (tempos e recursos das execuções nacionais: [o que esperar](reproduction.md#o-que-esperar-nos-dados-nacionais)), [backfill](backfill.md) |
+| Revisão cruzada entre modelos | `scripts/cross_review.py` (`prepare`, `run`, `prompt`), `review/` (prompts, pacotes, esquema, campanhas); [revisão cruzada entre modelos](cross-model-review.md) |
 | Contratos | `election_audit/resources/contracts/schema.json` e `features.json`; `contracts.py`; [dicionário do esquema](schema-dictionary.md), [prontidão de features](feature-readiness.md), [convenções de transformação](transformation-conventions.md) |
 | Documentos de pesquisa | [protocolo do estudo](../../research/analysis-plan.pt-BR.md), [plano de conclusão](../../research/completion-plan.pt-BR.md), [fontes de download](../../research/download-sources.pt-BR.md), [trabalhos relacionados](../../research/related-work.pt-BR.md) |
 | Verificação de documentação | `scripts/check_docs.py` (pares, revisões, links, paridade de blocos), `scripts/check_doc_commands.py` (flags via `--help`, sintaxe SQL) |
