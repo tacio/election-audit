@@ -24,7 +24,15 @@ blocks of each section's log:
 - E3: after any error, no vote cycle (beyond the one in flight after a signing error) is
   completed in the urn's stream before GAP starts an application again, which repeats the
   start-up checks. The markers do not show restarts (a block is a context, not a boot), so
-  each object holding an error is reread from its staged copy to find them.
+  each object holding an error is reread from its staged copy to find them. A dynamic-file
+  error (``Erro na verificação de assinatura do arquivo - <name>.vsu``) that GAP follows, in
+  the same start-up and before VOTA starts, with a completed synchronisation of the dynamic
+  files (``Sincronização dos arquivos dinâmicos concluída com sucesso``) is
+  ``recovered_by_sync`` and does not count for E3. That synchronisation never follows an
+  ordinary start-up (0 of 1,810 official start-ups in 400 random round-1 objects); the log
+  does not show the restored files verified again. The rule was written after reading the
+  31 v2 failures (xr1-20261109 R4), which all had this shape; their raw counts stay in
+  ``votes_without_restart``.
 
 Votes later in the block and in later official blocks are counted as ``votes_later``.
 Copies of one block in both memories count once (device, block start, template, rank in
@@ -46,7 +54,7 @@ from election_audit import integrity_checks as ic
 from election_audit.national_migration import atomic, sha
 from election_audit.types import JSON, Row
 
-VERSION = "integrity-signature-errors-v2"  # v2: restart evidence read from the logs (E3)
+VERSION = "integrity-signature-errors-v3"  # v3: dynamic-file errors recovered by sync (E3)
 SEMANTIC_VERSION = "session-aggregates-v5"
 RULES = {
     "E1": "no vote cycle completed in the same session after a verification error",
@@ -54,8 +62,11 @@ RULES = {
     "signing error",
     "E3": "after an error, no vote cycle (one in flight after a signing error) completed in "
     "its urn's stream before GAP started an application again, which repeats the start-up "
-    "checks",
+    "checks; a dynamic-file (.vsu) verification error followed in its start-up, before VOTA "
+    "starts, by a completed dynamic-file synchronisation is recovered and not counted",
 }
+DYNAMIC_FILE = re.compile(r"Erro na verificação de assinatura do arquivo - \S+\.vsu$")
+SYNC_DONE = "Sincronização dos arquivos dinâmicos concluída com sucesso"
 VERIFICATION = re.compile(r"verifica|valida")
 MARKER_SQL = """
 SELECT m.object_sha256, m.stream_ordinal, m.segment_ordinal, m.session_ordinal, m.device_id,
@@ -89,6 +100,7 @@ SECTION_SCHEMA = pa.schema(
         ("votes_without_restart_after_verification", pa.int32()),  # max over errors
         ("votes_without_restart_after_signing", pa.int32()),  # max over errors
         ("restart_unavailable", pa.int32()),  # errors whose object could not be reread
+        ("recovered_by_sync", pa.int32()),  # errors not counted for E3
         ("inconsistent_counts", pa.int32()),
         ("failed_json", pa.string()),
     ]
@@ -108,6 +120,7 @@ ERROR_SCHEMA = pa.schema(
         ("votes_later", pa.int32()),
         ("votes_without_restart", pa.int32()),  # before the stream's next GAP start
         ("restart_line", pa.int64()),  # that GAP start's line; null when none follows
+        ("recovered_by_sync", pa.bool_()),  # dynamic-file error, files resynchronised
     ]
 )
 
@@ -157,12 +170,14 @@ def error_counts(m: Row, sessions: Sequence[Row], round_number: int) -> Row:
         "votes_later": after_block - (same or 0) + later,
         "votes_without_restart": m.get("votes_without_restart"),
         "restart_line": m.get("restart_line"),
+        "recovered_by_sync": m.get("recovered_by_sync"),
         "inconsistent": after_block < 0 or (same is not None and same < 0),
     }
 
 
 def restart_evidence(source: bytes, errors: Sequence[Row]) -> dict[tuple[int, int], Row]:
-    """Per error (stream, line): votes completed before its stream's next GAP start, and its line.
+    """Per error (stream, line): votes completed before its stream's next GAP start, its line,
+    and whether a dynamic-file error was recovered by a synchronisation before VOTA started.
 
     Lines and streams are numbered as the semantic pass numbers them (every line counts; a
     stream is a run of well-formed lines with one member path and device), so a marker's line
@@ -188,23 +203,33 @@ def restart_evidence(source: bytes, errors: Sequence[Row]) -> dict[tuple[int, in
             application, message = fields[3], fields[4]
             if application == "GAP" and message.startswith("Iniciando aplicação"):
                 events[stream].append((total, "restart"))
+            elif application == "GAP" and message.startswith(SYNC_DONE):
+                events[stream].append((total, "sync"))
+            elif application == "VOTA" and message.startswith("Iniciando aplicação"):
+                events[stream].append((total, "vota"))
             elif application == "VOTA" and classify(application, message, LOG_RULES)[0] == (
                 "completion"
             ):
                 events[stream].append((total, "completion"))
     found = {}
     for e in errors:
-        votes, restart = 0, None
+        votes, restart, synced, started = 0, None, False, False
         for number, kind in events.get(e["stream_ordinal"], ()):
             if number <= e["line"]:
                 continue
             if kind == "restart":
                 restart = number
                 break
-            votes += 1
+            if kind == "sync" and not started and not votes:
+                synced = True
+            elif kind == "vota":
+                started = True
+            elif kind == "completion":
+                votes += 1
         found[(e["stream_ordinal"], e["line"])] = {
             "votes_without_restart": votes,
             "restart_line": restart,
+            "recovered_by_sync": bool(DYNAMIC_FILE.search(e.get("template", ""))) and synced,
         }
     return found
 
@@ -227,16 +252,20 @@ def section_rules(markers: Sequence[Row], sessions: Sequence[Row], round_number:
             if (counts[name] or 0) > (kept[name] or 0):
                 kept[name] = counts[name]
         kept["inconsistent"] = kept["inconsistent"] or counts["inconsistent"]
+        # copies log the same events: a sync in either copy happened
+        kept["recovered_by_sync"] = kept["recovered_by_sync"] or counts["recovered_by_sync"]
     errors = list(distinct.values())
 
-    def most(cls: str | None, name: str) -> int | None:
-        values = [e[name] for e in errors if cls in (None, e["class"]) and e[name] is not None]
+    def most(cls: str | None, name: str, among: Sequence[Row] = errors) -> int | None:
+        values = [e[name] for e in among if cls in (None, e["class"]) and e[name] is not None]
         return max(values) if values else None
 
     same_verification = most("verification", "votes_same_session")
     same_signing = most("signing", "votes_same_session")
-    unrestarted_verification = most("verification", "votes_without_restart")
-    unrestarted_signing = most("signing", "votes_without_restart")
+    counted = [e for e in errors if not e.get("recovered_by_sync")]
+    unrestarted_verification = most("verification", "votes_without_restart", counted)
+    unrestarted_signing = most("signing", "votes_without_restart", counted)
+    # the row keeps the raw counts of every error, recovered ones included
     failed = []
     if same_verification:
         failed.append("E1")
@@ -252,9 +281,12 @@ def section_rules(markers: Sequence[Row], sessions: Sequence[Row], round_number:
             "votes_same_session_after_verification": same_verification,
             "votes_same_session_after_signing": same_signing,
             "votes_later": most(None, "votes_later"),
-            "votes_without_restart_after_verification": unrestarted_verification,
-            "votes_without_restart_after_signing": unrestarted_signing,
+            "votes_without_restart_after_verification": most(
+                "verification", "votes_without_restart"
+            ),
+            "votes_without_restart_after_signing": most("signing", "votes_without_restart"),
             "restart_unavailable": sum(e["votes_without_restart"] is None for e in errors),
+            "recovered_by_sync": sum(bool(e.get("recovered_by_sync")) for e in errors),
             "inconsistent_counts": sum(e["inconsistent"] for e in errors),
             "failed_json": json.dumps(failed, separators=(",", ":")),
         },
@@ -413,6 +445,9 @@ def run_signature_errors(
                 for e in error_rows
                 if e["votes_without_restart"] is not None
             )
+        ),
+        "errors_recovered_by_sync": dict(
+            Counter(e["template"] for e in error_rows if e["recovered_by_sync"])
         ),
         "errors_restart_unavailable": sum(e["votes_without_restart"] is None for e in error_rows),
         "objects_reread": dict(reread),

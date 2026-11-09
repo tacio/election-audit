@@ -1,6 +1,6 @@
 # Tier 1 integrity checks (Phase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 9 · Language: en
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 10 · Language: en
 
 [Português](../pt-BR/integrity-checks.md) · [Implementation index](implementation-index.md)
 
@@ -707,7 +707,7 @@ just integrity-check hash-lists \
 
 ### Signature errors and votes
 
-`integrity-check signature-errors` (`integrity-signature-errors-v1`, module
+`integrity-check signature-errors` (`integrity-signature-errors-v3`, module
 `signature_errors`) asks whether an urn that logged a signature or integrity error
 went on to record votes ([O19](observations.md#operations)). It reads the
 `signature_error` markers of `session-aggregates-v5` (a template naming a signature
@@ -721,7 +721,31 @@ failed:
 
 - E1: no vote cycle is completed in the same session after a verification error;
 - E2: at most one vote cycle, the voter's cycle in flight, is completed in the same
-  session after a signing error.
+  session after a signing error;
+- E3 (v2, cross-model review xr1-20261109 P4-03): after any error, no vote cycle
+  (beyond the one in flight after a signing error) is completed in the urn's stream
+  before GAP starts an application again. A later session is not proof of a restart,
+  so each object holding an error is reread from its staged copy, checked against its
+  certified hash, to find the stream's next GAP start.
+
+v2 failed E3 in 22 sections in round 1 and 9 in round 2. Read in the logs (digits
+masked), all 31 have one shape: GAP logs `Erro na verificação de assinatura do arquivo
+- <name>.vsu` (`vota` 22, `uenux` 5, `rdv` 3, `ze` 1) during an official start-up,
+right after `Iniciando aplicação`; it then logs `Início da sincronização dos arquivos
+dinâmicos`, restores the dynamic files from the other memory (external 15, internal
+16), logs `Sincronização dos arquivos dinâmicos concluída com sucesso`, and only then
+starts VOTA. The `.vsu` files sign the urn's dynamic files (its working state), not its
+programs. That synchronisation never follows an ordinary start-up: 0 of 1,810 official
+start-ups in 400 random round-1 objects. v3 therefore marks such an error
+`recovered_by_sync` when the completed synchronisation comes in the same start-up,
+before VOTA starts and before any vote, and leaves it out of E3. This rule was written
+after reading the v2 failures; the raw counts stay in `votes_without_restart` and the
+recovered errors are listed in the manifest. The log does not show the restored files
+verified again ([T14](observations.md#transparency)).
+
+The other three verification errors in those sections (the program `vota.of`, the
+signature tree, the voting medium) were followed by the urn being switched off and
+restarted, with no vote in between.
 
 Copies of a block in both memories count once.
 
@@ -729,16 +753,26 @@ Copies of a block in both memories count once.
 just integrity-check signature-errors \
   --sections ~/data/election-audit-stage/phase20/national-r1-sections-v4-20261107 \
   --semantic ~/data/election-audit-stage/phase20b-zeresima/v5-national-r1-20261108 \
-  --output ~/data/election-audit-stage/phase20b-signature-errors/national-r1-signature-errors-v1-20261109
+  --output ~/data/election-audit-stage/phase20b-signature-errors/national-r1-signature-errors-v3-20261109
 ```
 
-| Round | Sections with errors | Verification errors (start-up / in session) | Signing errors (start-up / in session) | Errors followed by votes after a restart | Failed |
-| --- | --- | --- | --- | --- | --- |
-| 1 | 181 | 280 / 92 | 57 / 12 | 306 | 0 |
-| 2 | 307 | 360 / 51 | 66 / 24 | 423 | 0 |
+| Round | Sections with errors | Verification errors (start-up / in session) | Signing errors (start-up / in session) | Errors followed by later votes | Recovered by sync (with votes before a restart) | Failed v2 / v3 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 181 | 280 / 92 | 57 / 12 | 306 | 35 (22) | 22 / 0 |
+| 2 | 307 | 360 / 51 | 66 / 24 | 423 | 23 (9) | 9 / 0 |
 
-- No urn completed a vote in the session of a verification error. Every vote after
-  an error comes in a later session, after the urn was switched on again.
+| Run | Duration | Workers | Peak RAM |
+| --- | --- | --- | --- |
+| v3 round 1 | 20 s | 1 | 1.4 GB |
+| v3 round 2 | 27 s | 1 | 1.4 GB |
+
+Every object holding an official-round error was reread (181 and 307), none
+unavailable.
+
+- No urn completed a vote in the session of a verification error. After a program or
+  medium error the urn was switched off and restarted before any vote; after a
+  dynamic-file error recovered by synchronisation, the urn voted without a further
+  restart.
 - After a signing error, one section per round completed one vote in the same
   session. Read in the log, both are the vote in flight: the voter confirmed the
   last office, the urn reported the signing failure (round 1: a voter-keyboard fault

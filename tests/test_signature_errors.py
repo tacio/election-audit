@@ -123,8 +123,54 @@ class SignatureErrorRuleTests(unittest.TestCase):
         found = restart_evidence(
             jez(body), [{"stream_ordinal": 0, "line": 3}, {"stream_ordinal": 0, "line": 6}]
         )
-        self.assertEqual(found[(0, 3)], {"votes_without_restart": 1, "restart_line": 5})
-        self.assertEqual(found[(0, 6)], {"votes_without_restart": 1, "restart_line": None})
+        self.assertEqual(
+            found[(0, 3)],
+            {"votes_without_restart": 1, "restart_line": 5, "recovered_by_sync": False},
+        )
+        self.assertEqual(
+            found[(0, 6)],
+            {"votes_without_restart": 1, "restart_line": None, "recovered_by_sync": False},
+        )
+
+    def test_dynamic_file_error_recovered_by_sync_is_not_counted_for_e3(self) -> None:
+        # xr1-20261109 R4: GAP resynchronises the dynamic files, then starts VOTA.
+        from test_semantic_pass import TOKEN, jez
+
+        from election_audit.signature_errors import restart_evidence
+
+        error = "Erro na verificação de assinatura do arquivo - vota.vsu"
+        records = [
+            ("GAP", "Iniciando aplicação - ELEIÇÃO OFICIAL PRIMEIRO TURNO - 1º turno"),
+            ("GAP", error),
+            ("GAP", "Início da sincronização dos arquivos dinâmicos"),
+            ("GAP", "Sincronização dos arquivos dinâmicos concluída com sucesso"),
+            ("VOTA", "Iniciando aplicação - 1º turno"),
+            ("VOTA", "O voto do eleitor foi computado"),
+            ("VOTA", "Sincronização dos arquivos dinâmicos concluída com sucesso"),
+        ]
+        body = "".join(
+            f"04/10/2026 08:00:{i:02d}\tINFO\t12345678\t{app}\t{message}\t{TOKEN}\n"
+            for i, (app, message) in enumerate(records)
+        ).encode("latin-1")
+
+        def evidence(source: bytes, template: str) -> dict[str, Any]:
+            wanted = [{"stream_ordinal": 0, "line": 2, "template": template}]
+            return restart_evidence(jez(source), wanted)[(0, 2)]
+
+        recovered = evidence(body, error)
+        self.assertEqual(recovered["votes_without_restart"], 1)
+        self.assertFalse(evidence(body, VERIFY)["recovered_by_sync"])  # only .vsu files
+        self.assertTrue(recovered["recovered_by_sync"])
+        no_sync = [r for r in records if not r[1].startswith("Sincronização")][:4]
+        body = "".join(
+            f"04/10/2026 08:00:{i:02d}\tINFO\t12345678\t{app}\t{message}\t{TOKEN}\n"
+            for i, (app, message) in enumerate(no_sync)
+        ).encode("latin-1")
+        self.assertFalse(evidence(body, error)["recovered_by_sync"])
+        kept = marker(error, 10, votes_without_restart=132, recovered_by_sync=True)
+        row, failed, _ = self.rules([kept], [session(1, 132)])
+        self.assertEqual((failed, row["recovered_by_sync"]), ([], 1))
+        self.assertEqual(row["votes_without_restart_after_verification"], 132)
 
     def test_counts_that_do_not_add_up_are_reported(self) -> None:
         row, _, errors = self.rules([marker(VERIFY, 10, before=5)], [session(1, 2)])

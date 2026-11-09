@@ -1,6 +1,6 @@
 # Verificações de integridade de nível 1 (Fase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 9 · Language: pt-BR
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 10 · Language: pt-BR
 
 [English](../en/integrity-checks.md) · [Índice de implementação](implementation-index.md)
 
@@ -734,7 +734,7 @@ just integrity-check hash-lists \
 
 ### Erros de assinatura e votos
 
-`integrity-check signature-errors` (`integrity-signature-errors-v1`, módulo
+`integrity-check signature-errors` (`integrity-signature-errors-v3`, módulo
 `signature_errors`) pergunta se uma urna que registrou um erro de assinatura ou de
 integridade seguiu registrando votos ([O19](observations.md#operação)). Lê os
 marcadores `signature_error` de `session-aggregates-v5` (um modelo que nomeia uma
@@ -749,7 +749,33 @@ votos depois de um reinício são contados, não reprovados:
 - E1: nenhum ciclo de voto é concluído na mesma sessão depois de um erro de
   verificação;
 - E2: no máximo um ciclo de voto, o do eleitor em curso, é concluído na mesma sessão
-  depois de um erro de assinatura.
+  depois de um erro de assinatura;
+- E3 (v2, revisão entre modelos xr1-20261109 P4-03): depois de qualquer erro, nenhum
+  ciclo de voto (além do em curso depois de um erro de assinatura) é concluído no fluxo
+  da urna antes de o GAP iniciar de novo um aplicativo. Uma sessão posterior não prova
+  um reinício, então cada objeto com um erro é relido da sua cópia preparada, conferida
+  com o hash certificado, para achar o próximo início do GAP no fluxo.
+
+A v2 reprovou E3 em 22 seções no 1º turno e 9 no 2º. Lidas nos logs (dígitos
+mascarados), as 31 têm uma só forma: o GAP registra `Erro na verificação de assinatura
+do arquivo - <nome>.vsu` (`vota` 22, `uenux` 5, `rdv` 3, `ze` 1) durante uma
+inicialização oficial, logo depois de `Iniciando aplicação`; depois registra `Início
+da sincronização dos arquivos dinâmicos`, restaura os arquivos dinâmicos da outra
+memória (externa 15, interna 16), registra `Sincronização dos arquivos dinâmicos
+concluída com sucesso` e só então inicia o VOTA. Os arquivos `.vsu` assinam os
+arquivos dinâmicos da urna (seu estado de trabalho), não seus programas. Essa
+sincronização nunca segue uma inicialização comum: 0 de 1.810 inicializações oficiais
+em 400 objetos sorteados do 1º turno. Por isso a v3 marca esse erro como
+`recovered_by_sync` quando a sincronização concluída vem na mesma inicialização, antes
+de o VOTA iniciar e antes de qualquer voto, e o deixa fora de E3. Esta regra foi
+escrita depois de ler as reprovações da v2; as contagens brutas ficam em
+`votes_without_restart` e os erros recuperados são listados no manifesto. O log não
+mostra os arquivos restaurados verificados de novo
+([T14](observations.md#transparência)).
+
+Os outros três erros de verificação nessas seções (o programa `vota.of`, a árvore de
+assinaturas, a mídia de votação) foram seguidos do desligamento e reinício da urna,
+sem voto entre eles.
 
 Cópias de um bloco nas duas memórias contam uma vez.
 
@@ -757,16 +783,26 @@ Cópias de um bloco nas duas memórias contam uma vez.
 just integrity-check signature-errors \
   --sections ~/data/election-audit-stage/phase20/national-r1-sections-v4-20261107 \
   --semantic ~/data/election-audit-stage/phase20b-zeresima/v5-national-r1-20261108 \
-  --output ~/data/election-audit-stage/phase20b-signature-errors/national-r1-signature-errors-v1-20261109
+  --output ~/data/election-audit-stage/phase20b-signature-errors/national-r1-signature-errors-v3-20261109
 ```
 
-| Turno | Seções com erros | Erros de verificação (inicialização / em sessão) | Erros de assinatura (inicialização / em sessão) | Erros seguidos de votos depois de um reinício | Reprovadas |
-| --- | --- | --- | --- | --- | --- |
-| 1 | 181 | 280 / 92 | 57 / 12 | 306 | 0 |
-| 2 | 307 | 360 / 51 | 66 / 24 | 423 | 0 |
+| Turno | Seções com erros | Erros de verificação (inicialização / em sessão) | Erros de assinatura (inicialização / em sessão) | Erros seguidos de votos posteriores | Recuperados por sincronização (com votos antes de um reinício) | Reprovadas v2 / v3 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 181 | 280 / 92 | 57 / 12 | 306 | 35 (22) | 22 / 0 |
+| 2 | 307 | 360 / 51 | 66 / 24 | 423 | 23 (9) | 9 / 0 |
 
-- Nenhuma urna concluiu um voto na sessão de um erro de verificação. Todo voto depois
-  de um erro vem numa sessão posterior, depois que a urna foi religada.
+| Execução | Duração | Workers | Pico de RAM |
+| --- | --- | --- | --- |
+| v3 1º turno | 20 s | 1 | 1,4 GB |
+| v3 2º turno | 27 s | 1 | 1,4 GB |
+
+Todo objeto com um erro do turno oficial foi relido (181 e 307), nenhum
+indisponível.
+
+- Nenhuma urna concluiu um voto na sessão de um erro de verificação. Depois de um erro
+  de programa ou de mídia a urna foi desligada e religada antes de qualquer voto;
+  depois de um erro de arquivo dinâmico recuperado por sincronização, a urna votou sem
+  novo reinício.
 - Depois de um erro de assinatura, uma seção por turno concluiu um voto na mesma
   sessão. Lidos no log, os dois são o voto em curso: o eleitor confirmou o último
   cargo, a urna informou a falha de assinatura (1º turno: uma falha do teclado do
