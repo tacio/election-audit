@@ -19,3 +19,10 @@
   - Codex P8 searched the clone for hard-coded paths, which is its task.
   - Gemini P7's flag matched a DOI link in the final report's text. The audit no longer
     scans final reports.
+- R4 decisions (user, 9 November 2026): the three study-design rows take the recommended
+  options (see `user_decision` in the ledger). Fix order: Phase 23 blockers first
+  (protected-evaluation guard, inspection registry, protocol wording), then the
+  integrity checks with national reruns, then portability, then low-severity rows.
+- Round 3: Codex's quota ran out after P6; P7 and P8 were rerun after the reset at
+  14:16. Both boundary flags of round 3 are false positives (a probe with mocked URLs;
+  Gemini testing the audit regex, whose text contains the patterns).
