@@ -1,6 +1,6 @@
 # Verificações de integridade de nível 1 (Fase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 12 · Language: pt-BR
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 13 · Language: pt-BR
 
 [English](../en/integrity-checks.md) · [Índice de implementação](implementation-index.md)
 
@@ -35,7 +35,11 @@ discrepâncias. Nenhum modelo estatístico é usado.
 | `logs` | I5, I6, I7 | uma versão de `sections`, versões da Fase 21 | `sections` |
 
 Cada `release/` também guarda `discrepancies.jsonl` e um `manifest.json` com o
-vínculo, um resumo e os hashes dos arquivos.
+vínculo, um resumo e os hashes dos arquivos. `discrepancies.jsonl` lista as linhas que
+discordam ou reprovam. Linhas que uma verificação não pôde avaliar (um log protegido ou
+ausente, I5 `unavailable`) são contadas no resumo do manifesto, não listadas; um
+arquivo vazio, portanto, nada diz sobre cobertura, que o resumo informa
+(xr1-20261109-P0-07).
 
 ```sh
 just integrity-check sections \
@@ -584,10 +588,11 @@ assinatura real cai nesses casos.
 
 O passe semântico (`session-aggregates-v5`, [passe semântico](semantic-pass.md#versão-5-fase-20b))
 guarda um marcador para cada linha de zerésima e de prontidão. `integrity-check
-zeresima` (`integrity-zeresima-v2`, módulo `zeresima`) lê os marcadores dos blocos
+zeresima` (`integrity-zeresima-v3`, módulo `zeresima`) lê os marcadores dos blocos
 oficiais do turno de cada seção. Cópias de um bloco nas duas memórias contam uma vez.
 Urnas que registraram votos sem zerésima própria são contadas, não reprovadas: uma
-urna de contingência assume uma seção cuja zerésima a urna substituída imprimiu.
+urna de contingência assume uma seção cuja zerésima a urna substituída imprimiu. Z6
+testa essa premissa.
 
 - Z1: uma seção com votos concluídos nos seus blocos oficiais tem zerésima;
 - Z2: nenhum ciclo de voto concluído antes da primeira zerésima do seu fluxo (ordem
@@ -595,13 +600,17 @@ urna de contingência assume uma seção cuja zerésima a urna substituída impr
 - Z3: toda zerésima tem a data do dia da eleição (relógio da urna);
 - Z4: nenhuma zerésima depois de um ciclo de voto concluído antes no seu fluxo;
 - Z5: nenhum `Urna pronta para receber votos` antes da primeira zerésima do seu
-  fluxo.
+  fluxo;
+- Z6 (v3, revisão entre modelos xr1-20261109 P4-10): uma urna com votos e sem
+  zerésima própria começa sua primeira sessão de votação depois de outra urna da seção
+  imprimir uma (relógios das urnas); uma sessão ou zerésima sem leitura conta como
+  desconhecida.
 
 ```sh
 just integrity-check zeresima \
   --sections $EA_STAGE/phase20/national-r1-sections-v4-20261107 \
   --semantic $EA_STAGE/phase20b-zeresima/v5-national-r1-20261108 \
-  --output $EA_STAGE/phase20b-zeresima/national-r1-zeresima-v2-20261109
+  --output $EA_STAGE/phase20b-zeresima/national-r1-zeresima-v3-20261109
 ```
 
 | Turno | Seções lidas | Aprovadas | Reprovadas | Sem votos oficiais | Duas ou mais urnas com zerésima | Protegidas ou indisponíveis |
@@ -620,6 +629,11 @@ just integrity-check zeresima \
   reiniciada antes da votação, que imprime outra ([O18](observations.md#operação));
   12 e 4 logs não têm nenhum voto oficial. A versão 2 testa a propriedade que importa:
   nenhuma zerésima depois de votos.
+- Z6 (v3) não reprova nenhuma seção. Urnas que votaram sem zerésima própria estão em
+  2118 seções no 1º turno (33 com duas dessas urnas) e 1428 no 2º (27); cada uma
+  começa a votar depois de outra urna da sua seção imprimir uma. Uma urna por turno
+  não tem ordem conhecida: está na seção de Z1, que não tem nenhuma zerésima. Fora
+  isso a versão 3 é igual à versão 2 (0:29 e 0:30, um processo, 2,9 GB).
 
 ### Logs de preparação do GEDAI
 
@@ -697,7 +711,9 @@ compara as verificações de assinatura de pacotes registradas nos logs (a tabel
 `packages` de `session-aggregates-v5`) com as listas de hash publicadas pelo TSE
 para os quatro modelos de urna (`path1u13`, `path1u15`, `path1u20`, `path1u22`). Os
 logs não trazem hash de programa, então a verificação compara nomes e resultados, não
-o conteúdo dos arquivos:
+o conteúdo dos arquivos. Ela não verifica a integridade dos programas: os SHA-512 que
+as listas publicam são lidos, mas nada local pode ser comparado com eles
+(xr1-20261109-P3-12):
 
 - H1: todo pacote de programa verificado num log aparece numa lista, e como:
   `exact` (a lista do seu modelo), `other_model`, `model_suffix` (nomeado sem o ano
@@ -968,6 +984,33 @@ Resultados:
 | I8 v2 | 0:29 | 1 | 0,56 GB | 0,2 MB |
 | JWS v3, 1º / 2º turno | 0:12 / 0:09 | 1 | 0,11 GB | 0,2 MB |
 | Novo hash das entradas | 9:18 | 4 | 0,87 GB | 1 kB |
+
+Segundo lote, executado em 9 e 10 de novembro de 2026:
+
+| Verificação | Versão | Mudança | Registro (`xr1-20261109-`) |
+| --- | --- | --- | --- |
+| Seções (I3, I9) | `integrity-sections-v6` | O código de carga e o número da urna do RDV devem ser iguais aos do BU (I9 `rdv_urn`); um cargo que o RDV não consegue recontar é uma linha de I3 | P3-10, P4-07 |
+| Zerésima | `integrity-zeresima-v3` | Z6, ver [zerésima](#zerésima) | P4-10 |
+| Logs (I5, I6) | `integrity-logs-v4` | Cópias que discordam são linhas I5 `copy_conflict`; linhas malformadas são contadas, e uma igualdade de I6 sobre elas é informada | P0-12, P2-02 |
+| GEDAI | `integrity-gedai-v5` | Um BU sem campos de carga é `n/a` no resumo, não aprovado | P4-08 |
+| I8 | `printed-bu-v3` | Conteúdo cujas fatias de código não podem ser recuperadas é `chain_unverified`, não `not_authentic` | P4-09 |
+| JWS | `integrity-jws-v3` | O arquivo de chave deve ter um SHA-256 fixado ([entradas baixadas à mão](manual-inputs.md)) | P3-06 |
+
+- Seções v6: 0 divergências nos dois turnos e resumos iguais aos da v5. Todo RDV vem
+  da urna e da carga do seu BU, e todo cargo é recontado.
+- Logs v5 (código v4): nenhum conflito de cópias. Seis seções por turno têm linhas
+  malformadas, todas já I6 `differs`, então nenhuma igualdade de I6 depende de uma
+  linha malformada.
+- GEDAI v5 e I8 v3: resumos iguais aos das versões anteriores. O arquivo de chave JWS
+  em uso tem o hash fixado, então os resultados JWS se mantêm.
+
+| Execução | Duração | Workers | Pico de memória | Saída |
+| --- | --- | --- | --- | --- |
+| Seções v6, 1º / 2º turno | 1:12:17 ativas (11:24:25 com uma suspensão da máquina de 10:12:08) / 1:05:15 | 6 | 4,8 / 4,1 GB | 629 / 337 MB |
+| Logs v5 (código v4), 1º / 2º turno | 0:25 / 0:47 | 1 | 2,6 / 3,4 GB | 1,2 / 1,7 MB |
+| GEDAI v5, 1º / 2º turno | 0:52 / 0:51 | 1 | 2,3 GB | 0,9 / 0,8 MB |
+| I8 v3 | 0:29 | 1 | 0,56 GB | 0,2 MB |
+
 
 ## Limites
 

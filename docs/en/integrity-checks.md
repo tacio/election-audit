@@ -1,6 +1,6 @@
 # Tier 1 integrity checks (Phase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 12 · Language: en
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 13 · Language: en
 
 [Português](../pt-BR/integrity-checks.md) · [Implementation index](implementation-index.md)
 
@@ -34,7 +34,10 @@ involved.
 | `logs` | I5, I6, I7 | a `sections` release, Phase 21 releases | `sections` |
 
 Each `release/` also holds `discrepancies.jsonl` and a `manifest.json` with the
-binding, a summary and file hashes.
+binding, a summary and file hashes. `discrepancies.jsonl` lists rows that disagree or
+fail. Rows a check could not evaluate (a protected or missing log, I5 `unavailable`)
+are counted in the manifest summary, not listed; an empty file is therefore no
+statement about coverage, which the summary gives (xr1-20261109-P0-07).
 
 ```sh
 just integrity-check sections \
@@ -563,22 +566,26 @@ those cases.
 
 The semantic pass (`session-aggregates-v5`, [semantic pass](semantic-pass.md#version-5-phase-20b))
 keeps a marker for every zerésima and readiness line. `integrity-check zeresima`
-(`integrity-zeresima-v2`, module `zeresima`) reads the markers of each section's
+(`integrity-zeresima-v3`, module `zeresima`) reads the markers of each section's
 official blocks of the round. Copies of a block in both memories count once. Urns
 that recorded votes without a zerésima of their own are counted, not failed: a
-contingency urn takes over a section whose zerésima the replaced urn printed.
+contingency urn takes over a section whose zerésima the replaced urn printed. Z6
+tests that premise.
 
 - Z1: a section with completed votes in its official blocks has a zerésima;
 - Z2: no vote cycle completed before the first zerésima of its stream (file order);
 - Z3: every zerésima is dated on the election day (urn clock);
 - Z4: no zerésima after a vote cycle completed earlier in its stream;
-- Z5: no `Urna pronta para receber votos` before the first zerésima of its stream.
+- Z5: no `Urna pronta para receber votos` before the first zerésima of its stream;
+- Z6 (v3, cross-model review xr1-20261109 P4-10): an urn with votes but no zerésima
+  of its own starts its first voting session after another urn of the section printed
+  one (urn clocks); a session or zerésima without a reading counts as unknown.
 
 ```sh
 just integrity-check zeresima \
   --sections $EA_STAGE/phase20/national-r1-sections-v4-20261107 \
   --semantic $EA_STAGE/phase20b-zeresima/v5-national-r1-20261108 \
-  --output $EA_STAGE/phase20b-zeresima/national-r1-zeresima-v2-20261109
+  --output $EA_STAGE/phase20b-zeresima/national-r1-zeresima-v3-20261109
 ```
 
 | Round | Sections read | Passed | Failed | Without official votes | Two or more urns with a zerésima | Protected or unavailable |
@@ -597,6 +604,11 @@ just integrity-check zeresima \
   urn or from an urn restarted before voting, which prints a new one
   ([O18](observations.md#operations)); 12 and 4 logs hold no official vote at all.
   Version 2 tests the property that matters, no zerésima after votes.
+- Z6 (v3) fails no section. Urns voting without their own zerésima are in 2118
+  sections in round 1 (33 with two such urns) and 1428 in round 2 (27); each starts
+  voting after another urn of its section printed one. One urn per round has no
+  known order: it is in the Z1 section, which has no zerésima at all. Version 3 is
+  otherwise equal to version 2 (0:29 and 0:30, one process, 2.9 GB).
 
 ### GEDAI preparation logs
 
@@ -671,7 +683,9 @@ just integrity-check gedai \
 compares the package signature checks recorded in the logs (the `packages` table of
 `session-aggregates-v5`) with TSE's published hash lists for the four urn models
 (`path1u13`, `path1u15`, `path1u20`, `path1u22`). The logs carry no program hash, so
-the check compares names and results, not file contents:
+the check compares names and results, not file contents. It does not verify program
+integrity: the SHA-512 values the lists publish are parsed but nothing local can be
+compared with them (xr1-20261109-P3-12):
 
 - H1: every program package verified in a log is named in a list, and how:
   `exact` (its model's list), `other_model`, `model_suffix` (named without the
@@ -933,6 +947,32 @@ Results:
 | I8 v2 | 0:29 | 1 | 0.56 GB | 0.2 MB |
 | JWS v3, round 1 / 2 | 0:12 / 0:09 | 1 | 0.11 GB | 0.2 MB |
 | Input rehash | 9:18 | 4 | 0.87 GB | 1 kB |
+
+Second batch, run on 9 and 10 November 2026:
+
+| Check | Version | Change | Ledger (`xr1-20261109-`) |
+| --- | --- | --- | --- |
+| Sections (I3, I9) | `integrity-sections-v6` | The RDV's load code and urn number must equal the BU's (I9 `rdv_urn`); a contest the RDV cannot recount is an I3 row | P3-10, P4-07 |
+| Zerésima | `integrity-zeresima-v3` | Z6, see [zerésima](#zerésima) | P4-10 |
+| Logs (I5, I6) | `integrity-logs-v4` | Copies that disagree are I5 `copy_conflict` rows; malformed lines are counted, and an I6 equality over them is reported | P0-12, P2-02 |
+| GEDAI | `integrity-gedai-v5` | A BU without load fields is `n/a` in the summary, not passed | P4-08 |
+| I8 | `printed-bu-v3` | Content whose code slices cannot be recovered is `chain_unverified`, not `not_authentic` | P4-09 |
+| JWS | `integrity-jws-v3` | The key file must have a pinned SHA-256 ([inputs downloaded by hand](manual-inputs.md)) | P3-06 |
+
+- Sections v6: 0 discrepancies in both rounds and summaries equal to v5. Every RDV
+  comes from its BU's urn and load, and every contest is recounted.
+- Logs v5 (code v4): no copy conflict. Six sections per round have malformed lines,
+  all already I6 `differs`, so no I6 equality rests on a malformed line.
+- GEDAI v5 and I8 v3: summaries equal to the previous versions. The JWS key file in
+  use has the pinned digest, so the JWS results stand.
+
+| Run | Wall time | Workers | Peak memory | Output |
+| --- | --- | --- | --- | --- |
+| Sections v6, round 1 / 2 | 1:12:17 active (11:24:25 with a 10:12:08 machine suspend) / 1:05:15 | 6 | 4.8 / 4.1 GB | 629 / 337 MB |
+| Logs v5 (code v4), round 1 / 2 | 0:25 / 0:47 | 1 | 2.6 / 3.4 GB | 1.2 / 1.7 MB |
+| GEDAI v5, round 1 / 2 | 0:52 / 0:51 | 1 | 2.3 GB | 0.9 / 0.8 MB |
+| I8 v3 | 0:29 | 1 | 0.56 GB | 0.2 MB |
+
 
 ## Limits
 
