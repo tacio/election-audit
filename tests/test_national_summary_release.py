@@ -76,6 +76,25 @@ class SummaryReleaseTests(unittest.TestCase):
                 before,
             )
 
+    def test_a_failed_export_keeps_its_reservation_for_the_retry(self) -> None:
+        # xr1-20261109-P6-04: a reservation left by an export that never published is
+        # reused by the retry, which before failed on the reservation's primary key.
+        with sqlite3.connect(Path(self.spec["store"]) / "work.sqlite") as db:
+            db.execute("INSERT OR IGNORE INTO metadata VALUES('released_bytes','0')")
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS analysis_reservations("
+                "output TEXT PRIMARY KEY,reserved INTEGER,actual INTEGER,state TEXT)"
+            )
+            db.execute(
+                "INSERT INTO analysis_reservations VALUES(?,?,NULL,'reserved')",
+                (str(self.release.resolve()), 64 * 1024**2),
+            )
+        manifest = json.loads(self.export().stdout)
+        self.assertEqual(len(manifest["files"]), 5)
+        with sqlite3.connect(Path(self.spec["store"]) / "work.sqlite") as db:
+            rows = db.execute("SELECT state FROM analysis_reservations").fetchall()
+        self.assertEqual(len(rows), 1)
+
     def test_existing_parquet_corruption_is_never_overwritten(self) -> None:
         self.export()
         part = next((self.release / "source_summaries").glob("*.parquet"))

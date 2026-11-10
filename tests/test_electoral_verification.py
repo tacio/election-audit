@@ -77,3 +77,17 @@ class VerificationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 e.get("https://resultados.tse.jus.br/example", "fixture")
             e.db.close()
+
+
+class CompositionTests(unittest.TestCase):
+    def test_empty_and_unknown_compositions_invent_no_member(self) -> None:
+        # xr1-20261109-P5-10: '' is not section 0000; #NE#/-3 stay unknown
+        from election_audit.electoral_verification import member_sections
+
+        self.assertEqual(member_sections("12", ""), ["0012"])
+        self.assertEqual(member_sections("12", "#NULO#"), ["0012"])
+        self.assertEqual(member_sections("12", "13/ 14"), ["0012", "0013", "0014"])
+        self.assertEqual(member_sections("12", "#NE#"), [])
+        self.assertEqual(member_sections("12", "-3"), [])
+        with self.assertRaises(ValueError):
+            member_sections("12", "12")

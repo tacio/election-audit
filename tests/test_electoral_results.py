@@ -204,6 +204,18 @@ class ElectoralTests(unittest.TestCase):
         with self.assertRaisesRegex(PublicationError, "Cyclic"):
             derive_electoral(data)
 
+    def test_any_version_supersedes_and_unknown_status_blocks_selection(self) -> None:
+        # xr1-20261109-P5-08: an annulment supersedes the totalized version it names
+        data = electoral_data()
+        add_version(data, "annulment", status="rejected", supersedes=["v"])
+        state = derive_electoral(data)[0]["canonical_result"][0]
+        self.assertNotEqual(state["selection_state"], "selected")
+        self.assertIsNone(state["result_version_id"])
+        data = electoral_data()
+        add_version(data, "unclear", status="unknown")
+        state = derive_electoral(data)[0]["canonical_result"][0]
+        self.assertEqual(state["selection_state"], "conflict")
+
     def test_duplicate_candidate_and_wrong_round_or_contest_rejected(self) -> None:
         data = electoral_data()
         data["vote_choice"].append(
@@ -396,5 +408,15 @@ class ElectoralTests(unittest.TestCase):
         data["harmonized_population"].append(
             {**data["harmonized_population"][0], "population_id": "second"}
         )
+        with self.assertRaisesRegex(PublicationError, "overlap"):
+            derive_electoral(data)
+        # xr1-20261109-P5-03: another snapshot of the same principal is the same population
+        data["harmonized_member"].pop()
+        data["harmonized_population"].pop()
+        for name in ("snapshot", "section_composition"):
+            data[name] += [
+                {**r, "snapshot_id": "later"} for r in data[name] if r["snapshot_id"] == "snap"
+            ]
+        data["harmonized_member"].append({**data["harmonized_member"][0], "snapshot_id": "later"})
         with self.assertRaisesRegex(PublicationError, "overlap"):
             derive_electoral(data)

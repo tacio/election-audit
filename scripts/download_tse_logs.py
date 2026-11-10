@@ -869,7 +869,10 @@ def run_collection(args: argparse.Namespace, collector: Collector) -> int:
             "national_coverage": outcome == "finished"
             and not args.limit
             and set(args.ufs) == set(UFS)
-            and not any(counts.get(s, 0) for s in ("error", "aux_not_published", "no_log_listed")),
+            and not any(counts.get(s, 0) for s in ("error", "aux_not_published", "no_log_listed"))
+            # every advertised log version saved (xr1-20261109-P1-09); the section
+            # denominator comes from the snapshot coverage stage, not from this run
+            and saved == advertised,
         }
         (args.output / "coverage.json").write_text(json.dumps(report, indent=2) + "\n")
         logger.info(json.dumps(report, indent=2))

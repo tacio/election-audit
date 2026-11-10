@@ -2,6 +2,7 @@
 
 import fcntl
 import shutil
+import unittest
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -179,3 +180,13 @@ class ReleaseTests(test_snapshots.SourceFixture):
                 )
         self.assertEqual(len(calls), 1)
         self.assertEqual(sorted(hit for _path, hit in results), [False, True])
+
+
+class WriterIdentityTests(unittest.TestCase):
+    def test_release_identity_names_the_writer_code_and_libraries(self) -> None:
+        # xr1-20261109-P6-03
+        from election_audit.publication import writer_identity
+
+        identity = writer_identity()
+        self.assertEqual(set(identity["modules"]), {"publication.py", "operational_marts.py"})
+        self.assertEqual(set(identity["packages"]), {"duckdb", "pyarrow"})

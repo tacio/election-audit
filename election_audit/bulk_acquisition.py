@@ -158,23 +158,48 @@ def download_one(
     Returns (sha256, sha512, bytes, zip members or None).
     """
     partial = target.with_name(target.name + ".part")
+    # The prefix a resume keeps is checked against the digest recorded when it was written
+    # (xr1-20261109-P1-01): without that, altered bytes would enter the acquisition digest.
+    checkpoint = target.with_name(target.name + ".part.json")
     if expected["bytes"] is None and not target.name.endswith(".sha512"):
         raise ValueError(f"Server did not announce a length: {url}")
     limit = UNSIZED_LIMIT if expected["bytes"] is None else expected["bytes"]
     digest, long_digest = hashlib.sha256(), hashlib.sha512()
     offset = 0
     if partial.exists():
-        if not expected["ranges"] or not expected["etag"] or expected["bytes"] is None:
+        state = json.loads(checkpoint.read_text()) if checkpoint.exists() else None
+        if (
+            not expected["ranges"]
+            or not expected["etag"]
+            or expected["bytes"] is None
+            or state is None
+            or state.get("etag") != expected["etag"]
+            or not 0 < state["bytes"] <= min(limit, partial.stat().st_size)
+        ):
             partial.unlink()
         else:
             with partial.open("rb") as stream:
-                for block in iter(lambda: stream.read(CHUNK), b""):
+                while offset < state["bytes"]:
+                    block = stream.read(min(CHUNK, state["bytes"] - offset))
+                    if not block:
+                        break
                     digest.update(block)
                     long_digest.update(block)
                     offset += len(block)
-            if offset > limit:
-                partial.unlink()
+            if offset != state["bytes"] or digest.hexdigest() != state["sha256"]:
+                partial.unlink()  # the kept prefix is not what was received: start over
                 digest, long_digest, offset = hashlib.sha256(), hashlib.sha512(), 0
+            else:
+                os.truncate(partial, offset)  # bytes after the checkpoint are not trusted
+    checkpoint.unlink(missing_ok=True)
+
+    def save_checkpoint(stream: Any) -> None:
+        stream.flush()
+        os.fsync(stream.fileno())
+        if expected["etag"] and offset:
+            state = {"etag": expected["etag"], "bytes": offset, "sha256": digest.hexdigest()}
+            checkpoint.write_text(json.dumps(state))
+
     headers = {}
     if offset:
         headers = {"Range": f"bytes={offset}-", "If-Range": expected["etag"]}
@@ -193,25 +218,27 @@ def download_one(
         if response.headers.get("ETag") and response.headers.get("ETag") != expected["etag"]:
             raise ValueError(f"ETag changed during download: {url}")
         with partial.open(mode) as stream:
-            last = time.monotonic()
-            while True:
-                block = response.read(CHUNK)
-                if not block:
-                    break
-                stream.write(block)
-                digest.update(block)
-                long_digest.update(block)
-                offset += len(block)
-                if offset > limit:
-                    raise ValueError(f"Server sent more bytes than announced: {url}")
-                if time.monotonic() - last > 10:
-                    last = time.monotonic()
-                    if _free(target.parent) < reserve:
-                        raise RuntimeError("Output free-space reserve breached")
-                    if progress:
-                        progress(offset)
-            stream.flush()
-            os.fsync(stream.fileno())
+            try:
+                last = time.monotonic()
+                while True:
+                    block = response.read(CHUNK)
+                    if not block:
+                        break
+                    stream.write(block)
+                    digest.update(block)
+                    long_digest.update(block)
+                    offset += len(block)
+                    if offset > limit:
+                        raise ValueError(f"Server sent more bytes than announced: {url}")
+                    if time.monotonic() - last > 10:
+                        last = time.monotonic()
+                        save_checkpoint(stream)
+                        if _free(target.parent) < reserve:
+                            raise RuntimeError("Output free-space reserve breached")
+                        if progress:
+                            progress(offset)
+            finally:
+                save_checkpoint(stream)  # what was written and hashed, for a resume
     if expected["bytes"] is not None and offset != expected["bytes"]:
         raise ValueError(f"Short download ({offset} of {expected['bytes']} bytes): {url}")
     if sha(partial) != digest.hexdigest():
@@ -220,6 +247,7 @@ def download_one(
     if target.name.endswith(".zip"):
         with zipfile.ZipFile(partial) as archive:
             members = len(archive.infolist())
+    checkpoint.unlink(missing_ok=True)
     os.chmod(partial, 0o444)
     os.replace(partial, target)
     fd = os.open(target.parent, os.O_DIRECTORY)
@@ -360,11 +388,16 @@ def acquire(
             url = resource["url"]
             name = Path(urlsplit(url).path).name
             existing = db.execute(
-                "SELECT status,etag,expected_bytes FROM files WHERE url=?", (url,)
+                "SELECT status,etag,expected_bytes,path,bytes FROM files WHERE url=?", (url,)
             ).fetchone()
             if existing and existing[0] == "complete":
-                rows.append((url, None))
-                continue
+                stored = output / existing[3]
+                if stored.is_file() and stored.stat().st_size == existing[4]:
+                    rows.append((url, None))
+                    continue
+                # a complete row whose file is gone or changed size is fetched again
+                # (xr1-20261109-P1-03); verify checks the digests
+                db.execute("UPDATE files SET status='pending' WHERE url=?", (url,))
             expected = head(url)
             if existing and (existing[1], existing[2]) != (expected["etag"], expected["bytes"]):
                 partial = output / "files" / (name + ".part")

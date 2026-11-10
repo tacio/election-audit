@@ -137,23 +137,33 @@ def publish_release(
                     "SELECT key,CAST(value AS INTEGER) FROM metadata WHERE key!='initialised'"
                 )
             )
-            allowance = min(
-                8 * 1024**3,
-                r["output_budget_bytes"]
-                - min(2 * 1024**3, r["output_budget_bytes"] // 4)
-                - meta["bytes"]
-                - meta["released_bytes"],
-            )
-            if allowance < 1024**2:
-                raise OSError("Combined recovery/analysis output budget exhausted")
-            budget.execute(
-                "UPDATE metadata SET value=CAST(value AS INTEGER)+? WHERE key='released_bytes'",
-                (allowance,),
-            )
-            budget.execute(
-                "INSERT INTO analysis_reservations VALUES(?,?,NULL,'reserved')",
-                (str(output), allowance),
-            )
+            earlier = budget.execute(
+                "SELECT state,reserved FROM analysis_reservations WHERE output=?", (str(output),)
+            ).fetchone()
+            if earlier is not None and earlier[0] != "reserved":
+                raise OSError(f"Reservation for {output} is already {earlier[0]}")
+            # An export that failed before publishing keeps its reservation; a retry reuses
+            # it instead of reserving again or being refused (xr1-20261109-P6-04).
+            if earlier is not None:
+                allowance = earlier[1]
+            else:
+                allowance = min(
+                    8 * 1024**3,
+                    r["output_budget_bytes"]
+                    - min(2 * 1024**3, r["output_budget_bytes"] // 4)
+                    - meta["bytes"]
+                    - meta["released_bytes"],
+                )
+                if allowance < 1024**2:
+                    raise OSError("Combined recovery/analysis output budget exhausted")
+                budget.execute(
+                    "UPDATE metadata SET value=CAST(value AS INTEGER)+? WHERE key='released_bytes'",
+                    (allowance,),
+                )
+                budget.execute(
+                    "INSERT INTO analysis_reservations VALUES(?,?,NULL,'reserved')",
+                    (str(output), allowance),
+                )
             budget.commit()
         with (
             closing(

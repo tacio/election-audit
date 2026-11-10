@@ -198,6 +198,13 @@ class MechanismValidationTests(unittest.TestCase):
             self.assertTrue(result[0]["injected"])
             self.assertEqual(records, original)
             self.assertLessEqual(result[0]["a"] + result[0]["b"] + result[0]["other"], 100)
+        # either candidate can be the beneficiary (xr1-20261109-P7-06)
+        towards_b = perturb_mechanism(
+            records, "switching", seed=42, fraction=1, concentration="municipal", beneficiary="b"
+        )
+        self.assertEqual(
+            (towards_b[0]["a"] < records[0]["a"], towards_b[0]["b"] > records[0]["b"]), (True, True)
+        )
         records[0]["a"] = 50
         saturated = perturb_mechanism(
             records, "additions", seed=42, fraction=1, concentration="municipal"
@@ -230,8 +237,9 @@ class MechanismValidationTests(unittest.TestCase):
                 callback_id="synthetic-refit-v1",
                 specification=spec,
             )
-            self.assertEqual(first["states"], {"complete": 4})
-            self.assertEqual(len(calls), 4)
+            # switching runs once per beneficiary (xr1-20261109-P7-06)
+            self.assertEqual(first["states"], {"complete": 8})
+            self.assertEqual(len(calls), 8)
             run_mechanism_validation(
                 records,
                 records,
@@ -241,7 +249,7 @@ class MechanismValidationTests(unittest.TestCase):
                 callback_id="synthetic-refit-v1",
                 specification=spec,
             )
-            self.assertEqual(len(calls), 4)
+            self.assertEqual(len(calls), 8)
             with self.assertRaises(ValueError):
                 run_mechanism_validation(
                     records,

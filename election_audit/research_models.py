@@ -550,10 +550,24 @@ def simulate_models(
     return result
 
 
+# Count mechanisms run for each candidate as the beneficiary (xr1-20261109-P7-06).
+BENEFICIARIES = {m: ("a", "b") for m in ("additions", "switching", "turnout_reduction")}
+
+
 def perturb_mechanism(
-    records: Sequence[Row], mechanism: str, *, seed: int, fraction: float, concentration: str
+    records: Sequence[Row],
+    mechanism: str,
+    *,
+    seed: int,
+    fraction: float,
+    concentration: str,
+    beneficiary: str = "a",
 ) -> Sequence[Row]:
-    """Transform reconciled anonymous counts or sanitized histories on independent copies."""
+    """Transform reconciled anonymous counts or sanitized histories on independent copies.
+
+    ``beneficiary`` names the candidate ("a" or "b") a count mechanism favours; validation
+    runs both, so power is never measured for one direction only (xr1-20261109-P7-06).
+    """
     import copy
 
     import numpy as np
@@ -569,6 +583,9 @@ def perturb_mechanism(
         raise ValueError("Unknown mechanism")
     if not 0 <= fraction <= 1 or concentration not in {"dispersed", "municipal"}:
         raise ValueError("Invalid injection scope")
+    if beneficiary not in {"a", "b"}:
+        raise ValueError("The beneficiary is candidate a or b")
+    gain, loss = (beneficiary, "b" if beneficiary == "a" else "a")
     result = copy.deepcopy(records)
     rng = np.random.default_rng(seed)
     if concentration == "municipal":
@@ -608,14 +625,14 @@ def perturb_mechanism(
             q = max(1, int(0.05 * (row["a"] + row["b"] + row["other"])))
             if mechanism == "additions":
                 q = min(q, row["electorate"] - row["a"] - row["b"] - row["other"])
-                row["a"] += q
+                row[gain] += q
             elif mechanism == "switching":
-                q = min(q, row["b"])
-                row["b"] -= q
-                row["a"] += q
+                q = min(q, row[loss])
+                row[loss] -= q
+                row[gain] += q
             else:
-                q = min(q, row["b"])
-                row["b"] -= q
+                q = min(q, row[loss])
+                row[loss] -= q
             row["injected"] = bool(q)
         else:
             events = row.get("events")
@@ -681,62 +698,66 @@ def run_mechanism_validation(
     for mechanism in specification["mechanisms"]:
         for concentration in specification["concentration"]:
             for fraction in specification["affected_fractions"]:
-                for repetition in range(specification["repetitions"]):
-                    setting = {
-                        "mechanism": mechanism,
-                        "concentration": concentration,
-                        "fraction": fraction,
-                        "seed": specification["seed"] + repetition,
-                    }
-                    key = digest(setting)
-                    if db.execute("SELECT 1 FROM experiment WHERE id=?", (key,)).fetchone():
-                        continue
-                    if max_experiments is not None and newly_completed >= max_experiments:
-                        continue
-                    try:
-                        arguments = {
+                for beneficiary in BENEFICIARIES.get(mechanism, ("a",)):
+                    for repetition in range(specification["repetitions"]):
+                        setting = {
                             "mechanism": mechanism,
                             "concentration": concentration,
                             "fraction": fraction,
+                            "seed": specification["seed"] + repetition,
                         }
-                        train = perturb_mechanism(training, seed=setting["seed"], **arguments)
-                        cal = perturb_mechanism(
-                            calibration, seed=setting["seed"] + 10000, **arguments
-                        )
-                        test = perturb_mechanism(
-                            evaluation, seed=setting["seed"] + 20000, **arguments
-                        )
-                        flags = list(
-                            fit_calibrate_score(
-                                copy.deepcopy(train),
-                                copy.deepcopy(cal),
-                                copy.deepcopy(test),
-                                setting["seed"],
+                        if mechanism in BENEFICIARIES:
+                            setting["beneficiary"] = beneficiary
+                        key = digest(setting)
+                        if db.execute("SELECT 1 FROM experiment WHERE id=?", (key,)).fetchone():
+                            continue
+                        if max_experiments is not None and newly_completed >= max_experiments:
+                            continue
+                        try:
+                            arguments = {
+                                "mechanism": mechanism,
+                                "concentration": concentration,
+                                "fraction": fraction,
+                                "beneficiary": beneficiary,
+                            }
+                            train = perturb_mechanism(training, seed=setting["seed"], **arguments)
+                            cal = perturb_mechanism(
+                                calibration, seed=setting["seed"] + 10000, **arguments
                             )
-                        )
-                        if len(flags) != len(test) or any((type(f) is not bool for f in flags)):
-                            raise ValueError(
-                                "Refit callback requires exactly one boolean signal per evaluation unit"
+                            test = perturb_mechanism(
+                                evaluation, seed=setting["seed"] + 20000, **arguments
                             )
-                        affected = sum((bool(r["injected"]) for r in test))
-                        result = {
-                            **setting,
-                            "state": "complete",
-                            "affected": affected,
-                            "detected": sum((f and r["injected"] for f, r in zip(flags, test))),
-                            "false_alarms": sum(
-                                (f and (not r["injected"]) for f, r in zip(flags, test))
-                            ),
-                            "evaluation_n": len(test),
-                            "interpretation": "specified synthetic mechanism and complete supplied refit pipeline only",
-                        }
-                    except ValueError as exc:
-                        result = {**setting, "state": "unavailable", "reason": str(exc)}
-                    db.execute(
-                        "INSERT INTO experiment VALUES(?,?)", (key, canonical(result).decode())
-                    )
-                    db.commit()
-                    newly_completed += 1
+                            flags = list(
+                                fit_calibrate_score(
+                                    copy.deepcopy(train),
+                                    copy.deepcopy(cal),
+                                    copy.deepcopy(test),
+                                    setting["seed"],
+                                )
+                            )
+                            if len(flags) != len(test) or any((type(f) is not bool for f in flags)):
+                                raise ValueError(
+                                    "Refit callback requires exactly one boolean signal per evaluation unit"
+                                )
+                            affected = sum((bool(r["injected"]) for r in test))
+                            result = {
+                                **setting,
+                                "state": "complete",
+                                "affected": affected,
+                                "detected": sum((f and r["injected"] for f, r in zip(flags, test))),
+                                "false_alarms": sum(
+                                    (f and (not r["injected"]) for f, r in zip(flags, test))
+                                ),
+                                "evaluation_n": len(test),
+                                "interpretation": "specified synthetic mechanism and complete supplied refit pipeline only",
+                            }
+                        except ValueError as exc:
+                            result = {**setting, "state": "unavailable", "reason": str(exc)}
+                        db.execute(
+                            "INSERT INTO experiment VALUES(?,?)", (key, canonical(result).decode())
+                        )
+                        db.commit()
+                        newly_completed += 1
     counts = dict(
         db.execute("SELECT json_extract(payload,'$.state'),count(*) FROM experiment GROUP BY 1")
     )
@@ -873,6 +894,11 @@ def validate_mechanisms(
             event_map[row["unit_key"]] = row["events"]
     target = manifest["config"]["target"]
     variant = manifest["config"]["variant"]
+    # The runoff pair comes from the features release, never fixed numbers (xr1-20261109-P7-06).
+    pair = json.loads((Path(features) / "manifest.json").read_text()).get("candidate_pair")
+    if not isinstance(pair, list) or len(pair) != 2 or not all(pair) or pair[0] == pair[1]:
+        raise ValueError("Mechanism validation needs the features release's candidate pair")
+    code_a, code_b = (str(code) for code in pair)
     populations = []
     with read_only(_catalog(features, document)) as db:
         for partition in ("training", "calibration"):
@@ -894,9 +920,9 @@ def validate_mechanisms(
                     entry = choices.get(code)
                     return entry.get("count") if isinstance(entry, dict) else entry
 
-                a, b = value("13"), value("22")
+                a, b = value(code_a), value(code_b)
                 if type(a) is not int or type(b) is not int:
-                    raise ValueError("Explicit 13/22 runoff counts required")
+                    raise ValueError("Explicit runoff counts of both candidates required")
                 total = counts["total_presidential_ballots"]
                 result.append(
                     {

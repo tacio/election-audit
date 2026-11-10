@@ -38,6 +38,9 @@ POOL_LIMIT = 100_000
 MAX_SELECTED_BYTES = 64 * 1024**2
 
 
+DATE_TOKEN = re.compile(r"(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/(19|20)[0-9]{2}")
+
+
 def select_pilot(
     root: str | Path,
     *,
@@ -212,7 +215,13 @@ def review_original_messages(snapshot: Path) -> JSON:
                         if len(fields) != 6:
                             counters["malformed_shape"] += 1
                             continue
-                        dates[fields[0][:10]] += 1
+                        # only a valid dd/mm/yyyy date is exported; any other first field is
+                        # counted, never copied (xr1-20261109-P6-02)
+                        day = fields[0][:10]
+                        if DATE_TOKEN.fullmatch(day):
+                            dates[day] += 1
+                        else:
+                            counters["invalid_date"] += 1
                         message = fields[4]
                         if fields[3] == "VOTA" and message in MESSAGES:
                             counters["exact_" + MESSAGES[message]] += 1

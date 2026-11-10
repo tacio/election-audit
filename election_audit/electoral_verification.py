@@ -21,6 +21,16 @@ from election_audit.binary_bu import decode_bu
 from election_audit.elections import ElectionDescriptor, election_for_round
 from election_audit.types import JSON, Argv, Row
 
+
+def member_sections(principal: str, raw: str) -> list[str]:
+    """Sorted members of a principal section from DS_SECOES_AGREGADAS, [] when TSE marks the
+    composition unknown (#NE#, -3). An empty string means no aggregation; it never becomes a
+    member section 0000 (xr1-20261109-P5-10). Raises ValueError on duplicates."""
+    from election_audit.features import verified_member_sections
+
+    return verified_member_sections(principal, {"composition_raw": raw})
+
+
 VERSION = "electoral-verification-v1"
 BASE = "https://resultados.tse.jus.br/oficial"
 
@@ -258,10 +268,11 @@ def verify_section(records: list[Row], binary: Row, candidates: dict[str, JSON])
         and attendance + abstention == eligible,
         "BWEB/binary arithmetic mismatch",
     )
-    members = [key[2]]
-    if r["DS_SECOES_AGREGADAS"] not in {"#NULO#", "#NULO", "-1"}:
-        members += [x.strip().zfill(4) for x in r["DS_SECOES_AGREGADAS"].split("/")]
-    _required(len(members) == len(set(members)), "Duplicate principal/member composition")
+    try:
+        members = member_sections(key[2], r["DS_SECOES_AGREGADAS"])
+    except ValueError:
+        members = []
+        _required(False, "Duplicate principal/member composition")
     choices: dict[str, Any] = {
         c: {
             "count": binary["choices"].get(c, 0),
@@ -290,7 +301,7 @@ def verify_section(records: list[Row], binary: Row, candidates: dict[str, JSON])
         "unresolved_votes": 0,
         "choices": choices,
         "complete_choices": True,
-        "member_sections": sorted(members),
+        "member_sections": members or None,  # None: TSE marks the composition unknown
         "composition_raw": r["DS_SECOES_AGREGADAS"],
         "location_code": r["NR_LOCAL_VOTACAO"].zfill(4),
         "binary_link": "exact_identity_and_counts_match",
@@ -391,15 +402,7 @@ def verify(
         if previous and previous[0] == "content_verified":
             result = json.loads(previous["payload"])
             if "member_sections" not in result:
-                raw = result["composition_raw"]
-                result["member_sections"] = sorted(
-                    [sec]
-                    + (
-                        []
-                        if raw in {"#NULO#", "#NULO", "-1"}
-                        else [s.strip().zfill(4) for s in raw.split("/")]
-                    )
-                )
+                result["member_sections"] = member_sections(sec, result["composition_raw"]) or None
                 store.db.execute(
                     "UPDATE section_result SET payload=? WHERE uf=? AND municipality=? AND zone=? AND section=? AND round=?",
                     (_json(result), uf, mu, zone, sec, election.round),

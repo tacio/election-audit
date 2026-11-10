@@ -246,6 +246,10 @@ def fetch(
         not_final = db.execute(
             "SELECT count(*) FROM files WHERE kind='unified' AND totalization_final!='s'"
         ).fetchone()[0]
+        # a unified file without tf has an unknown status, never final (xr1-20261109-P5-06)
+        final_unknown = db.execute(
+            "SELECT count(*) FROM files WHERE kind='unified' AND totalization_final IS NULL"
+        ).fetchone()[0]
         stamps = sorted(
             datetime.strptime(f"{day} {clock}", "%d/%m/%Y %H:%M:%S").isoformat()
             for day, clock in db.execute(
@@ -260,6 +264,7 @@ def fetch(
         "planned": len(entries),
         "files": {f"{k} {s}": v for (k, s), v in sorted(counts.items())},
         "unified_not_final": not_final,
+        "unified_final_unknown": final_unknown,
         "generated_range": list(stamps),
         "config_sha256": hashlib.sha256(config_body).hexdigest(),
     }

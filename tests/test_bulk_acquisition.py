@@ -181,6 +181,30 @@ class BulkAcquisitionTests(unittest.TestCase):
             (self.output / "files" / "x_1t_AC.zip").read_bytes(), self.server.files["x_1t_AC.zip"]
         )
 
+    def test_an_altered_partial_prefix_restarts_the_download(self) -> None:
+        # xr1-20261109-P1-01: a resume keeps only bytes matching the recorded checkpoint.
+        self.server.cut = ("x_1t_AC.zip", 100)
+        with self.assertRaises(Exception):
+            self.run_acquire()
+        partial = self.output / "files" / "x_1t_AC.zip.part"
+        partial.write_bytes(b"\0" * 100)
+        before = len(self.server.requests)
+        self.run_acquire(resume=True)
+        self.assertNotIn(("/cdn/x_1t_AC.zip", "bytes=100-"), self.server.requests[before:])
+        self.assertEqual(
+            (self.output / "files" / "x_1t_AC.zip").read_bytes(), self.server.files["x_1t_AC.zip"]
+        )
+
+    def test_resume_fetches_a_complete_file_that_is_gone(self) -> None:
+        # xr1-20261109-P1-03
+        self.run_acquire()
+        path = self.output / "files" / "x_1t_AC.zip"
+        path.chmod(0o644)
+        path.unlink()
+        self.run_acquire(resume=True)
+        self.assertEqual(path.read_bytes(), self.server.files["x_1t_AC.zip"])
+        self.assertEqual(bulk.verify(self.output)["verified_files"], 2)
+
     def test_changed_server_object_restarts_instead_of_splicing(self) -> None:
         self.server.cut = ("x_1t_AC.zip", 100)
         with self.assertRaises(Exception):

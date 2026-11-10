@@ -13,7 +13,9 @@ from election_audit.types import JSON, Row
 
 type Tables = dict[str, list[Row]]
 
-VERSION = "electoral-results-v1"
+VERSION = (
+    "electoral-results-v2"  # v2: supersession by any version; one snapshot per principal (xr1)
+)
 CATEGORY_FIELDS = {
     "candidate": "valid_candidate_votes",
     "blank": "blank_votes",
@@ -220,11 +222,9 @@ def validate_electoral(data: Tables, generated: Tables) -> None:
         comp = compositions.get((member["snapshot_id"], member["principal_section_id"]))
         if not policy or not comp or comp["member_section_id"] != comp["principal_section_id"]:
             raise PublicationError("Harmonized member must be whole principal population")
-        key = (
-            policy["harmonization_policy"],
-            member["snapshot_id"],
-            member["principal_section_id"],
-        )
+        # A principal enters a policy's populations once, whatever the snapshot: two snapshots
+        # of one principal would count its electorate and votes twice (xr1-20261109-P5-03).
+        key = (policy["harmonization_policy"], member["principal_section_id"])
         if key in disjoint:
             raise PublicationError("Harmonized populations overlap within policy")
         disjoint.add(key)
@@ -278,8 +278,11 @@ def _canonical(data: Tables) -> list[Row]:
             if v["result_status"] == "totalized"
             and evidence[v["result_version_id"]]["official_target"]
         ]
+        # Any evidenced version can supersede, an annulment or rejection included; an
+        # observed version of unknown status leaves the selection unresolved
+        # (xr1-20261109-P5-08).
         superseded = {
-            old for v in eligible for old in evidence[v["result_version_id"]]["supersedes"]
+            old for v in observed for old in evidence[v["result_version_id"]]["supersedes"]
         }
         survivors = [v for v in eligible if v["result_version_id"] not in superseded]
         unresolved = [
@@ -290,6 +293,9 @@ def _canonical(data: Tables) -> list[Row]:
                 v in unknown
                 and v["result_status"] in {"totalized", "unknown", "conflict"}
                 or v["result_status"] == "conflict"
+                # an unknown-status version competes only with an eligible one
+                or v["result_status"] == "unknown"
+                and bool(eligible)
             )
         ]
         state = (
@@ -490,7 +496,14 @@ def _hierarchy(data: Tables, canonical: list[Row]) -> list[Row]:
         if not ref["metrics"]:
             raise PublicationError("Hierarchy requires at least one numeric metric")
         for field, reference in ref["metrics"].items():
-            if field not in TOTAL_FIELDS or type(reference) is not int or reference < 0:
+            if field not in TOTAL_FIELDS:
+                # Candidate totals are reconciled against EA20 by integrity check I4, not
+                # here (xr1-20261109-P5-09).
+                raise PublicationError(
+                    f"Unsupported hierarchy metric {field!r}: this path reconciles only "
+                    f"{', '.join(TOTAL_FIELDS)}; candidate totals are checked by I4"
+                )
+            if type(reference) is not int or reference < 0:
                 raise PublicationError("Invalid hierarchy metric")
             values = [
                 totals.get(r["result_version_id"], {}).get(field)

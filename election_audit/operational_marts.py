@@ -295,6 +295,17 @@ def materialize_marts(
         _insert(connection, "processing_event_availability", batch)
     sections = {r["section_id"]: r for r in context["context_tables"]["section"]}
     elections = {r["election_id"]: r for r in context["context_tables"]["election"]}
+    shards = list(shards)
+    # Only a section whose sessions come from more than one shard can be split between them;
+    # the others keep their measures (xr1-20261109-P6-08).
+    spanning: set[str] = set()
+    if cross_shard_overlap:
+        seen: dict[str, Path] = {}
+        for shard in shards:
+            for session in _rows(shard / "voting_session.jsonl"):
+                principal = session.get("principal_section_id")
+                if seen.setdefault(principal, shard) != shard:
+                    spanning.add(principal)
     for shard in shards:
         events, cycles = defaultdict(list), defaultdict(list)
         for row in _rows(shard / "selected_event.jsonl"):
@@ -312,7 +323,7 @@ def materialize_marts(
                 events[sid],
                 section,
                 elections.get(section.get("election_id"), {}),
-                cross_shard_overlap=cross_shard_overlap,
+                cross_shard_overlap=session.get("principal_section_id") in spanning,
             )
             _insert(connection, "late_voting", [row])
     return ["operational_coverage", "processing_event_availability", "late_voting"]

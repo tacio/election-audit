@@ -213,7 +213,11 @@ def build_cases(
                         "zone": unit["zone"],
                         "section": unit["section"],
                         "prediction": prediction,
-                        "candidate_blinded": True,
+                        # The packet shows the signed residual and a directional selection
+                        # reason, which reveal the favoured candidate of a candidate-share
+                        # model: it is not blinded (xr1-20261109-P7-04).
+                        "candidate_blinded": False,
+                        "direction_visible": "signed residual and selection reason",
                         "candidate_interpretation": "fixed model roles; no anonymous ballot attribution",
                         "source_snapshot_id": unit["source_snapshot_id"],
                         "lineage_keys": unit_payload.get("lineage_keys", {}),
@@ -276,7 +280,8 @@ def record_review(
         "conclusion": conclusion,
         "alternative_explanations": list(explanations),
         "corroboration": list(corroboration),
-        "candidate_blinded": True,
+        # what the reviewer saw, as the packet states it, never asserted here
+        "candidate_blinded": case.get("candidate_blinded") is True,
     }
     db = open_journal(journal, protocol)
     try:

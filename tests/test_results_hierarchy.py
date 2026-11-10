@@ -23,7 +23,7 @@ CONFIG = {
 }
 
 
-def unified(scope_type: str, scope: str, *, tf: str = "s", **changes: Any) -> bytes:
+def unified(scope_type: str, scope: str, *, tf: str | None = "s", **changes: Any) -> bytes:
     value = {
         "ele": "6258",
         "t": "2",
@@ -38,6 +38,8 @@ def unified(scope_type: str, scope: str, *, tf: str = "s", **changes: Any) -> by
         "carg": [{"cd": "1"}],
         "s": {"ts": "10", "st": "10"},
     }
+    if tf is None:
+        del value["tf"]
     value.update(changes)
     return json.dumps(value).encode()
 
@@ -138,6 +140,10 @@ class ResultsHierarchyTests(unittest.TestCase):
         get, _ = self.getter(bodies(**{url: unified("mu", "29300", tf="n")}))
         result = rh.fetch(2, self.root / "r2", delay=0, get=get)
         self.assertEqual(result["unified_not_final"], 1)
+        # xr1-20261109-P5-06: a file without tf is unknown, never final
+        get, _ = self.getter(bodies(**{url: unified("mu", "29300", tf=None)}))
+        result = rh.fetch(2, self.root / "r2-unknown", delay=0, get=get)
+        self.assertEqual(result["unified_final_unknown"], 1)
 
     def test_planned_rejects_malformed_configuration(self) -> None:
         broken = dict(CONFIG, abr=[{"cd": "ac", "mu": [{"cd": "1120"}]}])

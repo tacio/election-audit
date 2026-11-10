@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import tempfile
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import asdict, dataclass
@@ -93,6 +94,24 @@ class ResourceConfig:
                 raise PublicationError(f"Invalid resource setting: {key}")
         if self.parser_workers > 64 or self.duckdb_threads > 64 or self.batch_rows > 100_000:
             raise PublicationError("Worker/thread/batch limit exceeded")
+
+
+def writer_identity() -> JSON:
+    """Digests of the modules that write a release and the versions of its libraries, so a
+    changed writer never reuses an earlier release id (xr1-20261109-P6-03)."""
+    from importlib import metadata
+
+    from election_audit import operational_marts
+
+    modules = {
+        Path(module.__file__).name: hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()
+        for module in (sys.modules[__name__], operational_marts)
+        if module.__file__
+    }
+    return {
+        "modules": modules,
+        "packages": {name: metadata.version(name) for name in ("duckdb", "pyarrow")},
+    }
 
 
 def _guard(path: str | Path, config: ResourceConfig, extra_bytes: int = 0) -> None:
@@ -347,6 +366,7 @@ def publish_release(
             "shards": [p.name for p in shards],
             "parse_id": next(iter(parse_ids)),
             "config": asdict(config),
+            "writer": writer_identity(),
         }
         key = digest(inputs)
         parent = store / "releases"

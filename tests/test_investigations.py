@@ -118,7 +118,7 @@ class InvestigationTests(unittest.TestCase):
             self.assertEqual(result["counts"]["ranked_negative"], 2)
             packets = [json.loads(s) for s in (root / "cases/cases.jsonl").read_text().splitlines()]
             self.assertNotIn(test, [p["unit_key"] for p in packets])
-            self.assertTrue(all(p["candidate_blinded"] for p in packets))
+            self.assertFalse(any(p["candidate_blinded"] for p in packets))  # xr1 P7-04
             export_cases_dataset(root / "cases", protocol, root / "dashboard")
             ds = AuditDataset.open(root / "dashboard/dataset.json")
             self.assertEqual(ds.manifest["access_state"], "development_only")
