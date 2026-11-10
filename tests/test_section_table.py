@@ -166,7 +166,16 @@ def row(
     key = ("ac", "01392", "0009", section)
     profile = {("ac", "01392", "0009", m): {c: 1 for c in PROFILE_COLUMNS} for m in members}
     result_row = (
-        {"eligible": 10, "attendance": 8, "unparsed_votes": 0, "location": "1554"}
+        {
+            "eligible": 10,
+            "attendance": 8,
+            "abstentions": 2,
+            "nominal": 6,
+            "blank": 1,
+            "null_votes": 1,
+            "unparsed_votes": 0,
+            "location": "1554",
+        }
         if result
         else None
     )
@@ -245,6 +254,20 @@ class RowTests(unittest.TestCase):
         ids = {r["unit_id"] for r in rows[:3]}
         self.assertEqual(len(ids), 1)
         self.assertEqual({r["unit_id"] for r in restricted[:3]}, ids)
+
+    def test_unreconciled_results_and_incomplete_units_are_not_ready(self) -> None:
+        # xr1-20261109-P5-01: doubled choices do not add up to the attendance
+        doubled = row(1, "0080", ["0080"])
+        doubled["_result"]["nominal"] *= 2
+        _finish(doubled, "law_uf", "15:00:00")
+        self.assertEqual(
+            (doubled["results_state"], doubled["results_reason"]), ("unavailable", "unreconciled")
+        )
+        # xr1-20261109-P5-05: a member registered in round 1 only breaks continuity
+        rows = [row(1, "0070", ["0070", "0071"]), row(2, "0070", ["0070"])]
+        restricted = [_finish(r, "law_uf", "15:00:00") for r in rows]
+        (unit,) = harmonize(rows, restricted, 2026)
+        self.assertFalse(unit["comparable"])
 
     def test_chunks_hold_whole_municipalities_of_one_uf(self) -> None:
         sizes = [

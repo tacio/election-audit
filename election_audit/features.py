@@ -426,15 +426,21 @@ def measures(
         and candidate_a
         and candidate_b
         and candidate_a != candidate_b
-        and set(candidate) == {candidate_a, candidate_b}
+        and candidate
+        and set(candidate) <= {candidate_a, candidate_b}
     ):
-        a, b = candidate.get(candidate_a), candidate.get(candidate_b)
+        # BWEB omits a candidate with no votes. With complete choices that absence is a
+        # zero, so unanimous sections keep their shares (xr1-20261109-P7-05); without
+        # complete choices it stays unknown.
+        absent = 0 if complete else None
+        pair = {code: candidate.get(code, absent) for code in (candidate_a, candidate_b)}
+        a, b = pair[candidate_a], pair[candidate_b]
         denom = a + b if type(a) is int and type(b) is int else None
         for code, label in [(candidate_a, "candidate_a_share"), (candidate_b, "candidate_b_share")]:
             ratio(
                 "candidate_share_target",
                 label,
-                candidate.get(code),
+                pair[code],
                 denom,
                 None
                 if ready and complete and legal

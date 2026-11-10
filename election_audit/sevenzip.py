@@ -205,13 +205,20 @@ def _decode(folder: Folder, packed: memoryview, limit: int) -> bytes:
             }
         else:
             raise SevenZipError(f"Unsupported 7z coder {method.hex()}")
+        # The archive chooses the dictionary size (up to 4 GiB), and the decoder allocates
+        # it before any output bound applies. No match reaches back further than the
+        # output, so a dictionary larger than the declared size is never needed
+        # (xr1-20261109-P1-04); liblzma's minimum is 4 KiB.
+        spec["dict_size"] = max(4096, min(spec["dict_size"], folder["size"]))
         # 7z LZMA streams usually have no end marker, so a raw decoder runs past the
         # declared size; stop exactly there and let the CRC vouch for the bytes.
-        decoder = lzma.LZMADecompressor(format=lzma.FORMAT_RAW, filters=[spec])
         try:
+            decoder = lzma.LZMADecompressor(format=lzma.FORMAT_RAW, filters=[spec])
             out = decoder.decompress(bytes(packed), max_length=folder["size"])
         except lzma.LZMAError as error:
             raise SevenZipError(f"Corrupt LZMA stream: {error}") from None
+        except MemoryError:
+            raise SevenZipError("LZMA decoder memory exhausted") from None
     if len(out) != folder["size"]:
         raise SevenZipError("Unpacked size mismatch")
     if folder["crc"] is not None and zlib.crc32(out) != folder["crc"]:
@@ -221,6 +228,9 @@ def _decode(folder: Folder, packed: memoryview, limit: int) -> bytes:
 
 def _unpack(data: bytes, base: int, streams: Streams, limit: int) -> list[bytes]:
     pack_pos, pack_sizes, folders, sub = streams
+    # The bound covers the whole archive, not each folder (xr1-20261109-P1-06).
+    if sum(folder["size"] for folder in folders) > limit:
+        raise SevenZipError("Unpacked size bound exceeded")
     offset, outputs = base + pack_pos, []
     for folder, size, parts in zip(folders, pack_sizes, sub, strict=True):
         if offset + size > len(data):

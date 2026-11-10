@@ -136,6 +136,18 @@ class FeatureTests(unittest.TestCase):
             measures(unit(), c, [], "13", "22")[("blank_null_targets", "null_share")][0]
         )
 
+    def test_a_unanimous_section_keeps_its_candidate_shares(self) -> None:
+        # xr1-20261109-P7-05: BWEB omits a candidate with no votes
+        c = counts()
+        del c["choices"]["22"]
+        c["choices"]["13"]["count"] = 75
+        values = measures(unit(), c, [], "13", "22")
+        self.assertEqual(values[("candidate_share_target", "candidate_a_share")][0], 1.0)
+        self.assertEqual(values[("candidate_share_target", "candidate_b_share")][0], 0.0)
+        c["complete_choices"] = False  # the absence is then unknown, not zero
+        values = measures(unit(), c, [], "13", "22")
+        self.assertIsNone(values[("candidate_share_target", "candidate_b_share")][0])
+
     def test_conflicting_duplicate_fails_without_multiplication(self) -> None:
         db = database()
         _store_unit(db, unit(), counts())

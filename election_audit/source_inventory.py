@@ -144,10 +144,13 @@ def read_manifest(
         predicate = f"uf IN ({placeholders})"
         parameters = ufs
         if selected is not None:
-            predicate = " OR ".join(
-                "(uf=? AND municipality=? AND zone=? AND section=?)" for key in selected
+            # One JSON parameter instead of one OR clause per key: SQLite refuses an
+            # expression tree of 1000 or more nodes (xr1-20261109-P1-10).
+            predicate = (
+                "(uf, municipality, zone, section) IN (SELECT value->>0, value->>1, "
+                "value->>2, value->>3 FROM json_each(?))"
             )
-            parameters = tuple(value for key in selected for value in key)
+            parameters = (json.dumps([list(key) for key in selected]),)
         sections = [
             dict(row)
             for row in connection.execute(

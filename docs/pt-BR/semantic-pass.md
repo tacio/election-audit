@@ -1,6 +1,6 @@
 # Passada semântica em fluxo (Fase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 8 · Language: pt-BR
+Document-ID: EA-SEMANTIC-PASS · Revision: 9 · Language: pt-BR
 
 [English](../en/semantic-pass.md) · [Índice de implementação](implementation-index.md)
 
@@ -198,6 +198,26 @@ linha (`EXCEPT ALL` nos dois sentidos, zero linhas). Os logs do segundo turno tr
 histórico do 1º turno, então o release do 2º turno tem os marcadores dos dois turnos;
 as verificações selecionam blocos pelo contexto.
 
+## Versão 6 (revisão entre modelos, ainda não executada)
+
+`session-aggregates-v6` muda a máquina de ciclos de voto onde a revisão entre modelos
+de 9 de novembro de 2026 (`xr1-20261109`) achou que ela podia ligar uma conclusão ao
+eleitor errado:
+
+- uma habilitação cujos eventos VOTA seguintes caem fora do dia da eleição (uma
+  excursão do relógio) termina `unresolved` em vez de receber uma conclusão lida
+  depois que o relógio volta (P2-04);
+- uma conclusão órfã (sem ciclo habilitado) encerra como `unresolved` um pedido de
+  habilitação manual pendente, para que suas marcas nunca cheguem ao eleitor seguinte
+  (P2-05);
+- o `rules_sha256` da release cobre os modelos de mensagem de 2026 embutidos quando o
+  arquivo de regras não os tem (P2-08).
+
+As releases nacionais deste guia são da versão 5. As mudanças alcançam no máximo os
+ciclos perto dos 39 e 13 recuos do relógio dentro de sessões oficiais (1º e 2º
+turnos) e uma conclusão órfã no 1º turno. Rodar o passe de novo exige rodar de novo
+todas as verificações e tabelas construídas sobre ele.
+
 ## Logs de apuração de contingência (SA)
 
 Seções apuradas pelo Sistema de Apuração (SA), o sistema de apuração de
@@ -354,3 +374,14 @@ corrupção.
   ficam como observadas, assim como cópias de uma sessão em várias memórias de uma
   urna. A tabela por seção e o I5–I7 contam essas cópias uma vez pela linhagem do
   bloco.
+- Eventos cuja leitura do relógio da urna cai fora do dia da eleição são pulados. A
+  votação encerra às 17:00, então isso exige um erro de relógio ou um encerramento
+  depois da meia-noite; essa sessão mantém suas contagens anteriores e perde só esses
+  eventos (xr1-20261109-P2-06).
+- `operational-review` (Fase 13) só acha candidatos a cópia de memória entre fluxos
+  que terminam na mesma linha; o caminho nacional deduplica cópias por dispositivo e
+  início de bloco (xr1-20261109-P2-09).
+- Uma raiz preparada é lida com seu `manifest.sqlite` aberto como imutável, o que
+  ignora quadros WAL não consolidados: prepare um manifesto com checkpoint. Uma
+  leitura desatualizada é recusada pela conciliação com o certificado de preparação
+  (xr1-20261109-P1-07).

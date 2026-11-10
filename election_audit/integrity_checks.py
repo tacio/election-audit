@@ -1777,6 +1777,11 @@ def ea20_nodes(
     uri = (ea20_root / "manifest.sqlite").resolve().as_uri() + "?mode=ro&immutable=1"
     nodes, hashes, extras = {}, {}, {}
     with contextlib.closing(sqlite3.connect(uri, uri=True)) as db:
+        unknown = db.execute(
+            "SELECT count(*) FROM files WHERE kind = 'unified' AND totalization_final IS NULL"
+        ).fetchone()[0]
+        if unknown:  # a status that is not known is not final (xr1-20261109-P5-06)
+            raise ValueError(f"EA20 root has {unknown} unified files of unknown finality")
         for scope, uf, municipality, path, digest_ in db.execute(
             "SELECT scope_type, uf, municipality, path, sha256 FROM files WHERE kind = 'unified'"
         ):

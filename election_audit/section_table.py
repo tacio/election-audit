@@ -55,7 +55,7 @@ if TYPE_CHECKING:
     import duckdb
 type Connection = duckdb.DuckDBPyConnection
 
-VERSION = "section-features-v4"
+VERSION = "section-features-v5"  # v5: reconciled results, unknown compositions, member coverage, software (xr1)
 SESSIONS_VERSION = "session-aggregates-v4"
 BWEB_FILE = re.compile(r"files/bweb_([12])t_([A-Z]{2})_\d{12}\.zip")
 PROFILE_FILE = re.compile(r"files/perfil_eleitor_secao_(\d{4})_([A-Z]{2})\.zip")
@@ -269,10 +269,14 @@ def compositions(db: Connection, round_number: int) -> int:
             members = verified_member_sections(section, {"composition_raw": raw})
         except ValueError:
             members, errors = [], errors + 1
-        if not members:  # unknown composition: the principal alone is certain
+        # #NE#, -3, a missing or a malformed value: the composition is unknown, not the
+        # principal alone (xr1-20261109-P0-03); the principal is kept as the one certain
+        # member and flagged.
+        unknown = not members
+        if not members:
             members = [section]
         for member in members:
-            rows.append((uf, municipality, zone, section, member, raw is None))
+            rows.append((uf, municipality, zone, section, member, unknown))
     db.execute(
         f"CREATE TABLE members{round_number} (uf VARCHAR, municipality VARCHAR, zone VARCHAR, "
         "section VARCHAR, member VARCHAR, composition_unknown BOOLEAN)"
@@ -410,7 +414,7 @@ SESSION_COLUMNS = (
     "completed_interrupted first_completion_reading last_completion_reading "
     "completions_by_reading_hour completion_gap_max_s model software_version clock_adh_before "
     "clock_adh_shift_s_before clock_tz_shifts_before clock_tz_shift_s_before clock_dst_before "
-    "configured_close"
+    "configured_close software_supported"
 ).split()
 CYCLE_STATES = ("completed", "suspended", "cancelled", "unresolved")
 METHODS = ("biometric", "manual", "unknown")
@@ -486,6 +490,11 @@ def section_operations(sessions: Sequence[Row]) -> JSON:
         "copy_conflicts": conflicts,
         "unlinked_sessions": sum(1 for s in kept if s["block_start"] is None),
         "devices": len({s["device_id"] for s in kept}),
+        # an official session without the pinned software line counts no cycle
+        # (xr1-20261109-P2-03): its zeros are not operations
+        "unsupported_software_sessions": sum(
+            1 for s in kept if s.get("software_supported") is False
+        ),
     }
     for state in CYCLE_STATES:
         for method in METHODS:
@@ -1035,6 +1044,21 @@ OPERATION_FIELDS = (
 )
 
 
+def reconciled(result: Row | None) -> bool:
+    """One section's BWEB totals add up: attendance and abstentions make the electorate, the
+    presidential choices make the attendance. Attendance is one value per section while the
+    choices are summed over rows, so repeated rows break the second equation."""
+    if result is None:
+        return False
+    names = ("eligible", "attendance", "abstentions", "nominal", "blank", "null_votes")
+    numbers = [v for v in (result.get(n) for n in names) if isinstance(v, int) and v >= 0]
+    other = result.get("other_votes") or 0  # absent when no such row exists
+    if len(numbers) != len(names) or not isinstance(other, int) or other < 0:
+        return False
+    eligible, attendance, abstentions, nominal, blank, null = numbers
+    return eligible == attendance + abstentions and nominal + blank + null + other == attendance
+
+
 def _finish(row: Row, rule: str, expected: str | None) -> Row:
     """Close rule, clock state and availability; returns the restricted measures."""
     ops, result = row.pop("_ops"), row.pop("_result")
@@ -1046,12 +1070,18 @@ def _finish(row: Row, rule: str, expected: str | None) -> Row:
         result is not None and result["eligible"] is not None and not result["unparsed_votes"],
         "missing_input" if result is None else "conflict",
     )
+    if row["results_state"] == "ready" and not reconciled(result):
+        # Ready results must add up: repeated BWEB rows, negative or missing counts and
+        # totals that do not reconcile are not ready (xr1-20261109-P5-01).
+        row["results_state"], row["results_reason"] = "unavailable", "unreconciled"
     if row["log_status"] == "protected_until_freeze":
         row["operations_state"], row["operations_reason"] = "unavailable", "outside_scope"
     elif ops is None:
         row["operations_state"], row["operations_reason"] = "unavailable", "missing_input"
     elif ops["copy_conflicts"]:
         row["operations_state"], row["operations_reason"] = "unavailable", "conflict"
+    elif ops.get("unsupported_software_sessions"):
+        row["operations_state"], row["operations_reason"] = "unavailable", "unsupported_software"
     else:
         unresolved = sum(ops[f"unresolved_{m}"] for m in METHODS) + ops["orphan_completions"]
         row["operations_state"] = "partial" if unresolved else "ready"
@@ -1165,8 +1195,27 @@ def harmonize(section_rows: Sequence[Row], restricted_rows: Sequence[Row], year:
         else:
             kind = "recombined"
         unit["kind"] = kind
-        unit["comparable"] = kind != "one_round_only" and all(
-            sections[(r, *k)]["results_state"] == "ready" for r in (1, 2) for k in principals[r]
+        # Every registered member must be represented in both rounds and no composition may
+        # be unknown; ready principals alone do not make a population continuous
+        # (xr1-20261109-P5-05, P0-03).
+        covered = {
+            r: {
+                (*k[:3], m)
+                for k in principals[r]
+                for m in json.loads(sections[(r, *k)]["members_json"])
+            }
+            for r in (1, 2)
+        }
+        known = all(
+            sections[(r, *k)].get("composition") != "unknown" for r in (1, 2) for k in principals[r]
+        )
+        unit["comparable"] = (
+            kind != "one_round_only"
+            and known
+            and covered[1] == covered[2] == set(members)
+            and all(
+                sections[(r, *k)]["results_state"] == "ready" for r in (1, 2) for k in principals[r]
+            )
         )
         units.append(unit)
         for r in (1, 2):

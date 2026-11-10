@@ -60,7 +60,8 @@ from election_audit.types import JSON, Argv, Row
 type Segment = tuple[str, int, int]
 
 VERSION = (  # v2: int64 seconds; v3: device and clock columns; v4: sessions-v2; v5: markers
-    "session-aggregates-v5"
+    # v6: clock excursions and orphan completions close the pending cycle (xr1)
+    "session-aggregates-v6"
 )
 ADAPTER_VERSION = "real-operational-v1"
 SHARD_OBJECTS = 500
@@ -687,6 +688,11 @@ class ObjectSummary:
             and application == "VOTA"
         )
         if not active:
+            if self.pending is not None and not on_day and application == "VOTA":
+                # A clock excursion skips the events off election day; the cycle they
+                # interrupt cannot be followed, so it ends unresolved instead of taking a
+                # later completion (xr1-20261109-P2-04).
+                self._finish_cycle("unresolved")
             return
         session["active_events"] += 1
         pending = self.pending
@@ -738,6 +744,8 @@ class ObjectSummary:
                 session["completions_by_reading_hour"][(reading % 86400) // 3600] += 1
             else:
                 session["orphan_completions"] += 1
+                if pending:  # its request flags must not reach the next voter (P2-05)
+                    self._finish_cycle("unresolved")
         elif kind == "suspension_full":
             self._finish_cycle("suspended")
         elif kind in ("suspension_partial", "resumption"):
@@ -1014,7 +1022,13 @@ def _init_worker() -> None:
 
 
 def _rules_sha(year: int) -> str:
-    return hashlib.sha256(json.dumps(rules_for(year), sort_keys=True).encode()).hexdigest()
+    """Digest of the rules a pass applies, the built-in 2026 templates included when the
+    rules file has none (xr1-20261109-P2-08)."""
+    from election_audit.operational_review import TEMPLATES_2026
+
+    rules = rules_for(year)
+    effective = {**rules, "templates": rules.get("templates", TEMPLATES_2026)}
+    return hashlib.sha256(json.dumps(effective, sort_keys=True).encode()).hexdigest()
 
 
 def run_pass(

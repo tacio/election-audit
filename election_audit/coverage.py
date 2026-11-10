@@ -320,6 +320,10 @@ def build_population(inventory: dict) -> dict:
             state, availability = "unresolved", "unknown"
         elif principal != key:
             state, availability = "aggregated", "not_applicable"
+        elif urls and len(successes) == len(urls) and aux_states.get(key) != "verified":
+            # Every URL in a fallback inventory is present, but the advertised inventory
+            # could not be verified, so completeness is unknown (xr1-20261109-P1-02).
+            state, availability = "acquired_inventory_unverified", "available"
         elif urls and len(successes) == len(urls):
             state, availability = "acquired", "available"
         elif bad or failed_attempts:

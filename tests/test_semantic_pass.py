@@ -195,6 +195,50 @@ class SessionMachineTests(unittest.TestCase):
         # The restart line stays in the official block.
         self.assertEqual([g["context"] for g in restart.segments], ["initial", "official_round_2"])
 
+    def test_a_clock_excursion_or_orphan_completion_ends_the_pending_cycle(self) -> None:
+        # xr1-20261109-P2-04: an authorization whose next events are off election day does
+        # not take a completion read after the clock returns.
+        start = [
+            ("25/10/2026", 0, "GAP", OFFICIAL_2),
+            ("25/10/2026", 1, "VOTA", "Iniciando aplicação - 2º turno"),
+            ("25/10/2026", 2, "VOTA", SOFTWARE),
+        ]
+        excursion = timed_body(
+            [
+                *start,
+                ("25/10/2026", 10, "VOTA", "Eleitor foi habilitado"),
+                ("01/01/2000", 11, "VOTA", "Eleitor foi suspenso e não confirmou nenhum voto"),
+                ("25/10/2026", 12, "VOTA", "O voto do eleitor foi computado"),
+            ]
+        )
+        # xr1-20261109-P2-05: an orphan completion clears a pending manual request.
+        orphan = timed_body(
+            [
+                *start,
+                (
+                    "25/10/2026",
+                    10,
+                    "VOTA",
+                    "Solicitação de dado pessoal do eleitor para habilitação manual",
+                ),
+                ("25/10/2026", 10, "VOTA", f"Mesário {VOTER} habilitou o eleitor"),
+                ("25/10/2026", 11, "VOTA", "O voto do eleitor foi computado"),
+                ("25/10/2026", 12, "VOTA", "Eleitor foi habilitado"),
+                ("25/10/2026", 13, "VOTA", "O voto do eleitor foi computado"),
+            ]
+        )
+        with tempfile.TemporaryDirectory() as d:
+            original = Path(d) / "x.jez"
+            original.write_bytes(jez(excursion))
+            (moved,) = sp.summarize_object(original, "x", 2).sessions
+            original.write_bytes(jez(orphan))
+            (cleared,) = sp.summarize_object(original, "x", 2).sessions
+        self.assertEqual(sum(moved[f"cycles_completed_{m}"] for m in sp.METHODS), 0)
+        self.assertEqual(sum(moved[f"cycles_unresolved_{m}"] for m in sp.METHODS), 1)
+        self.assertEqual(cleared["orphan_completions"], 1)
+        self.assertEqual(cleared["cycles_completed_manual"], 0)
+        self.assertEqual(cleared["cycles_completed_unknown"], 1)
+
     def test_zeresima_markers_keep_their_place_among_the_votes(self) -> None:
         zeresima = [
             "Aguardando data e hora para emissão da zerésima",

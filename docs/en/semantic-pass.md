@@ -1,6 +1,6 @@
 # Streaming semantic pass (Phase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 8 · Language: en
+Document-ID: EA-SEMANTIC-PASS · Revision: 9 · Language: en
 
 [Português](../pt-BR/semantic-pass.md) · [Implementation index](implementation-index.md)
 
@@ -192,6 +192,25 @@ sessions, segments, objects and vocabulary tables equal version 4 row for row
 (`EXCEPT ALL` both ways, zero rows). Runoff logs carry the round-1 history, so the
 round-2 release holds both rounds' markers; checks select blocks by context.
 
+## Version 6 (cross-model review, not yet run)
+
+`session-aggregates-v6` changes the vote-cycle machine where the cross-model review
+of 9 November 2026 (`xr1-20261109`) found it could attach a completion to the wrong
+voter:
+
+- an authorization whose following VOTA events fall off election day (a clock
+  excursion) ends `unresolved` instead of taking a completion read after the clock
+  returns (P2-04);
+- an orphan completion (one without an authorized cycle) ends a pending manual
+  request as `unresolved`, so its flags never reach the next voter (P2-05);
+- the release's `rules_sha256` covers the built-in 2026 templates when the rules
+  file has none (P2-08).
+
+The national releases of this guide are version 5. The changes reach at most the
+cycles near 39 and 13 backward clock steps inside official sessions (rounds 1 and 2)
+and one orphan completion in round 1. Rerunning the pass also requires rerunning
+every check and table built on it.
+
 ## Contingency counting (SA) logs
 
 Sections counted with the Sistema de Apuração (SA), TSE's contingency counting
@@ -343,3 +362,12 @@ SHA-256; these are urn clock events for Phase 22, not corruption.
 - Sessions with several official runs per object (urn replacement or restarts)
   are kept as observed, and so are copies of one session in several memories of an
   urn. The section table and I5–I7 count such copies once by block lineage.
+- Events whose urn clock reading is off election day are skipped. Voting closes at
+  17:00, so this needs a clock error or a closing after midnight; such a session
+  keeps its earlier counts and loses only those events (xr1-20261109-P2-06).
+- `operational-review` (Phase 13) finds memory-copy candidates only among streams
+  that end on the same line; the national path deduplicates copies by device and
+  block start instead (xr1-20261109-P2-09).
+- A staged root is read with its `manifest.sqlite` opened immutable, which ignores
+  uncommitted WAL frames: stage a checkpointed manifest. A stale read is refused by
+  the reconciliation with the staging certificate (xr1-20261109-P1-07).

@@ -9,6 +9,7 @@ import unittest
 import zlib
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from election_audit import sevenzip
 
@@ -112,6 +113,22 @@ class SevenZipTests(unittest.TestCase):
     def test_lzma_archive_with_several_files_round_trips(self) -> None:
         files = [("inner.jez", b"PK" + bytes(range(256)) * 40), ("logd.dat", b"line\tA\n" * 999)]
         self.assertEqual([(n, b) for n, b, _ in sevenzip.read(make_7z(files))], files)
+
+    def test_the_dictionary_is_never_larger_than_the_output(self) -> None:
+        # xr1-20261109-P1-04: the archive's dictionary size is allocated before any bound.
+        from unittest.mock import patch
+
+        seen = []
+        real = sevenzip.lzma.LZMADecompressor
+
+        def recording(**options: Any) -> Any:
+            seen.append(options["filters"][0]["dict_size"])
+            return real(**options)
+
+        files = [("logd.dat", b"line\tA\n" * 999)]
+        with patch.object(sevenzip.lzma, "LZMADecompressor", side_effect=recording):
+            self.assertEqual([(n, b) for n, b, _ in sevenzip.read(make_7z(files))], files)
+        self.assertEqual(seen, [len(files[0][1])])
 
     def test_encoded_header_and_copy_coder(self) -> None:
         files = [("logd.dat", b"x" * 1000)]

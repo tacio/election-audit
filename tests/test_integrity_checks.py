@@ -612,10 +612,13 @@ class SectionPassTests(unittest.TestCase):
             body = json.dumps(dict(node, cdabr=code or uf)).encode()
             digest = hashlib.sha256(body).hexdigest()
             (root / "objects" / f"{digest}.json").write_bytes(body)
-            rows.append(("unified", scope, uf, code, f"objects/{digest}.json", digest))
+            rows.append(("unified", scope, uf, code, f"objects/{digest}.json", digest, "s"))
         with contextlib.closing(sqlite3.connect(root / "manifest.sqlite")) as db:
-            db.execute("CREATE TABLE files(kind, scope_type, uf, municipality, path, sha256)")
-            db.executemany("INSERT INTO files VALUES(?,?,?,?,?,?)", rows)
+            db.execute(
+                "CREATE TABLE files(kind, scope_type, uf, municipality, path, sha256,"
+                " totalization_final)"
+            )
+            db.executemany("INSERT INTO files VALUES(?,?,?,?,?,?,?)", rows)
             db.commit()
         (root / "status.json").write_text(
             json.dumps({"stage": "finished", "round": 2, "unified_not_final": 0})

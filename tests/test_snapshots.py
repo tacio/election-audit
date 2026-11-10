@@ -307,13 +307,19 @@ class PopulationTests(SourceFixture):
         other = self.log_url.replace("/0001/pkg/", "/0002/pkg/")
         self.advertise(other, code="0002")
         self.save(other, b"unselected")
+        # xr1-20261109-P1-10: a large selection is one parameter, not 1000 OR clauses
+        filler = [(self.key[0], self.key[1], self.key[2], f"{9000 + i:04d}") for i in range(999)]
+        large = inventory_sources(self.root, ["ac"], section_keys=[self.key, *filler])
+        self.assertEqual(len(large["manifest_rows"]["logs"]), 1)
         inventory = inventory_sources(self.root, ["ac"], section_keys=[self.key])
         self.assertEqual(len(inventory["manifest_rows"]["logs"]), 1)
         self.assertNotIn(other, [row["url"] for row in inventory["object_checks"]])
         population = build_population(inventory)
         self.assertEqual(population["coverage_summary"]["expected_members"], 2)
         self.assertEqual(
-            population["coverage_summary"]["member_accounting"], {"acquired": 1, "not_selected": 1}
+            population["coverage_summary"]["member_accounting"],
+            # no auxiliary file: every listed URL is present, completeness unknown (P1-02)
+            {"acquired_inventory_unverified": 1, "not_selected": 1},
         )
         self.assertEqual(len(population["tables"]["coverage_ledger"]), 2)
 
@@ -384,7 +390,7 @@ class SnapshotTests(SourceFixture):
         self.assertNotEqual(path, second)
         self.assertEqual(
             inspect_snapshot(second)["payload"]["coverage_summary"]["member_accounting"],
-            {"acquired": 1, "aggregated": 1},
+            {"acquired_inventory_unverified": 1, "aggregated": 1},
         )
 
     def test_changed_source_aborts_before_publication_and_retry_is_safe(self) -> None:
