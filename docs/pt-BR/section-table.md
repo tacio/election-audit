@@ -1,6 +1,6 @@
-# Tabela de atributos por seção v4 (Fases 22 e 20b)
+# Tabela de atributos por seção v5.1 (Fases 22 e 20b)
 
-Document-ID: EA-SECTION-TABLE · Revision: 5 · Language: pt-BR
+Document-ID: EA-SECTION-TABLE · Revision: 6 · Language: pt-BR
 
 [English](../en/section-table.md) · [Índice de implementação](implementation-index.md)
 
@@ -116,6 +116,16 @@ horário exigem `ok` ou `adjusted`.
 | `adjusted` | Ajuste do operador, de fuso ou de horário de verão antes da sessão |
 | `ok` | Nenhum dos anteriores |
 
+**Prontidão dos resultados.** Os resultados de uma seção só ficam `ready` quando o BWEB
+informa seu eleitorado, seu comparecimento e suas abstenções, e duas equações valem:
+eleitorado = comparecimento + abstenções, e votos nominais + brancos + nulos + outros =
+comparecimento. Linhas que não são lidas, contagens negativas e linhas repetidas do BWEB
+deixam os resultados `unavailable` (`conflict` ou `unreconciled`). O BWEB lista só as
+categorias que têm votos, então uma categoria de brancos, nulos ou outros sem linha é
+nula. Ela conta como zero apenas porque a equação então vale com ela zerada. Uma seção
+cujas categorias não somam o comparecimento continua `unreconciled`, e o total nominal
+nunca recebe valor padrão (`reconciled`, xr1-20261109-P5-01).
+
 **Medidas** (`restricted/sections.parquet`):
 
 - ciclos concluídos, suspensos, cancelados e não resolvidos, por forma de
@@ -191,6 +201,33 @@ turno de 2026, 30 no 2º turno de 2022), o que confirma que os relógios das urn
 marcam a hora local.
 
 ## Resultados nacionais
+
+Versão 5.1 (`section-features-v5.1`), construída em 11 de novembro de 2026 em
+`$EA_STAGE/phase20b-sessions/table-2026-v51-20261111/` e `table-2022-v51-20261111/`,
+sobre as mesmas entradas da versão intermediária 5 (as passagens semânticas
+`v4-national-*` de 7 de novembro, as seções de integridade v6 e os logs v5). A versão 5
+(`table-2026-v5-20261110/`, `table-2022-v5-20261110/`) aplicou a regra de resultados
+acima, mas leu uma categoria de brancos ou nulos sem linha como não conciliada. Ela
+marcou 93278 seções de 2026 e 71143 de 2022 como `unavailable` (`unreconciled`), 9,3%
+e 7,5% das seções. Em todas as UFs de desenvolvimento (AC, AL, DF, ES, PR) as falhas
+eram uma categoria sem linha no BWEB cujas outras contagens somam exatamente o
+comparecimento, e a versão 5.1 restaura todas as 93278 seções de 2026 e 71138 de 2022.
+Cinco seções de 2022 (quatro no turno 1, uma no turno 2) continuam `unreconciled`. A
+versão 5 está substituída; use a versão 5.1.
+
+Em relação à versão 4, só estes campos mudam (apenas contagens; resultados e valores
+operacionais continuam sem leitura fora das UFs de desenvolvimento):
+
+| | 2026 | 2022 |
+| --- | --- | --- |
+| Resultados `ready` → `unavailable` (`unreconciled`) | 0 | 5 |
+| Operações e tempos `partial` → `unavailable` (`unsupported_software`) | 1 | 9 |
+| `i7_failed_json` | 20 seções | — |
+| Unidades comparáveis | 499205 de 499248 | 472024 de 472693 |
+| Tempo de construção, pico de memória | 3074 s, 3,74 GB | 2811 s, 3,25 GB |
+
+Todos os outros campos são iguais aos da versão 4. A tabela da versão 4 segue para
+referência.
 
 Versão 4, construída em 8 de novembro de 2026 em
 `$EA_STAGE/phase20b-sessions/table-2026-v4-20261108c/` (sobre as

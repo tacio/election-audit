@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 43 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 44 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -8,7 +8,7 @@ This is the single current-state entry point. It says what exists, what has
 actually run, where the results are and what comes next. Guides under `docs/en/`
 describe how each tool behaves. Handoffs under `docs/en/handoffs/` are dated
 records of what each task did at the time; read them for detail, not for status.
-Plans live in `research/`. State below is as of **9 November 2026**.
+Plans live in `research/`. State below is as of **11 November 2026**.
 
 ## Current state
 
@@ -265,8 +265,17 @@ the integrity checks are done and reran nationally on 9 November 2026
 ([cross-model review fixes](integrity-checks.md#phase-20b-cross-model-review-fixes)):
 sp/0176 now fails G3 in 168 sections per round, I7 R2 adds 20 sections that already
 failed R6, and E3's 31 start-up recoveries are recorded (T14); no other result
-changed. Still to do: the portability fixes and the low-severity rows, then round 5
-verifies them. Then
+changed. The portability fixes and the low-severity rows are done (every confirmed row
+links to its fix; P7-08 waits for Phase 23), and sections v6 reran nationally with 0
+discrepancies. Section tables v5.1 were rebuilt on 11 November 2026
+([section table](section-table.md#national-results)): the new rule that results must
+add up first marked 9.3% of the 2026 sections unavailable, because a blank or null
+category with no BWEB row was read as missing; it is zero when the other counts equal
+the attendance, and v5.1 restores them. Still to do: the decision whether to rerun
+semantic pass v6 nationally (about 6 hours for 2026, plus everything built on it; the
+new rules touch about 39 cycles and 13 backward clock steps), then round 5 verifies
+the fixes. Before Phase 23, discuss the consequence of the 8.3% development-place
+share. Then
 start Phase 23 (development modelling, power study,
 protocol freeze) on development data only. Phase 20b is complete and its checks and gaps are registered in the
 protocol ([handoff](handoffs/task-20b.md)); before the freeze, add TSE's reply on the
@@ -417,7 +426,7 @@ digests, in [inputs downloaded by hand](manual-inputs.md).
 | Integrity checks | `integrity_checks` (`integrity-sections-v4`, `integrity-logs-v2`; signature layout `resources/assinatura-2026-observed.asn1`), `round1_prefix` (`integrity-round1-prefix-v1`, `integrity-check prefix`), `printed_bu` (`printed-bu-v1`, `integrity-check printed`), `ed521_crosscheck` (`ed521-crosscheck-v1`), `zeresima` (`integrity-zeresima-v2`), `gedai` (`integrity-gedai-v3`), `hash_lists` (`integrity-hash-lists-v1`), `signature_errors` (`integrity-signature-errors-v1`), `signed_results` (`signed-results-fetch-v1`, `integrity-jws-v2`; `results-hierarchy fetch-signed`); [integrity checks](integrity-checks.md) |
 | Electoral imports and verification | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` and `electoral_verification` (Phase 12); [electoral results](electoral-results.md). `electoral_references` is an unwired, untested prototype for official reference sets |
 | Analysis foundation | `analysis`, `analysis_partitions`, `analysis_ledgers`, `analysis_reports`; [analysis](analysis.md) |
-| Section table | `section_table` (`section-features-v4`, Phases 22 and 20b); [section table](section-table.md), [observation register](observations.md) |
+| Section table | `section_table` (`section-features-v5.1`, Phases 22 and 20b); [section table](section-table.md), [observation register](observations.md) |
 | Research path | `features` (Phase 14), `research_protocol` and `research_evaluation` (Phase 15), `research_models` (Phase 16), `investigations` (Phase 17); see their handoffs |
 | Dashboard | `dashboard`, `dashboard_data`, `dashboard_ui`, `dashboard_development`, `election_audit/notebooks/` (Phase 18) |
 | Reproduction | `reproduction`, `pilot`, `walkthrough`; [reproduction](reproduction.md) (national run times and resources: [what to expect](reproduction.md#what-to-expect-on-the-national-data)), [backfill](backfill.md) |

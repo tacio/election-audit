@@ -11,6 +11,7 @@ from election_audit.section_table import (
     clock_state,
     close_rules,
     harmonize,
+    reconciled,
     section_operations,
 )
 
@@ -268,6 +269,19 @@ class RowTests(unittest.TestCase):
         restricted = [_finish(r, "law_uf", "15:00:00") for r in rows]
         (unit,) = harmonize(rows, restricted, 2026)
         self.assertFalse(unit["comparable"])
+
+    def test_absent_blank_or_null_category_is_zero_only_when_the_sums_hold(self) -> None:
+        # BWEB lists only categories with votes: no row means null, zero if the rest adds up
+        base = {"eligible": 10, "attendance": 8, "abstentions": 2, "nominal": 7}
+        self.assertTrue(reconciled({**base, "blank": 1, "null_votes": None}))
+        self.assertTrue(reconciled({**base, "blank": None, "null_votes": 1}))
+        self.assertTrue(reconciled({**base, "nominal": 8, "blank": None, "null_votes": None}))
+        # the rest does not add up to the attendance: the absence is not read as zero
+        self.assertFalse(reconciled({**base, "blank": None, "null_votes": None}))
+        self.assertFalse(reconciled({**base, "blank": 2, "null_votes": None}))
+        # the nominal total is never defaulted, and negative counts are rejected
+        self.assertFalse(reconciled({**base, "nominal": None, "blank": 8, "null_votes": 0}))
+        self.assertFalse(reconciled({**base, "blank": -1, "null_votes": 2}))
 
     def test_chunks_hold_whole_municipalities_of_one_uf(self) -> None:
         sizes = [

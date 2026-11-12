@@ -1,6 +1,6 @@
-# Section feature table v4 (Phases 22 and 20b)
+# Section feature table v5.1 (Phases 22 and 20b)
 
-Document-ID: EA-SECTION-TABLE · Revision: 5 · Language: en
+Document-ID: EA-SECTION-TABLE · Revision: 6 · Language: en
 
 [Português](../pt-BR/section-table.md) · [Implementation index](implementation-index.md)
 
@@ -114,6 +114,16 @@ measures need `ok` or `adjusted`.
 | `adjusted` | An operator, time-zone or daylight-saving adjustment before the session |
 | `ok` | None of the above |
 
+**Results readiness.** A section's results are `ready` only when BWEB gives its
+electorate, its attendance and its abstentions, and two equations hold: electorate =
+attendance + abstentions, and nominal + blank + null + other votes = attendance. Rows
+that do not parse, negative counts and repeated BWEB rows leave the results
+`unavailable` (`conflict` or `unreconciled`). BWEB lists only the categories that have
+votes, so a blank, null or other category with no row is null. It counts as zero only
+because the equation then holds with it as zero. A section whose categories do not add
+up to its attendance stays `unreconciled`, and the nominal total is never defaulted
+(`reconciled`, xr1-20261109-P5-01).
+
 **Measures** (`restricted/sections.parquet`):
 
 - completed, suspended, cancelled and unresolved cycles by authorization method;
@@ -185,6 +195,31 @@ printed a configured close printed 15:00 (52 sessions in 2026 round 2, 30 in 202
 round 2), which confirms that urn clocks run on local time.
 
 ## National results
+
+Version 5.1 (`section-features-v5.1`), built on 11 November 2026 in
+`$EA_STAGE/phase20b-sessions/table-2026-v51-20261111/` and `table-2022-v51-20261111/`,
+on the same inputs as the intermediate version 5 (the semantic passes
+`v4-national-*` of 7 November, integrity sections v6 and logs v5). Version 5 (`table-2026-v5-20261110/`,
+`table-2022-v5-20261110/`) applied the results rule above but read a missing blank or
+null category as unreconciled. It marked 93278 sections of 2026 and 71143 of 2022
+`unavailable` (`unreconciled`), 9.3% and 7.5% of the sections. In every one of the
+development UFs (AC, AL, DF, ES, PR) the failures were a category with no BWEB row
+whose other counts equal the attendance exactly, and version 5.1 restores all 93278
+sections of 2026 and 71138 of 2022. Five sections of 2022 (four in round 1, one in
+round 2) stay `unreconciled`. Version 5 is superseded; use version 5.1.
+
+Compared with version 4, only these fields change (counts only; results and
+operational values stay unread outside the development UFs):
+
+| | 2026 | 2022 |
+| --- | --- | --- |
+| Results `ready` → `unavailable` (`unreconciled`) | 0 | 5 |
+| Operations and timing `partial` → `unavailable` (`unsupported_software`) | 1 | 9 |
+| `i7_failed_json` | 20 sections | — |
+| Comparable units | 499205 of 499248 | 472024 of 472693 |
+| Build time, peak memory | 3074 s, 3.74 GB | 2811 s, 3.25 GB |
+
+Every other field is equal to version 4. The version 4 table follows for reference.
 
 Version 4, built on 8 November 2026 in
 `$EA_STAGE/phase20b-sessions/table-2026-v4-20261108c/` (on the

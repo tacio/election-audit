@@ -55,7 +55,7 @@ if TYPE_CHECKING:
     import duckdb
 type Connection = duckdb.DuckDBPyConnection
 
-VERSION = "section-features-v5"  # v5: reconciled results, unknown compositions, member coverage, software (xr1)
+VERSION = "section-features-v5.1"  # v5.1: absent blank/null category is zero when the sums hold; v5: reconciled results, unknown compositions, member coverage, software (xr1)
 SESSIONS_VERSION = "session-aggregates-v4"
 BWEB_FILE = re.compile(r"files/bweb_([12])t_([A-Z]{2})_\d{12}\.zip")
 PROFILE_FILE = re.compile(r"files/perfil_eleitor_secao_(\d{4})_([A-Z]{2})\.zip")
@@ -1047,16 +1047,21 @@ OPERATION_FIELDS = (
 def reconciled(result: Row | None) -> bool:
     """One section's BWEB totals add up: attendance and abstentions make the electorate, the
     presidential choices make the attendance. Attendance is one value per section while the
-    choices are summed over rows, so repeated rows break the second equation."""
+    choices are summed over rows, so repeated rows break the second equation.
+
+    BWEB lists only the categories that have votes, so a blank, null or other category
+    with no row is null in the result. It counts as zero only here, and only because the
+    equation then holds with it as zero: a section whose categories do not add up to its
+    attendance stays unreconciled. The nominal total is never defaulted."""
     if result is None:
         return False
-    names = ("eligible", "attendance", "abstentions", "nominal", "blank", "null_votes")
+    names = ("eligible", "attendance", "abstentions", "nominal")
     numbers = [v for v in (result.get(n) for n in names) if isinstance(v, int) and v >= 0]
-    other = result.get("other_votes") or 0  # absent when no such row exists
-    if len(numbers) != len(names) or not isinstance(other, int) or other < 0:
+    optional = [result.get(n) or 0 for n in ("blank", "null_votes", "other_votes")]
+    if len(numbers) != len(names) or not all(isinstance(v, int) and v >= 0 for v in optional):
         return False
-    eligible, attendance, abstentions, nominal, blank, null = numbers
-    return eligible == attendance + abstentions and nominal + blank + null + other == attendance
+    eligible, attendance, abstentions, nominal = numbers
+    return eligible == attendance + abstentions and nominal + sum(optional) == attendance
 
 
 def _finish(row: Row, rule: str, expected: str | None) -> Row:

@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 43 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 44 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -9,7 +9,7 @@ de fato foi executado, onde estão os resultados e qual é o próximo passo. Os 
 em `docs/pt-BR/` descrevem o comportamento de cada ferramenta. Os handoffs em
 `docs/pt-BR/handoffs/` são registros datados do que cada tarefa fez na época;
 leia-os para detalhes, não para saber o estado. Os planos ficam em `research/`.
-O estado abaixo é de **9 de novembro de 2026**.
+O estado abaixo é de **11 de novembro de 2026**.
 
 ## Estado atual
 
@@ -282,8 +282,18 @@ nacionalmente em 9 de novembro de 2026
 ([correções da revisão entre modelos](integrity-checks.md#fase-20b-correções-da-revisão-entre-modelos)):
 sp/0176 passa a reprovar G3 em 168 seções por turno, R2 de I7 acrescenta 20 seções já
 reprovadas em R6, e as 31 recuperações na inicialização de E3 estão registradas (T14);
-nenhum outro resultado mudou. Falta: as correções de portabilidade e as linhas de baixa
-severidade; depois a rodada 5 as verifica. Depois, começar a Fase 23 (modelagem de desenvolvimento, estudo de poder, congelamento do
+nenhum outro resultado mudou. As correções de portabilidade e as linhas de baixa
+severidade estão feitas (cada linha confirmada aponta para sua correção; P7-08 espera a
+Fase 23), e as seções v6 rodaram nacionalmente com 0 discrepâncias. As tabelas por seção
+v5.1 foram refeitas em 11 de novembro de 2026
+([tabela por seção](section-table.md#resultados-nacionais)): a nova regra de que os
+resultados devem fechar marcou antes 9,3% das seções de 2026 como indisponíveis, porque
+uma categoria de brancos ou nulos sem linha no BWEB era lida como ausente; ela vale zero
+quando as outras contagens somam o comparecimento, e a v5.1 as restaura. Falta: decidir
+se a passagem semântica v6 será refeita nacionalmente (cerca de 6 horas para 2026, mais
+tudo que depende dela; as novas regras tocam cerca de 39 ciclos e 13 retrocessos de
+relógio), depois a rodada 5 verifica as correções. Antes da Fase 23, discutir a
+consequência da parcela de 8,3% de locais de desenvolvimento. Depois, começar a Fase 23 (modelagem de desenvolvimento, estudo de poder, congelamento do
 protocolo) só com dados de desenvolvimento. A Fase 20b está concluída e suas
 verificações e lacunas estão registradas no protocolo
 ([handoff](handoffs/task-20b.md)); antes do congelamento, acrescentar ao protocolo a
@@ -438,7 +448,7 @@ com seus hashes, em [entradas baixadas à mão](manual-inputs.md).
 | Verificações de integridade | `integrity_checks` (`integrity-sections-v4`, `integrity-logs-v2`; formato de assinatura `resources/assinatura-2026-observed.asn1`), `round1_prefix` (`integrity-round1-prefix-v1`, `integrity-check prefix`), `printed_bu` (`printed-bu-v1`, `integrity-check printed`), `ed521_crosscheck` (`ed521-crosscheck-v1`), `zeresima` (`integrity-zeresima-v2`), `gedai` (`integrity-gedai-v3`), `hash_lists` (`integrity-hash-lists-v1`), `signature_errors` (`integrity-signature-errors-v1`), `signed_results` (`signed-results-fetch-v1`, `integrity-jws-v2`; `results-hierarchy fetch-signed`); [verificações de integridade](integrity-checks.md) |
 | Importação e verificação eleitoral | `electoral_imports`, `electoral_results`, `derivatives`, `electoral_reports`, `official_bu`; `binary_bu` e `electoral_verification` (Fase 12); [resultados eleitorais](electoral-results.md). `electoral_references` é um protótipo sem integração na CLI e sem testes para conjuntos de referência oficiais |
 | Fundação analítica | `analysis`, `analysis_partitions`, `analysis_ledgers`, `analysis_reports`; [análise](analysis.md) |
-| Tabela por seção | `section_table` (`section-features-v4`, Fases 22 e 20b); [tabela por seção](section-table.md), [registro de observações](observations.md) |
+| Tabela por seção | `section_table` (`section-features-v5.1`, Fases 22 e 20b); [tabela por seção](section-table.md), [registro de observações](observations.md) |
 | Caminho de pesquisa | `features` (Fase 14), `research_protocol` e `research_evaluation` (Fase 15), `research_models` (Fase 16), `investigations` (Fase 17); veja seus handoffs |
 | Painel | `dashboard`, `dashboard_data`, `dashboard_ui`, `dashboard_development`, `election_audit/notebooks/` (Fase 18) |
 | Reprodução | `reproduction`, `pilot`, `walkthrough`; [reprodução](reproduction.md) (tempos e recursos das execuções nacionais: [o que esperar](reproduction.md#o-que-esperar-nos-dados-nacionais)), [backfill](backfill.md) |
