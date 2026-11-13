@@ -1,6 +1,6 @@
 # Implementation index
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 44 · Language: en
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 45 · Language: en
 
 [Português](../pt-BR/implementation-index.md)
 
@@ -8,7 +8,7 @@ This is the single current-state entry point. It says what exists, what has
 actually run, where the results are and what comes next. Guides under `docs/en/`
 describe how each tool behaves. Handoffs under `docs/en/handoffs/` are dated
 records of what each task did at the time; read them for detail, not for status.
-Plans live in `research/`. State below is as of **11 November 2026**.
+Plans live in `research/`. State below is as of **13 November 2026**.
 
 ## Current state
 
@@ -271,10 +271,12 @@ discrepancies. Section tables v5.1 were rebuilt on 11 November 2026
 ([section table](section-table.md#national-results)): the new rule that results must
 add up first marked 9.3% of the 2026 sections unavailable, because a blank or null
 category with no BWEB row was read as missing; it is zero when the other counts equal
-the attendance, and v5.1 restores them. Still to do: the decision whether to rerun
-semantic pass v6 nationally (about 6 hours for 2026, plus everything built on it; the
-new rules touch about 39 cycles and 13 backward clock steps), then round 5 verifies
-the fixes. Before Phase 23, discuss the consequence of the 8.3% development-place
+the attendance, and v5.1 restores them. Semantic pass v6 reran nationally on 12 November
+for both years and rounds, with every check and table built on it
+([semantic pass](semantic-pass.md#version-6-cross-model-review),
+[integrity checks](integrity-checks.md#semantic-pass-v6-rerun)): one 2026 round-1
+cycle becomes unresolved in a section that already failed I5, and no verdict or
+public table field changes. Still to do: round 5 verifies the fixes. Before Phase 23, discuss the consequence of the 8.3% development-place
 share. Then
 start Phase 23 (development modelling, power study,
 protocol freeze) on development data only. Phase 20b is complete and its checks and gaps are registered in the
@@ -386,7 +388,7 @@ digests, in [inputs downloaded by hand](manual-inputs.md).
 | Phase 19 bulk BU/RDV/log archives, 2026 and 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` on the output volume |
 | Phase 20 integrity-check releases (sections, BWEB, hierarchy, correspondences, logs), AC/ZZ development runs | `$EA_STAGE/phase20/` |
 | Phase 20b I6 prefix re-read (national releases v1 and v2, AC development run) | `$EA_STAGE/phase20b-i6/` |
-| Phase 20b semantic passes v4 (2026, 2022), AC equivalence samples, section tables v4, run logs and scripts | `$EA_STAGE/phase20b-sessions/` |
+| Phase 20b semantic passes v4 and v6 (2026, 2022), AC equivalence samples, section tables v4 and v5.1 (current: `*-20261112`), run logs and scripts | `$EA_STAGE/phase20b-sessions/` |
 | DataUrnas-BR tables used in the I3/I5 reconciliation, frozen at commit `f5e8005` | `$EA_STAGE/inputs/dataurnas-br-f5e8005-20261108/` |
 | Phase 20b Ed521 cross-check; its frozen references | `$EA_STAGE/phase20b-ed521/`; `$EA_STAGE/inputs/ed521-crosscheck-refs-20261108/` |
 | Phase 20b semantic passes v5 and zerésima checks; GEDAI checks; hash-list check; signature-error checks; JWS files and checks | `$EA_STAGE/phase20b-zeresima/`, `phase20b-gedai/`, `phase20b-hash-lists/`, `phase20b-signature-errors/`, `phase20b-jws/` |

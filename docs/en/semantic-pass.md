@@ -1,6 +1,6 @@
 # Streaming semantic pass (Phase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 9 · Language: en
+Document-ID: EA-SEMANTIC-PASS · Revision: 10 · Language: en
 
 [Português](../pt-BR/semantic-pass.md) · [Implementation index](implementation-index.md)
 
@@ -192,7 +192,7 @@ sessions, segments, objects and vocabulary tables equal version 4 row for row
 (`EXCEPT ALL` both ways, zero rows). Runoff logs carry the round-1 history, so the
 round-2 release holds both rounds' markers; checks select blocks by context.
 
-## Version 6 (cross-model review, not yet run)
+## Version 6 (cross-model review)
 
 `session-aggregates-v6` changes the vote-cycle machine where the cross-model review
 of 9 November 2026 (`xr1-20261109`) found it could attach a completion to the wrong
@@ -206,10 +206,28 @@ voter:
 - the release's `rules_sha256` covers the built-in 2026 templates when the rules
   file has none (P2-08).
 
-The national releases of this guide are version 5. The changes reach at most the
-cycles near 39 and 13 backward clock steps inside official sessions (rounds 1 and 2)
-and one orphan completion in round 1. Rerunning the pass also requires rerunning
-every check and table built on it.
+All four national runs used 6 workers on 12 November 2026, with no object errors,
+into `$EA_STAGE/phase20b-sessions/v6-national-r{1,2}-20261112/` and
+`v6-national-2022-r{1,2}-20261112/`. The AC equivalence samples (200 objects per
+year and round, seed 2103) matched the event-level adapter in every object first.
+For 2022 the release now holds the markers and package tables too.
+
+| Year | Round | Objects | Wall time | CPU time | Peak memory | Release |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026 | 1 | 498580 | 2:24:49 | 51146 s | 1.02 GB | 594 MB |
+| 2026 | 2 | 498581 | 4:02:18 | 85786 s | 1.07 GB | 922 MB |
+| 2022 | 1 | 471859 | 2:09:56 | 48202 s | 1.04 GB | 579 MB |
+| 2022 | 2 | 471983 | 3:29:29 | 77107 s | 1.14 GB | 907 MB |
+
+The runs took 5–23% longer than versions 4 and 5. Compared row for row (`EXCEPT ALL`
+both ways) with version 5 for 2026 and version 4 for 2022, objects, segments,
+markers, packages and vocabulary are equal in every year and round. One session
+differs: in a 2026 round-1 section one more biometric cycle ends `unresolved`,
+because an orphan completion now closes the pending request (P2-05). The clock-step
+rule (P2-04) changes no cycle. Every check and table built on the pass was rerun on
+version 6 ([integrity checks](integrity-checks.md#semantic-pass-v6-rerun),
+[section table](section-table.md#national-results)); the only change downstream is
+that section's I5 unresolved count.
 
 ## Contingency counting (SA) logs
 

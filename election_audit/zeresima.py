@@ -1,7 +1,7 @@
 """Phase 20b: the zerésima (zero-vote report) in every published log, against the votes.
 
 Before polls open each urn prints the zerésima, a report that every count is zero. The
-semantic pass (``session-aggregates-v5``) keeps one marker row per zerésima or readiness line,
+semantic pass (``session-aggregates-v6``) keeps one marker row per zerésima or readiness line,
 with its stream, block, session, local clock reading and the number of vote cycles completed
 earlier in the same block. This check reads those markers for the round's official blocks of
 each section's log and applies:
@@ -46,7 +46,7 @@ from election_audit.section_table import distinct_sessions
 from election_audit.types import JSON, Row
 
 VERSION = "integrity-zeresima-v3"  # v3: Z6, the replacement premise
-SEMANTIC_VERSION = "session-aggregates-v5"
+SEMANTIC_VERSION = "session-aggregates-v6"
 RULES = {
     "Z1": "a section with completed votes in its official blocks has a zerésima",
     "Z2": "no vote cycle completed before the first zerésima of its stream (file order)",

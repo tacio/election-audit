@@ -1,6 +1,6 @@
 # Section feature table v5.1 (Phases 22 and 20b)
 
-Document-ID: EA-SECTION-TABLE · Revision: 6 · Language: en
+Document-ID: EA-SECTION-TABLE · Revision: 7 · Language: en
 
 [Português](../pt-BR/section-table.md) · [Implementation index](implementation-index.md)
 
@@ -27,12 +27,13 @@ covariates, device, clock and availability fields, and counts.
 | --- | --- | --- |
 | BWEB, presidential rows, both rounds | Phase 19 `resultados-<year>-boletim-de-urna` | Results, composition (aggregated sections), BU metadata |
 | Voter profile by section, polling places | Phase 19 `eleitorado-<year>` | Covariates, location keys, coordinates |
-| Semantic pass `session-aggregates-v4`, both rounds | `semantic-pass run` | Operational measures, model, software, clock evidence |
+| Semantic pass `session-aggregates-v6`, both rounds | `semantic-pass run` | Operational measures, model, software, clock evidence |
 | Phase 20 releases (2026 only) | `integrity-check` | I1–I9 status, BU-side model and software |
 | Protection exclusions (2026) | `data/national/phase11-protection-2026-10-31/exclusions.json` | The 596 protected sections stay `outside_scope` |
 
 Version 4 of the table (`section-features-v4`, `session-aggregates-v4`) reads the
-semantic pass with session rules `sessions-v2`; its rules are unchanged.
+semantic pass with session rules `sessions-v2`; its rules are unchanged. Version 5.1
+reads `session-aggregates-v6` ([semantic pass](semantic-pass.md#version-6-cross-model-review)).
 `session-aggregates-v3` added nine columns per session and changed nothing else.
 Nationally, in both years and rounds, every column shared with the earlier release
 is equal in every session, segment and object row
@@ -157,12 +158,12 @@ A unit is `comparable` when every principal in both rounds has ready results.
 just section-table build --year 2026 \
   --bweb-root $EA_STAGE/inputs/resultados-2026-boletim-de-urna \
   --electorate-root $EA_STAGE/inputs/eleitorado-2026 \
-  --semantic-r1 $EA_STAGE/phase20b-sessions/v4-national-r1-20261107 \
-  --semantic-r2 $EA_STAGE/phase20b-sessions/v4-national-r2-20261107 \
-  --integrity-r1 "$(cat $EA_STAGE/phase20b-sessions/integrity-v4c-r1.json)" \
-  --integrity-r2 "$(cat $EA_STAGE/phase20b-sessions/integrity-v4c-r2.json)" \
+  --semantic-r1 $EA_STAGE/phase20b-sessions/v6-national-r1-20261112 \
+  --semantic-r2 $EA_STAGE/phase20b-sessions/v6-national-r2-20261112 \
+  --integrity-r1 "$(cat $EA_STAGE/phase20b-sessions/integrity-v7-r1.json)" \
+  --integrity-r2 "$(cat $EA_STAGE/phase20b-sessions/integrity-v7-r2.json)" \
   --exclusions data/national/phase11-protection-2026-10-31/exclusions.json \
-  --output $EA_STAGE/phase20b-sessions/table-2026-v4-20261108c
+  --output $EA_STAGE/phase20b-sessions/table-2026-v51-20261112
 ```
 
 `--integrity-r1`/`--integrity-r2` take a JSON object with the Phase 20 roots of the
@@ -196,11 +197,14 @@ round 2), which confirms that urn clocks run on local time.
 
 ## National results
 
-Version 5.1 (`section-features-v5.1`), built on 11 November 2026 in
-`$EA_STAGE/phase20b-sessions/table-2026-v51-20261111/` and `table-2022-v51-20261111/`,
-on the same inputs as the intermediate version 5 (the semantic passes
-`v4-national-*` of 7 November, integrity sections v6 and logs v5). Version 5 (`table-2026-v5-20261110/`,
-`table-2022-v5-20261110/`) applied the results rule above but read a missing blank or
+Version 5.1 (`section-features-v5.1`), built on 12 November 2026 in
+`$EA_STAGE/phase20b-sessions/table-2026-v51-20261112/` and `table-2022-v51-20261112/`
+on semantic pass v6, integrity sections v6 and logs v6. A first build on 11 November
+(`table-{2026,2022}-v51-20261111/`) read the semantic passes `v4-national-*` of
+7 November and logs v5; its public files (sections, units and ledger) are equal to
+the 12 November build. The one cycle that semantic pass v6 adds sits in a restricted
+measure. Version 5 (10 November, removed on 12 November because it was
+superseded) applied the results rule above but read a missing blank or
 null category as unreconciled. It marked 93278 sections of 2026 and 71143 of 2022
 `unavailable` (`unreconciled`), 9.3% and 7.5% of the sections. In every one of the
 development UFs (AC, AL, DF, ES, PR) the failures were a category with no BWEB row
@@ -217,7 +221,7 @@ operational values stay unread outside the development UFs):
 | Operations and timing `partial` → `unavailable` (`unsupported_software`) | 1 | 9 |
 | `i7_failed_json` | 20 sections | — |
 | Comparable units | 499205 of 499248 | 472024 of 472693 |
-| Build time, peak memory | 3074 s, 3.74 GB | 2811 s, 3.25 GB |
+| Build time, peak memory (12 November) | 3015 s, 3.67 GB | 2459 s, 3.15 GB |
 
 Every other field is equal to version 4. The version 4 table follows for reference.
 

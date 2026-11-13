@@ -1,6 +1,6 @@
 # Passada semântica em fluxo (Fase 21)
 
-Document-ID: EA-SEMANTIC-PASS · Revision: 9 · Language: pt-BR
+Document-ID: EA-SEMANTIC-PASS · Revision: 10 · Language: pt-BR
 
 [English](../en/semantic-pass.md) · [Índice de implementação](implementation-index.md)
 
@@ -198,7 +198,7 @@ linha (`EXCEPT ALL` nos dois sentidos, zero linhas). Os logs do segundo turno tr
 histórico do 1º turno, então o release do 2º turno tem os marcadores dos dois turnos;
 as verificações selecionam blocos pelo contexto.
 
-## Versão 6 (revisão entre modelos, ainda não executada)
+## Versão 6 (revisão entre modelos)
 
 `session-aggregates-v6` muda a máquina de ciclos de voto onde a revisão entre modelos
 de 9 de novembro de 2026 (`xr1-20261109`) achou que ela podia ligar uma conclusão ao
@@ -213,10 +213,29 @@ eleitor errado:
 - o `rules_sha256` da release cobre os modelos de mensagem de 2026 embutidos quando o
   arquivo de regras não os tem (P2-08).
 
-As releases nacionais deste guia são da versão 5. As mudanças alcançam no máximo os
-ciclos perto dos 39 e 13 recuos do relógio dentro de sessões oficiais (1º e 2º
-turnos) e uma conclusão órfã no 1º turno. Rodar o passe de novo exige rodar de novo
-todas as verificações e tabelas construídas sobre ele.
+As quatro execuções nacionais usaram 6 workers em 12 de novembro de 2026, sem erros
+de objeto, em `$EA_STAGE/phase20b-sessions/v6-national-r{1,2}-20261112/` e
+`v6-national-2022-r{1,2}-20261112/`. Antes, as amostras de equivalência do AC (200
+objetos por ano e turno, semente 2103) coincidiram com o adaptador por evento em
+todo objeto. Para 2022 a release agora também traz as tabelas de marcadores e de
+pacotes.
+
+| Ano | Turno | Objetos | Duração | Tempo de CPU | Pico de memória | Release |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026 | 1 | 498580 | 2:24:49 | 51146 s | 1,02 GB | 594 MB |
+| 2026 | 2 | 498581 | 4:02:18 | 85786 s | 1,07 GB | 922 MB |
+| 2022 | 1 | 471859 | 2:09:56 | 48202 s | 1,04 GB | 579 MB |
+| 2022 | 2 | 471983 | 3:29:29 | 77107 s | 1,14 GB | 907 MB |
+
+As execuções levaram 5–23% mais que as das versões 4 e 5. Comparados linha a linha
+(`EXCEPT ALL` nos dois sentidos) com a versão 5 em 2026 e com a versão 4 em 2022,
+objetos, segmentos, marcadores, pacotes e vocabulário são iguais em todo ano e turno.
+Uma sessão difere: numa seção do 1º turno de 2026, mais um ciclo biométrico termina
+`unresolved`, porque uma conclusão órfã agora encerra o pedido pendente (P2-05). A regra de recuo do relógio (P2-04) não muda nenhum ciclo. Toda verificação
+e tabela construída sobre a passada foi refeita sobre a versão 6
+([verificações de integridade](integrity-checks.md#refeitura-sobre-a-passada-semântica-v6),
+[tabela por seção](section-table.md#resultados-nacionais)); a única mudança adiante é
+a contagem de não resolvidos de I5 dessa seção.
 
 ## Logs de apuração de contingência (SA)
 

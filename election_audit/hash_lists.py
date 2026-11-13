@@ -12,7 +12,7 @@ and results, not bytes:
   the name, e.g. ``avmodue2020.vst`` against ``avmodue.vst``) or ``not_listed``;
 - H2: every program package verification ended in ``SUCESSO`` (failures counted per path).
 
-It reads the ``packages`` table of the semantic pass (``session-aggregates-v5``), national
+It reads the ``packages`` table of the semantic pass (``session-aggregates-v6``), national
 counts of (model, application, stage, path, file, result) with the number of logs.
 """
 
@@ -32,6 +32,7 @@ import pyarrow.parquet as pq
 from election_audit.national_migration import atomic, sha
 from election_audit.types import JSON
 
+SEMANTIC_VERSION = "session-aggregates-v6"
 VERSION = "integrity-hash-lists-v1"
 LISTS = {"UE2013": "path1u13", "UE2015": "path1u15", "UE2020": "path1u20", "UE2022": "path1u22"}
 ROW = re.compile(r"<tr[^>]*>(.*?)</tr>", re.S)
@@ -105,8 +106,8 @@ def run_hash_lists(
     for root in semantic_roots:
         release = Path(root).expanduser().absolute() / "release"
         manifest = json.loads((release / "manifest.json").read_text())
-        if manifest["version"] != "session-aggregates-v5":
-            raise ValueError(f"Expected a session-aggregates-v5 release: {release}")
+        if manifest["version"] != SEMANTIC_VERSION:
+            raise ValueError(f"Expected a {SEMANTIC_VERSION} release: {release}")
         if manifest["files"]["packages.parquet"]["sha256"] != sha(release / "packages.parquet"):
             raise ValueError(f"Packages table changed: {release}")
         releases.append((manifest["round"], release))

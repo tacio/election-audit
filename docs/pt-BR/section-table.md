@@ -1,6 +1,6 @@
 # Tabela de atributos por seção v5.1 (Fases 22 e 20b)
 
-Document-ID: EA-SECTION-TABLE · Revision: 6 · Language: pt-BR
+Document-ID: EA-SECTION-TABLE · Revision: 7 · Language: pt-BR
 
 [English](../en/section-table.md) · [Índice de implementação](implementation-index.md)
 
@@ -28,12 +28,13 @@ covariáveis, campos de urna, relógio e disponibilidade, e contagens.
 | --- | --- | --- |
 | BWEB, linhas de presidente, dois turnos | Fase 19 `resultados-<year>-boletim-de-urna` | Resultados, composição (seções agregadas), metadados do BU |
 | Perfil do eleitorado por seção, locais de votação | Fase 19 `eleitorado-<year>` | Covariáveis, chaves de local, coordenadas |
-| Passagem semântica `session-aggregates-v4`, dois turnos | `semantic-pass run` | Medidas operacionais, modelo, software, evidência de relógio |
+| Passagem semântica `session-aggregates-v6`, dois turnos | `semantic-pass run` | Medidas operacionais, modelo, software, evidência de relógio |
 | Releases da Fase 20 (só 2026) | `integrity-check` | Situação I1–I9, modelo e software do lado do BU |
 | Exclusões de proteção (2026) | `data/national/phase11-protection-2026-10-31/exclusions.json` | As 596 seções protegidas ficam `outside_scope` |
 
 A versão 4 da tabela (`section-features-v4`, `session-aggregates-v4`) lê a passada
-semântica com as regras de sessão `sessions-v2`; suas regras não mudam.
+semântica com as regras de sessão `sessions-v2`; suas regras não mudam. A versão 5.1
+lê `session-aggregates-v6` ([passada semântica](semantic-pass.md#versão-6-revisão-entre-modelos)).
 `session-aggregates-v3` acrescentou nove colunas por sessão e não mudou mais nada.
 No país todo, nos dois anos e turnos, toda coluna em comum com a versão anterior é
 igual em cada linha de sessão, segmento e objeto
@@ -161,12 +162,12 @@ unidade e turno.
 just section-table build --year 2026 \
   --bweb-root $EA_STAGE/inputs/resultados-2026-boletim-de-urna \
   --electorate-root $EA_STAGE/inputs/eleitorado-2026 \
-  --semantic-r1 $EA_STAGE/phase20b-sessions/v4-national-r1-20261107 \
-  --semantic-r2 $EA_STAGE/phase20b-sessions/v4-national-r2-20261107 \
-  --integrity-r1 "$(cat $EA_STAGE/phase20b-sessions/integrity-v4c-r1.json)" \
-  --integrity-r2 "$(cat $EA_STAGE/phase20b-sessions/integrity-v4c-r2.json)" \
+  --semantic-r1 $EA_STAGE/phase20b-sessions/v6-national-r1-20261112 \
+  --semantic-r2 $EA_STAGE/phase20b-sessions/v6-national-r2-20261112 \
+  --integrity-r1 "$(cat $EA_STAGE/phase20b-sessions/integrity-v7-r1.json)" \
+  --integrity-r2 "$(cat $EA_STAGE/phase20b-sessions/integrity-v7-r2.json)" \
   --exclusions data/national/phase11-protection-2026-10-31/exclusions.json \
-  --output $EA_STAGE/phase20b-sessions/table-2026-v4-20261108c
+  --output $EA_STAGE/phase20b-sessions/table-2026-v51-20261112
 ```
 
 `--integrity-r1`/`--integrity-r2` recebem um objeto JSON com as raízes da Fase 20 do
@@ -202,11 +203,14 @@ marcam a hora local.
 
 ## Resultados nacionais
 
-Versão 5.1 (`section-features-v5.1`), construída em 11 de novembro de 2026 em
-`$EA_STAGE/phase20b-sessions/table-2026-v51-20261111/` e `table-2022-v51-20261111/`,
-sobre as mesmas entradas da versão intermediária 5 (as passagens semânticas
-`v4-national-*` de 7 de novembro, as seções de integridade v6 e os logs v5). A versão 5
-(`table-2026-v5-20261110/`, `table-2022-v5-20261110/`) aplicou a regra de resultados
+Versão 5.1 (`section-features-v5.1`), construída em 12 de novembro de 2026 em
+`$EA_STAGE/phase20b-sessions/table-2026-v51-20261112/` e `table-2022-v51-20261112/`
+sobre a passada semântica v6, as seções de integridade v6 e os logs v6. Uma primeira
+construção em 11 de novembro (`table-{2026,2022}-v51-20261111/`) leu as passadas
+semânticas `v4-national-*` de 7 de novembro e os logs v5; seus arquivos públicos
+(seções, unidades e ledger) são iguais aos da construção de 12 de novembro. O único
+ciclo que a passada semântica v6 acrescenta fica numa medida restrita. A versão 5
+(10 de novembro, removida em 12 de novembro por estar substituída) aplicou a regra de resultados
 acima, mas leu uma categoria de brancos ou nulos sem linha como não conciliada. Ela
 marcou 93278 seções de 2026 e 71143 de 2022 como `unavailable` (`unreconciled`), 9,3%
 e 7,5% das seções. Em todas as UFs de desenvolvimento (AC, AL, DF, ES, PR) as falhas
@@ -224,7 +228,7 @@ operacionais continuam sem leitura fora das UFs de desenvolvimento):
 | Operações e tempos `partial` → `unavailable` (`unsupported_software`) | 1 | 9 |
 | `i7_failed_json` | 20 seções | — |
 | Unidades comparáveis | 499205 de 499248 | 472024 de 472693 |
-| Tempo de construção, pico de memória | 3074 s, 3,74 GB | 2811 s, 3,25 GB |
+| Tempo de construção, pico de memória (12 de novembro) | 3015 s, 3,67 GB | 2459 s, 3,15 GB |
 
 Todos os outros campos são iguais aos da versão 4. A tabela da versão 4 segue para
 referência.

@@ -1,6 +1,6 @@
 # Índice de implementação
 
-Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 44 · Language: pt-BR
+Document-ID: EA-IMPLEMENTATION-INDEX · Revision: 45 · Language: pt-BR
 
 [English](../en/implementation-index.md)
 
@@ -9,7 +9,7 @@ de fato foi executado, onde estão os resultados e qual é o próximo passo. Os 
 em `docs/pt-BR/` descrevem o comportamento de cada ferramenta. Os handoffs em
 `docs/pt-BR/handoffs/` são registros datados do que cada tarefa fez na época;
 leia-os para detalhes, não para saber o estado. Os planos ficam em `research/`.
-O estado abaixo é de **11 de novembro de 2026**.
+O estado abaixo é de **13 de novembro de 2026**.
 
 ## Estado atual
 
@@ -289,10 +289,14 @@ v5.1 foram refeitas em 11 de novembro de 2026
 ([tabela por seção](section-table.md#resultados-nacionais)): a nova regra de que os
 resultados devem fechar marcou antes 9,3% das seções de 2026 como indisponíveis, porque
 uma categoria de brancos ou nulos sem linha no BWEB era lida como ausente; ela vale zero
-quando as outras contagens somam o comparecimento, e a v5.1 as restaura. Falta: decidir
-se a passagem semântica v6 será refeita nacionalmente (cerca de 6 horas para 2026, mais
-tudo que depende dela; as novas regras tocam cerca de 39 ciclos e 13 retrocessos de
-relógio), depois a rodada 5 verifica as correções. Antes da Fase 23, discutir a
+quando as outras contagens somam o comparecimento, e a v5.1 as restaura. A passada semântica v6 foi
+refeita nacionalmente em 12 de novembro para os dois anos e turnos, com toda
+verificação e tabela construída sobre ela
+([passada semântica](semantic-pass.md#versão-6-revisão-entre-modelos),
+[verificações de integridade](integrity-checks.md#refeitura-sobre-a-passada-semântica-v6)):
+um ciclo do 1º turno de 2026 passa a não resolvido numa seção que já reprovava I5, e
+nenhum veredito nem campo público da tabela muda. Falta: a rodada 5 verifica as
+correções. Antes da Fase 23, discutir a
 consequência da parcela de 8,3% de locais de desenvolvimento. Depois, começar a Fase 23 (modelagem de desenvolvimento, estudo de poder, congelamento do
 protocolo) só com dados de desenvolvimento. A Fase 20b está concluída e suas
 verificações e lacunas estão registradas no protocolo
@@ -408,7 +412,7 @@ com seus hashes, em [entradas baixadas à mão](manual-inputs.md).
 | Arquivos em massa de BU/RDV/log da Fase 19, 2026 e 2022 | `bulk/2026-arqurnatot/`, `bulk/2022-arqurnatot/` no volume de saída |
 | Versões do `integrity-check` da Fase 20 (seções, BWEB, hierarquia, correspondências, logs), execuções de desenvolvimento do AC/ZZ | `$EA_STAGE/phase20/` |
 | Releitura por prefixo do I6 da Fase 20b (versões nacionais v1 e v2, execução de desenvolvimento do AC) | `$EA_STAGE/phase20b-i6/` |
-| Passadas semânticas v4 da Fase 20b (2026, 2022), amostras de equivalência do AC, tabelas por seção v4, logs e scripts das execuções | `$EA_STAGE/phase20b-sessions/` |
+| Passadas semânticas v4 e v6 da Fase 20b (2026, 2022), amostras de equivalência do AC, tabelas por seção v4 e v5.1 (atuais: `*-20261112`), logs e scripts das execuções | `$EA_STAGE/phase20b-sessions/` |
 | Tabelas do DataUrnas-BR usadas na conciliação de I3/I5, congeladas no commit `f5e8005` | `$EA_STAGE/inputs/dataurnas-br-f5e8005-20261108/` |
 | Comparação do Ed521 da Fase 20b; suas referências congeladas | `$EA_STAGE/phase20b-ed521/`; `$EA_STAGE/inputs/ed521-crosscheck-refs-20261108/` |
 | Passadas semânticas v5 e verificações de zerésima da Fase 20b; verificações do GEDAI; verificação das listas de hash; verificações de erros de assinatura; arquivos e verificações JWS | `$EA_STAGE/phase20b-zeresima/`, `phase20b-gedai/`, `phase20b-hash-lists/`, `phase20b-signature-errors/`, `phase20b-jws/` |

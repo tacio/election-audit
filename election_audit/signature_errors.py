@@ -1,6 +1,6 @@
 """Phase 20b: votes recorded after a signature or integrity error in the urn logs (O19).
 
-The semantic pass (``session-aggregates-v5``) keeps one ``signature_error`` marker per log line
+The semantic pass (``session-aggregates-v6``) keeps one ``signature_error`` marker per log line
 whose template names a signature or integrity (``assinatura``, ``integridade``) together with a
 failure (``erro``, ``falha``, ``inconsistente``), with its stream, block, session and the number
 of vote cycles completed earlier in the same block. Two classes of error are told apart by the
@@ -55,7 +55,7 @@ from election_audit.national_migration import atomic, sha
 from election_audit.types import JSON, Row
 
 VERSION = "integrity-signature-errors-v3"  # v3: dynamic-file errors recovered by sync (E3)
-SEMANTIC_VERSION = "session-aggregates-v5"
+SEMANTIC_VERSION = "session-aggregates-v6"
 RULES = {
     "E1": "no vote cycle completed in the same session after a verification error",
     "E2": "at most one vote cycle (the one in flight) completed in the same session after a "

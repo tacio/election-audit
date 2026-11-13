@@ -1,6 +1,6 @@
 # Verificações de integridade de nível 1 (Fase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 13 · Language: pt-BR
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 14 · Language: pt-BR
 
 [English](../en/integrity-checks.md) · [Índice de implementação](implementation-index.md)
 
@@ -1010,6 +1010,34 @@ Segundo lote, executado em 9 e 10 de novembro de 2026:
 | Logs v5 (código v4), 1º / 2º turno | 0:25 / 0:47 | 1 | 2,6 / 3,4 GB | 1,2 / 1,7 MB |
 | GEDAI v5, 1º / 2º turno | 0:52 / 0:51 | 1 | 2,3 GB | 0,9 / 0,8 MB |
 | I8 v3 | 0:29 | 1 | 0,56 GB | 0,2 MB |
+
+### Refeitura sobre a passada semântica v6
+
+Em 12 de novembro de 2026 toda verificação que lê a passada semântica foi refeita
+sobre a [passada semântica v6](semantic-pass.md#versão-6-revisão-entre-modelos), com as
+seções v6: logs (I5–I7) em `$EA_STAGE/phase20/national-r{1,2}-logs-v6-20261112/`, a
+releitura de prefixo de I6 em `$EA_STAGE/phase20b-i6/national-v3-20261112/`,
+zerésima, erros de assinatura e listas de hash em
+`national-r{1,2}-zeresima-v4-20261112/`,
+`national-r{1,2}-signature-errors-v4-20261112/` e `national-v2-20261112/` nas suas
+pastas da Fase 20b. A cadeia é `$EA_STAGE/phase20b-sessions/run-chain-v6.sh`,
+executada sob `systemd-inhibit` para que a máquina não suspendesse. Essas
+verificações, e a tabela por seção, agora só aceitam uma release
+`session-aggregates-v6`.
+
+Comparadas linha a linha com as releases anteriores, todas as saídas são iguais,
+exceto uma linha de logs do 1º turno: rj/60011/0008/0061 tem 3 ciclos não resolvidos
+em vez de 2. Essa seção já reprovava I5 (36 ciclos concluídos no log contra 311
+eleitores no BU), então nenhum veredito muda e os dois turnos mantêm suas contagens
+de divergências.
+
+| Execução | Duração | Workers | Pico de memória | Saída |
+| --- | --- | --- | --- | --- |
+| Logs v6, 1º / 2º turno | 0:28 / 0:50 | 1 | 2,6 / 3,6 GB | 1,2 / 1,6 MB |
+| Prefixo I6 v3 | 1:05:25 | 6 | 3,6 GB | 231 MB |
+| Zerésima v4, 1º / 2º turno | 0:34 / 0:35 | 1 | 2,9 GB | 0,7 / 0,6 MB |
+| Erros de assinatura v4, 1º / 2º turno | 0:19 / 0:25 | 1 | 1,4 GB | 0,7 / 0,6 MB |
+| Listas de hash v2 | 0:00,4 | 1 | 0,1 GB | 23 KB |
 
 
 ## Limites

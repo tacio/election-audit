@@ -2668,14 +2668,14 @@ def integrity_check_main(argv: Argv = None) -> int:
     vec.add_argument("--output", required=True, help="New output directory.")
     zer = sub.add_parser("zeresima", help="Z1-Z5: the zerésima in every log against the votes.")
     zer.add_argument("--sections", required=True, help="Section-pass output root (same round).")
-    zer.add_argument("--semantic", required=True, help="Semantic-pass v5 root (same round).")
+    zer.add_argument("--semantic", required=True, help="Semantic-pass v6 root (same round).")
     zer.add_argument("--output", required=True, help="New output directory.")
     zer.add_argument("--memory-limit", default="2GB", help="DuckDB memory limit.")
     errs = sub.add_parser(
         "signature-errors", help="E1-E2: votes after signature or integrity errors in the logs."
     )
     errs.add_argument("--sections", required=True, help="Section-pass output root (same round).")
-    errs.add_argument("--semantic", required=True, help="Semantic-pass v5 root (same round).")
+    errs.add_argument("--semantic", required=True, help="Semantic-pass v6 root (same round).")
     errs.add_argument("--output", required=True, help="New output directory.")
     errs.add_argument("--memory-limit", default="2GB", help="DuckDB memory limit.")
     gedai = sub.add_parser("gedai", help="G1-G3: BU urn loads against the GEDAI preparation logs.")
@@ -2694,7 +2694,7 @@ def integrity_check_main(argv: Argv = None) -> int:
     )
     lists = sub.add_parser("hash-lists", help="H1-H2: logged package names against TSE hash lists.")
     lists.add_argument(
-        "--semantic", action="append", required=True, help="Semantic-pass v5 root (repeatable)."
+        "--semantic", action="append", required=True, help="Semantic-pass v6 root (repeatable)."
     )
     lists.add_argument("--lists", required=True, help="Directory with path1u13/15/20/22.zip.")
     lists.add_argument("--output", required=True, help="New output directory.")

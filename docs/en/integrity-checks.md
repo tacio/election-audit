@@ -1,6 +1,6 @@
 # Tier 1 integrity checks (Phase 20)
 
-Document-ID: EA-INTEGRITY-CHECKS · Revision: 13 · Language: en
+Document-ID: EA-INTEGRITY-CHECKS · Revision: 14 · Language: en
 
 [Português](../pt-BR/integrity-checks.md) · [Implementation index](implementation-index.md)
 
@@ -972,6 +972,32 @@ Second batch, run on 9 and 10 November 2026:
 | Logs v5 (code v4), round 1 / 2 | 0:25 / 0:47 | 1 | 2.6 / 3.4 GB | 1.2 / 1.7 MB |
 | GEDAI v5, round 1 / 2 | 0:52 / 0:51 | 1 | 2.3 GB | 0.9 / 0.8 MB |
 | I8 v3 | 0:29 | 1 | 0.56 GB | 0.2 MB |
+
+### Semantic pass v6 rerun
+
+On 12 November 2026 every check that reads the semantic pass was rerun on
+[semantic pass v6](semantic-pass.md#version-6-cross-model-review), with sections v6:
+logs (I5–I7) into `$EA_STAGE/phase20/national-r{1,2}-logs-v6-20261112/`, the I6
+prefix re-read into `$EA_STAGE/phase20b-i6/national-v3-20261112/`, zerésima,
+signature errors and hash lists into `national-r{1,2}-zeresima-v4-20261112/`,
+`national-r{1,2}-signature-errors-v4-20261112/` and `national-v2-20261112/` under
+their Phase 20b folders. The chain is
+`$EA_STAGE/phase20b-sessions/run-chain-v6.sh`, run under `systemd-inhibit` so the
+machine could not suspend. These checks, and the section table, now accept only a
+`session-aggregates-v6` release.
+
+Compared row for row with the previous releases, every output is equal except one
+row of logs round 1: rj/60011/0008/0061 has 3 unresolved cycles instead of 2. That
+section already failed I5 (36 completed cycles in the log against 311 BU voters),
+so no verdict changes and both rounds keep their discrepancy counts.
+
+| Run | Wall time | Workers | Peak memory | Output |
+| --- | --- | --- | --- | --- |
+| Logs v6, round 1 / 2 | 0:28 / 0:50 | 1 | 2.6 / 3.6 GB | 1.2 / 1.6 MB |
+| I6 prefix v3 | 1:05:25 | 6 | 3.6 GB | 231 MB |
+| Zerésima v4, round 1 / 2 | 0:34 / 0:35 | 1 | 2.9 GB | 0.7 / 0.6 MB |
+| Signature errors v4, round 1 / 2 | 0:19 / 0:25 | 1 | 1.4 GB | 0.7 / 0.6 MB |
+| Hash lists v2 | 0:00.4 | 1 | 0.1 GB | 23 KB |
 
 
 ## Limits

@@ -4,7 +4,7 @@ Inputs are frozen releases and pinned input roots:
 
 - BWEB (presidential rows only) for results, composition and BU metadata;
 - the voter profile by section and the polling-place table (electorate datasets);
-- the semantic pass (``session-aggregates-v4``) of each round, for operational
+- the semantic pass (``session-aggregates-v6``) of each round, for operational
   measures, device model, software version and clock evidence;
 - for 2026, the Phase 20 integrity releases (I1-I9 status and BU-side device fields).
 
@@ -56,7 +56,7 @@ if TYPE_CHECKING:
 type Connection = duckdb.DuckDBPyConnection
 
 VERSION = "section-features-v5.1"  # v5.1: absent blank/null category is zero when the sums hold; v5: reconciled results, unknown compositions, member coverage, software (xr1)
-SESSIONS_VERSION = "session-aggregates-v4"
+SESSIONS_VERSION = "session-aggregates-v6"
 BWEB_FILE = re.compile(r"files/bweb_([12])t_([A-Z]{2})_\d{12}\.zip")
 PROFILE_FILE = re.compile(r"files/perfil_eleitor_secao_(\d{4})_([A-Z]{2})\.zip")
 PLACES_FILE = re.compile(r"files/eleitorado_local_votacao_(\d{4})\.zip")
@@ -1356,8 +1356,8 @@ def section_table_main(argv: Argv = None) -> int:
     run.add_argument("--year", type=int, required=True, choices=(2026, 2022), help="Election year.")
     run.add_argument("--bweb-root", required=True, help="Verified BWEB input root.")
     run.add_argument("--electorate-root", required=True, help="Voter profile and polling places.")
-    run.add_argument("--semantic-r1", required=True, help="Round-1 semantic pass (v4) root.")
-    run.add_argument("--semantic-r2", required=True, help="Round-2 semantic pass (v4) root.")
+    run.add_argument("--semantic-r1", required=True, help="Round-1 semantic pass (v6) root.")
+    run.add_argument("--semantic-r2", required=True, help="Round-2 semantic pass (v6) root.")
     run.add_argument("--integrity-r1", help="Round-1 Phase 20 roots as JSON (2026).")
     run.add_argument("--integrity-r2", help="Round-2 Phase 20 roots as JSON (2026).")
     run.add_argument("--exclusions", help="Protected/stress exclusions JSON (2026).")

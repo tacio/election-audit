@@ -82,7 +82,7 @@ class HashListTests(unittest.TestCase):
         table = pa.Table.from_pylist([dict(zip(names, r, strict=True)) for r in rows])
         pq.write_table(table, release / "packages.parquet")
         manifest = {
-            "version": "session-aggregates-v5",
+            "version": "session-aggregates-v6",
             "round": 1,
             "files": {"packages.parquet": {"sha256": hl.sha(release / "packages.parquet")}},
         }
